@@ -1,0 +1,6 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+images:
+  - name: 633339324534.dkr.ecr.us-east-1.amazonaws.com/aws-fsx-openzfs-csi-driver
+    newName: hughliu/ecr/us-east-1.amazonaws.com/aws-fsx-openzfs-csi-driver
+    newTag: v0.0.3
