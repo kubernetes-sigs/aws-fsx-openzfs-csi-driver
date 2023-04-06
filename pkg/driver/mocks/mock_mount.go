@@ -8,7 +8,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	mount "k8s.io/mount-utils"
+	mount_utils "k8s.io/mount-utils"
 )
 
 // MockMounter is a mock of Mounter interface.
@@ -79,10 +79,10 @@ func (mr *MockMounterMockRecorder) IsLikelyNotMountPoint(arg0 interface{}) *gomo
 }
 
 // List mocks base method.
-func (m *MockMounter) List() ([]mount.MountPoint, error) {
+func (m *MockMounter) List() ([]mount_utils.MountPoint, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "List")
-	ret0, _ := ret[0].([]mount.MountPoint)
+	ret0, _ := ret[0].([]mount_utils.MountPoint)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -147,6 +147,20 @@ func (m *MockMounter) MountSensitiveWithoutSystemd(arg0, arg1, arg2 string, arg3
 func (mr *MockMounterMockRecorder) MountSensitiveWithoutSystemd(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MountSensitiveWithoutSystemd", reflect.TypeOf((*MockMounter)(nil).MountSensitiveWithoutSystemd), arg0, arg1, arg2, arg3, arg4)
+}
+
+// MountSensitiveWithoutSystemdWithMountFlags mocks base method.
+func (m *MockMounter) MountSensitiveWithoutSystemdWithMountFlags(arg0, arg1, arg2 string, arg3, arg4, arg5 []string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MountSensitiveWithoutSystemdWithMountFlags", arg0, arg1, arg2, arg3, arg4, arg5)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// MountSensitiveWithoutSystemdWithMountFlags indicates an expected call of MountSensitiveWithoutSystemdWithMountFlags.
+func (mr *MockMounterMockRecorder) MountSensitiveWithoutSystemdWithMountFlags(arg0, arg1, arg2, arg3, arg4, arg5 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MountSensitiveWithoutSystemdWithMountFlags", reflect.TypeOf((*MockMounter)(nil).MountSensitiveWithoutSystemdWithMountFlags), arg0, arg1, arg2, arg3, arg4, arg5)
 }
 
 // PathExists mocks base method.

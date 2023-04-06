@@ -1,5 +1,4 @@
 ---
-
 kind: DaemonSet
 apiVersion: apps/v1
 metadata:
@@ -33,7 +32,8 @@ spec:
         - name: fsx-openzfs-plugin
           securityContext:
             privileged: true
-          image: 633339324534.dkr.ecr.us-east-1.amazonaws.com/aws-fsx-openzfs-csi-driver:v0.0.3
+          image: 633339324534.dkr.ecr.us-east-1.amazonaws.com/aws-fsx-openzfs-csi-driver:v0.0.22
+          imagePullPolicy: IfNotPresent
           args:
             - --endpoint=$(CSI_ENDPOINT)
             - --logtostderr
