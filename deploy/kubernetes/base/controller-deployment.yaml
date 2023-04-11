@@ -1,0 +1,107 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fsx-openzfs-csi-controller
+  labels:
+    app.kubernetes.io/name: aws-fsx-openzfs-csi-driver
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fsx-openzfs-csi-controller
+      app.kubernetes.io/name: aws-fsx-openzfs-csi-driver
+  template:
+    metadata:
+      labels:
+        app: fsx-openzfs-csi-controller
+        app.kubernetes.io/name: aws-fsx-openzfs-csi-driver
+    spec:
+      nodeSelector:
+        kubernetes.io/os: linux
+      hostNetwork: true
+      serviceAccountName: fsx-openzfs-csi-controller-sa
+      priorityClassName: system-cluster-critical
+      tolerations:
+        - key: CriticalAddonsOnly
+          operator: Exists
+        - operator: Exists
+          effect: NoExecute
+          tolerationSeconds: 300
+      containers:
+        - name: fsx-openzfs-plugin
+          image: 633339324534.dkr.ecr.us-east-1.amazonaws.com/aws-fsx-openzfs-csi-driver:v0.0.22
+          imagePullPolicy: IfNotPresent
+          args :
+            - --endpoint=$(CSI_ENDPOINT)
+            - --v=5
+          env:
+            - name: CSI_ENDPOINT
+              value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy/
+          ports:
+            - name: healthz
+              containerPort: 9910
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: healthz
+            initialDelaySeconds: 10
+            timeoutSeconds: 3
+            periodSeconds: 2
+            failureThreshold: 5
+        - name: csi-provisioner
+          image: public.ecr.aws/eks-distro/kubernetes-csi/external-provisioner:v3.4.0-eks-1-23-13
+          imagePullPolicy: IfNotPresent
+          args:
+            - --csi-address=$(ADDRESS)
+            - --timeout=5m
+            - --extra-create-metadata
+            - --leader-election=true
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy/
+        - name: csi-snapshotter
+          image: public.ecr.aws/eks-distro/kubernetes-csi/external-snapshotter/csi-snapshotter:v6.2.1-eks-1-26-latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - --csi-address=$(ADDRESS)
+            - --leader-election=true
+            - --timeout=5m
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy/
+        - name: csi-resizer
+          image: public.ecr.aws/eks-distro/kubernetes-csi/external-resizer:v1.7.0-eks-1-23-13
+          imagePullPolicy: IfNotPresent
+          args:
+            - --csi-address=$(ADDRESS)
+            - --leader-election=true
+            - --timeout=5m
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy/
+        - name: liveness-probe
+          image: public.ecr.aws/eks-distro/kubernetes-csi/livenessprobe:v2.9.0-eks-1-23-13
+          imagePullPolicy: IfNotPresent
+          args:
+            - --csi-address=/csi/csi.sock
+            - --health-port=9910
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+      volumes:
+        - name: socket-dir
+          emptyDir: {}

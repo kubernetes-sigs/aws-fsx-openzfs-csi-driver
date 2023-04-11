@@ -9,22 +9,22 @@ The [Amazon FSx for OpenZFS](https://aws.amazon.com/fsx/openzfs/) Container Stor
 
 This driver is in alpha stage. Basic volume operations that are functional include NodePublishVolume/NodeUnpublishVolume.
 
-### CSI Specification Compability Matrix
+### CSI Specification Compatibility Matrix
 | AWS FSx for OpenZFS CSI Driver \ CSI Version | v1.x.x |
 |----------------------------------------------|--------|
 | master branch                                | yes    |
 
-### Kubernetes Version Compability Matrix
+### Kubernetes Version Compatibility Matrix
 | AWS FSx for OpenZFS CSI Driver \ Kubernetes Version | v1.17+ |
 |-----------------------------------------------------|--------|
 | master branch                                       | yes    |
 
 ## Features
 * Static Provisioning - An FSx for OpenZFS file system or volume needs to be created manually first, then it could be mounted inside container as a volume using the driver.
-* Mount Options - NFS mount options can be specified in storage class to define how the volume should be mounted.
+* Mount Options - NFS mount options can be specified in a storage class to define how the volume should be mounted.
 
 ## CSI Interfaces
-* Controller Service:
+* Controller Service: ControllerGetCapabilities, CreateSnapshot, DeleteSnapshot
 * Node Service: NodePublishVolume, NodeUnpublishVolume, NodeGetCapabilities, NodeGetInfo, NodeGetId
 * Identity Service: GetPluginInfo, GetPluginCapabilities, Probe
 

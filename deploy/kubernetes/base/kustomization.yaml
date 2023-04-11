@@ -5,3 +5,5 @@ resources:
   - csidriver.yaml
   - node-daemonset.yaml
   - node-serviceaccount.yaml
+  - controller-deployment.yaml
+  - controller-serviceaccount.yaml

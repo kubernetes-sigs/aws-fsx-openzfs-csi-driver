@@ -5,6 +5,7 @@
 package mocks
 
 import (
+	context "context"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
@@ -34,16 +35,45 @@ func (m *MockCloud) EXPECT() *MockCloudMockRecorder {
 	return m.recorder
 }
 
-// GetMetadata mocks base method.
-func (m *MockCloud) GetMetadata() cloud.MetadataService {
+// CreateSnapshot mocks base method.
+func (m *MockCloud) CreateSnapshot(arg0 context.Context, arg1 cloud.SnapshotOptions) (*cloud.Snapshot, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetMetadata")
-	ret0, _ := ret[0].(cloud.MetadataService)
+	ret := m.ctrl.Call(m, "CreateSnapshot", arg0, arg1)
+	ret0, _ := ret[0].(*cloud.Snapshot)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateSnapshot indicates an expected call of CreateSnapshot.
+func (mr *MockCloudMockRecorder) CreateSnapshot(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSnapshot", reflect.TypeOf((*MockCloud)(nil).CreateSnapshot), arg0, arg1)
+}
+
+// DeleteSnapshot mocks base method.
+func (m *MockCloud) DeleteSnapshot(arg0 context.Context, arg1 string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteSnapshot", arg0, arg1)
+	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// GetMetadata indicates an expected call of GetMetadata.
-func (mr *MockCloudMockRecorder) GetMetadata() *gomock.Call {
+// DeleteSnapshot indicates an expected call of DeleteSnapshot.
+func (mr *MockCloudMockRecorder) DeleteSnapshot(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMetadata", reflect.TypeOf((*MockCloud)(nil).GetMetadata))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSnapshot", reflect.TypeOf((*MockCloud)(nil).DeleteSnapshot), arg0, arg1)
+}
+
+// WaitForSnapshotAvailable mocks base method.
+func (m *MockCloud) WaitForSnapshotAvailable(arg0 context.Context, arg1 string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WaitForSnapshotAvailable", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// WaitForSnapshotAvailable indicates an expected call of WaitForSnapshotAvailable.
+func (mr *MockCloudMockRecorder) WaitForSnapshotAvailable(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForSnapshotAvailable", reflect.TypeOf((*MockCloud)(nil).WaitForSnapshotAvailable), arg0, arg1)
 }
