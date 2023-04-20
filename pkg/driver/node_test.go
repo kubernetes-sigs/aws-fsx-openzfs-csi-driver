@@ -28,14 +28,14 @@ import (
 func TestNodePublishVolume(t *testing.T) {
 
 	var (
-		endpoint        = "endpoint"
-		nodeID          = "nodeID"
-		fsVolumeId      = "fs-0a2d0632b5ff567e9"
-		volumeId        = "fsvol-0efb292807cc770ff"
-		dnsname         = "fs-0a2d0632b5ff567e9.fsx.us-west-2.amazonaws.com"
-		volumemountname = "/fsx/testVol"
-		targetPath      = "/target/path"
-		stdVolCap       = &csi.VolumeCapability{
+		endpoint   = "endpoint"
+		nodeID     = "nodeID"
+		fsVolumeId = "fs-0a2d0632b5ff567e9"
+		volumeId   = "fsvol-0efb292807cc770ff"
+		dnsName    = "fs-0a2d0632b5ff567e9.fsx.us-west-2.amazonaws.com"
+		volumePath = "/fsx/testVol"
+		targetPath = "/target/path"
+		stdVolCap  = &csi.VolumeCapability{
 			AccessType: &csi.VolumeCapability_Mount{
 				Mount: &csi.VolumeCapability_MountVolume{},
 			},
@@ -59,14 +59,14 @@ func TestNodePublishVolume(t *testing.T) {
 					nodeID:   nodeID,
 					mounter:  mockMounter,
 				}
-				source := fmt.Sprintf("%s:%s", dnsname, rootVolumePath)
+				source := fmt.Sprintf("%s:%s", dnsName, rootVolumePath)
 
 				ctx := context.Background()
 				req := &csi.NodePublishVolumeRequest{
 					VolumeId: fsVolumeId,
 					VolumeContext: map[string]string{
-						"dnsname":    dnsname,
-						"mountname":  rootVolumePath,
+						"dnsName":    dnsName,
+						"volumePath": rootVolumePath,
 						"volumeType": fsVolumeType,
 					},
 					VolumeCapability: stdVolCap,
@@ -94,14 +94,14 @@ func TestNodePublishVolume(t *testing.T) {
 					nodeID:   nodeID,
 					mounter:  mockMounter,
 				}
-				source := fmt.Sprintf("%s:%s", dnsname, volumemountname)
+				source := fmt.Sprintf("%s:%s", dnsName, volumePath)
 
 				ctx := context.Background()
 				req := &csi.NodePublishVolumeRequest{
 					VolumeId: volumeId,
 					VolumeContext: map[string]string{
-						"dnsname":    dnsname,
-						"mountname":  volumemountname,
+						"dnsName":    dnsName,
+						"volumePath": volumePath,
 						"volumeType": volVolumeType,
 					},
 					VolumeCapability: stdVolCap,
@@ -120,7 +120,7 @@ func TestNodePublishVolume(t *testing.T) {
 			},
 		},
 		{
-			name: "success: missing mountname for file system mount in static provisioning, default 'fsx' used",
+			name: "success: missing volumePath for file system mount in static provisioning, default 'fsx' used",
 			testFunc: func(t *testing.T) {
 				mockCtrl := gomock.NewController(t)
 				mockMounter := mocks.NewMockMounter(mockCtrl)
@@ -129,13 +129,13 @@ func TestNodePublishVolume(t *testing.T) {
 					nodeID:   nodeID,
 					mounter:  mockMounter,
 				}
-				source := fmt.Sprintf("%s:%s", dnsname, rootVolumePath)
+				source := fmt.Sprintf("%s:%s", dnsName, rootVolumePath)
 
 				ctx := context.Background()
 				req := &csi.NodePublishVolumeRequest{
 					VolumeId: fsVolumeId,
 					VolumeContext: map[string]string{
-						"dnsname":    dnsname,
+						"dnsName":    dnsName,
 						"volumeType": fsVolumeType,
 					},
 					VolumeCapability: stdVolCap,
@@ -164,14 +164,14 @@ func TestNodePublishVolume(t *testing.T) {
 					mounter:  mockMounter,
 				}
 
-				source := fmt.Sprintf("%s:%s", dnsname, rootVolumePath)
+				source := fmt.Sprintf("%s:%s", dnsName, rootVolumePath)
 
 				ctx := context.Background()
 				req := &csi.NodePublishVolumeRequest{
 					VolumeId: fsVolumeId,
 					VolumeContext: map[string]string{
-						"dnsname":    dnsname,
-						"mountname":  rootVolumePath,
+						"dnsName":    dnsName,
+						"volumePath": rootVolumePath,
 						"volumeType": fsVolumeType,
 					},
 					VolumeCapability: stdVolCap,
@@ -201,14 +201,14 @@ func TestNodePublishVolume(t *testing.T) {
 					mounter:  mockMounter,
 				}
 
-				source := fmt.Sprintf("%s:%s", dnsname, rootVolumePath)
+				source := fmt.Sprintf("%s:%s", dnsName, rootVolumePath)
 
 				ctx := context.Background()
 				req := &csi.NodePublishVolumeRequest{
 					VolumeId: "volumeId",
 					VolumeContext: map[string]string{
-						"dnsname":    dnsname,
-						"mountname":  rootVolumePath,
+						"dnsName":    dnsName,
+						"volumePath": rootVolumePath,
 						"volumeType": fsVolumeType,
 					},
 					VolumeCapability: &csi.VolumeCapability{
@@ -249,8 +249,8 @@ func TestNodePublishVolume(t *testing.T) {
 				ctx := context.Background()
 				req := &csi.NodePublishVolumeRequest{
 					VolumeContext: map[string]string{
-						"dnsname":    dnsname,
-						"mountname":  rootVolumePath,
+						"dnsName":    dnsName,
+						"volumePath": rootVolumePath,
 						"volumeType": fsVolumeType,
 					},
 					VolumeCapability: stdVolCap,
@@ -280,8 +280,8 @@ func TestNodePublishVolume(t *testing.T) {
 				req := &csi.NodePublishVolumeRequest{
 					VolumeId: "volumeId",
 					VolumeContext: map[string]string{
-						"dnsname":    dnsname,
-						"mountname":  rootVolumePath,
+						"dnsName":    dnsName,
+						"volumePath": rootVolumePath,
 						"volumeType": fsVolumeType,
 					},
 					TargetPath: targetPath,
@@ -310,8 +310,8 @@ func TestNodePublishVolume(t *testing.T) {
 				req := &csi.NodePublishVolumeRequest{
 					VolumeId: fsVolumeId,
 					VolumeContext: map[string]string{
-						"dnsname":    dnsname,
-						"mountname":  rootVolumePath,
+						"dnsName":    dnsName,
+						"volumePath": rootVolumePath,
 						"volumeType": fsVolumeType,
 					},
 					VolumeCapability: &csi.VolumeCapability{
@@ -348,7 +348,7 @@ func TestNodePublishVolume(t *testing.T) {
 				req := &csi.NodePublishVolumeRequest{
 					VolumeId: fsVolumeId,
 					VolumeContext: map[string]string{
-						"mountname":  rootVolumePath,
+						"volumePath": rootVolumePath,
 						"volumeType": fsVolumeType,
 					},
 					VolumeCapability: stdVolCap,
@@ -378,8 +378,8 @@ func TestNodePublishVolume(t *testing.T) {
 				req := &csi.NodePublishVolumeRequest{
 					VolumeId: fsVolumeId,
 					VolumeContext: map[string]string{
-						"dnsname":    dnsname,
-						"mountname":  rootVolumePath,
+						"dnsName":    dnsName,
+						"volumePath": rootVolumePath,
 						"volumeType": "voolume",
 					},
 					VolumeCapability: stdVolCap,
@@ -395,7 +395,7 @@ func TestNodePublishVolume(t *testing.T) {
 			},
 		},
 		{
-			name: "fail: missing mountname when mounting volume",
+			name: "fail: missing volumePath when mounting volume",
 			testFunc: func(t *testing.T) {
 				mockCtrl := gomock.NewController(t)
 				mockMounter := mocks.NewMockMounter(mockCtrl)
@@ -409,7 +409,7 @@ func TestNodePublishVolume(t *testing.T) {
 				req := &csi.NodePublishVolumeRequest{
 					VolumeId: volumeId,
 					VolumeContext: map[string]string{
-						"dnsname":    dnsname,
+						"dnsName":    dnsName,
 						"volumeType": volVolumeType,
 					},
 					VolumeCapability: stdVolCap,
@@ -425,7 +425,7 @@ func TestNodePublishVolume(t *testing.T) {
 			},
 		},
 		{
-			name: "fail: invalid mountname when mounting a file system",
+			name: "fail: invalid volumePath when mounting a file system",
 			testFunc: func(t *testing.T) {
 				mockCtrl := gomock.NewController(t)
 				mockMounter := mocks.NewMockMounter(mockCtrl)
@@ -439,8 +439,8 @@ func TestNodePublishVolume(t *testing.T) {
 				req := &csi.NodePublishVolumeRequest{
 					VolumeId: fsVolumeId,
 					VolumeContext: map[string]string{
-						"dnsname":    dnsname,
-						"mountname":  volumemountname,
+						"dnsName":    dnsName,
+						"volumePath": volumePath,
 						"volumeType": fsVolumeType,
 					},
 					VolumeCapability: stdVolCap,
@@ -470,8 +470,8 @@ func TestNodePublishVolume(t *testing.T) {
 				req := &csi.NodePublishVolumeRequest{
 					VolumeId: fsVolumeId,
 					VolumeContext: map[string]string{
-						"dnsname":    dnsname,
-						"mountname":  rootVolumePath,
+						"dnsName":    dnsName,
+						"volumePath": rootVolumePath,
 						"volumeType": fsVolumeType,
 					},
 					VolumeCapability: stdVolCap,
@@ -500,8 +500,8 @@ func TestNodePublishVolume(t *testing.T) {
 				req := &csi.NodePublishVolumeRequest{
 					VolumeId: fsVolumeId,
 					VolumeContext: map[string]string{
-						"dnsname":    dnsname,
-						"mountname":  rootVolumePath,
+						"dnsName":    dnsName,
+						"volumePath": rootVolumePath,
 						"volumeType": fsVolumeType,
 					},
 					VolumeCapability: stdVolCap,
@@ -534,15 +534,15 @@ func TestNodePublishVolume(t *testing.T) {
 				req := &csi.NodePublishVolumeRequest{
 					VolumeId: fsVolumeId,
 					VolumeContext: map[string]string{
-						"dnsname":    dnsname,
-						"mountname":  rootVolumePath,
+						"dnsName":    dnsName,
+						"volumePath": rootVolumePath,
 						"volumeType": fsVolumeType,
 					},
 					VolumeCapability: stdVolCap,
 					TargetPath:       targetPath,
 				}
 
-				source := fmt.Sprintf("%s:%s", dnsname, rootVolumePath)
+				source := fmt.Sprintf("%s:%s", dnsName, rootVolumePath)
 				err := fmt.Errorf("failed to Mount")
 				mockMounter.EXPECT().MakeDir(gomock.Eq(targetPath)).Return(nil)
 				mockMounter.EXPECT().IsLikelyNotMountPoint(gomock.Eq(targetPath)).Return(true, nil)

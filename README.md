@@ -20,11 +20,12 @@ This driver is in alpha stage. Basic volume operations that are functional inclu
 | master branch                                       | yes    |
 
 ## Features
+* Dynamic Provisioning - Automatically create FSx OpenZFS file systems and volumes based on configurations. These can then be mounted to a given pod.
 * Static Provisioning - An FSx for OpenZFS file system or volume needs to be created manually first, then it could be mounted inside container as a volume using the driver.
 * Mount Options - NFS mount options can be specified in a storage class to define how the volume should be mounted.
 
 ## CSI Interfaces
-* Controller Service: ControllerGetCapabilities, CreateSnapshot, DeleteSnapshot
+* Controller Service: ControllerGetCapabilities, CreateVolume, DeleteVolume, CreateSnapshot, DeleteSnapshot
 * Node Service: NodePublishVolume, NodeUnpublishVolume, NodeGetCapabilities, NodeGetInfo, NodeGetId
 * Identity Service: GetPluginInfo, GetPluginCapabilities, Probe
 

@@ -77,6 +77,7 @@ sub-image-%:
 .PHONY: test
 test:
 	go test -v -race ./pkg/...
+	go test -v ./tests/sanity/...
 
 .PHONY: clean
 clean:
