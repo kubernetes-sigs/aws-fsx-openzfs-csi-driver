@@ -61,6 +61,10 @@ var _ = Describe("AWS FSx for OpenZFS CSI Driver", func() {
 		TargetPath:     mountPath,
 		StagingPath:    stagePath,
 		TestVolumeSize: 2000 * util.GiB,
+		TestVolumeParameters: map[string]string{
+			"volumeType":      "filesystem",
+			"skipFinalBackup": "true",
+		},
 	}
 	sanity.GinkgoTest(config)
 })

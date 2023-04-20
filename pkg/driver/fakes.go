@@ -18,6 +18,7 @@ package driver
 import (
 	"k8s.io/mount-utils"
 	"sigs.k8s.io/aws-fsx-openzfs-csi-driver/pkg/cloud"
+	"sigs.k8s.io/aws-fsx-openzfs-csi-driver/pkg/driver/internal"
 )
 
 func NewFakeMounter() Mounter {
@@ -35,6 +36,7 @@ func NewFakeDriver(endpoint string) *Driver {
 		endpoint: endpoint,
 		nodeID:   cloud.GetMetadata().GetInstanceID(),
 		cloud:    cloud,
+		inFlight: internal.NewInFlight(),
 		mounter:  NewFakeMounter(),
 	}
 }

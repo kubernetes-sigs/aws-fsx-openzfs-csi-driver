@@ -28,10 +28,7 @@ import (
 )
 
 var (
-	nodeCaps       = []csi.NodeServiceCapability_RPC_Type{}
-	fsVolumeType   = "filesystem"
-	volVolumeType  = "volume"
-	rootVolumePath = "fsx"
+	nodeCaps = []csi.NodeServiceCapability_RPC_Type{}
 )
 
 func (d *Driver) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
@@ -60,35 +57,35 @@ func (d *Driver) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolu
 	}
 
 	context := req.GetVolumeContext()
-	dnsname := context[volumeParamsDnsName]
-	mountname := context[volumeParamsMountName]
-	volumeType := strings.ToLower(context[volumeParamsVolumeType])
+	dnsName := context[volumeContextDnsName]
+	volumePath := context[volumeContextVolumePath]
+	volumeType := context[volumeContextVolumeType]
 
-	if len(dnsname) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume: dnsname is not provided")
+	if len(dnsName) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume: dnsName is not provided")
 	}
 
 	if volumeType != fsVolumeType && volumeType != volVolumeType {
 		return nil, status.Errorf(codes.InvalidArgument, "NodePublishVolume: volumeType %q is invalid", volumeType)
 	}
 
-	// If the mountname is not provided and we are attempting to "mount" a file system, then we should mount the
-	// root volume of the file system. On the other hand, if the mountname is not provided and we are attempting
+	// If the volumePath is not provided and we are attempting to "mount" a file system, then we should mount the
+	// root volume of the file system. On the other hand, if the volumePath is not provided and we are attempting
 	// to mount an OpenZFS volume, throw an error.
-	if len(mountname) == 0 {
+	if len(volumePath) == 0 {
 		if volumeType == fsVolumeType {
-			mountname = rootVolumePath
+			volumePath = rootVolumePath
 		} else {
-			return nil, status.Error(codes.InvalidArgument, "NodePublishVolume: mountname must be provided when mounting an OpenZFS volume")
+			return nil, status.Error(codes.InvalidArgument, "NodePublishVolume: volumePath must be provided when mounting an OpenZFS volume")
 		}
 	}
 
 	// If we are attempting to "mount" a file system, the mount path must be equal to the root volume path.
-	if volumeType == fsVolumeType && mountname != rootVolumePath {
-		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume: mountname must match the root volume path when mounting an OpenZFS file system")
+	if volumeType == fsVolumeType && volumePath != rootVolumePath {
+		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume: volumePath must match the root volume path when mounting an OpenZFS file system")
 	}
 
-	source := fmt.Sprintf("%s:%s", dnsname, mountname)
+	source := fmt.Sprintf("%s:%s", dnsName, volumePath)
 
 	targetPath := req.GetTargetPath()
 	if len(targetPath) == 0 {

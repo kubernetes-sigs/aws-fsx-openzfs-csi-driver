@@ -17,6 +17,7 @@ package cloud
 
 import (
 	"context"
+	"errors"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/fsx"
 	"github.com/golang/mock/gomock"
@@ -25,6 +26,1018 @@ import (
 	"testing"
 	"time"
 )
+
+func TestCreateFileSystem(t *testing.T) {
+	var (
+		kmsKeyId                      = aws.String("1234abcd-12ab-34cd-56ef-1234567890ab")
+		automaticBackupRetentionDays  = aws.Int64(1)
+		copyTagsToBackups             = aws.Bool(false)
+		copyTagsToVolumes             = aws.Bool(false)
+		dailyAutomaticBackupStartTime = aws.String("00:00")
+		deploymentType                = aws.String("SINGLE_AZ_1")
+		diskIopsConfiguration         = aws.String("Mode=USER_PROVISIONED,Iops=300")
+		rootVolumeConfiguration       = aws.String("CopyTagsToSnapshots=false,DataCompressionType=NONE,NfsExports=[{ClientConfigurations=[{Clients=*,Options=[crossmnt]}]}],ReadOnly=false,RecordSizeKiB=128,UserAndGroupQuotas=[{Id=1,StorageCapacityQuotaGiB=10,Type=USER}]")
+		throughputCapacity            = aws.Int64(64)
+		weeklyMaintenanceStartTime    = aws.String("7:09:00")
+		securityGroupIds              = []string{"sg-068000ccf82dfba88"}
+		storageCapacity               = aws.Int64(64)
+		subnetIds                     = []string{"subnet-0eabfaa81fb22bcaf"}
+		tags                          = aws.String("Tag1=Value1,Tag2=Value2")
+		fileSystemId                  = aws.String("fs-1234")
+		dnsName                       = aws.String("https://aws.com")
+		volumeName                    = "volumeName"
+		skipFinalBackup               = aws.Bool(true)
+	)
+	testCases := []struct {
+		name     string
+		testFunc func(t *testing.T)
+	}{
+		{
+			name: "success: all variables",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				req := FileSystemOptions{
+					KmsKeyId:                      kmsKeyId,
+					AutomaticBackupRetentionDays:  automaticBackupRetentionDays,
+					CopyTagsToBackups:             copyTagsToBackups,
+					CopyTagsToVolumes:             copyTagsToVolumes,
+					DailyAutomaticBackupStartTime: dailyAutomaticBackupStartTime,
+					DeploymentType:                deploymentType,
+					DiskIopsConfiguration:         diskIopsConfiguration,
+					RootVolumeConfiguration:       rootVolumeConfiguration,
+					ThroughputCapacity:            throughputCapacity,
+					WeeklyMaintenanceStartTime:    weeklyMaintenanceStartTime,
+					SecurityGroupIds:              securityGroupIds,
+					StorageCapacity:               storageCapacity,
+					SubnetIds:                     subnetIds,
+					Tags:                          tags,
+					SkipFinalBackup:               skipFinalBackup,
+				}
+				output := &fsx.CreateFileSystemOutput{
+					FileSystem: &fsx.FileSystem{
+						DNSName:         dnsName,
+						FileSystemId:    fileSystemId,
+						StorageCapacity: storageCapacity,
+					},
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().CreateFileSystemWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
+				resp, err := c.CreateFileSystem(ctx, volumeName, req)
+				if err != nil {
+					t.Fatalf("CreateFileSystem is failed: %v", err)
+				}
+
+				if resp == nil {
+					t.Fatal("resp is nil")
+				}
+
+				if resp.DnsName != aws.StringValue(dnsName) {
+					t.Fatalf("DnsName mismatches. actual: %v expected: %v", resp.DnsName, dnsName)
+				}
+
+				if resp.FileSystemId != aws.StringValue(fileSystemId) {
+					t.Fatalf("FileSystemId mismatches. actual: %v expected: %v", resp.FileSystemId, fileSystemId)
+				}
+
+				if resp.StorageCapacity != aws.Int64Value(storageCapacity) {
+					t.Fatalf("StorageCapacity mismatches. actual: %v expected: %v", resp.StorageCapacity, storageCapacity)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "success: required variables",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				req := FileSystemOptions{
+					DeploymentType:     deploymentType,
+					ThroughputCapacity: throughputCapacity,
+					StorageCapacity:    storageCapacity,
+					SubnetIds:          subnetIds,
+				}
+				output := &fsx.CreateFileSystemOutput{
+					FileSystem: &fsx.FileSystem{
+						DNSName:         dnsName,
+						FileSystemId:    fileSystemId,
+						StorageCapacity: storageCapacity,
+					},
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().CreateFileSystemWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
+				resp, err := c.CreateFileSystem(ctx, volumeName, req)
+				if err != nil {
+					t.Fatalf("CreateFileSystem is failed: %v", err)
+				}
+
+				if resp == nil {
+					t.Fatal("resp is nil")
+				}
+
+				if resp.DnsName != aws.StringValue(dnsName) {
+					t.Fatalf("DnsName mismatches. actual: %v expected: %v", resp.DnsName, dnsName)
+				}
+
+				if resp.FileSystemId != aws.StringValue(fileSystemId) {
+					t.Fatalf("FileSystemId mismatches. actual: %v expected: %v", resp.FileSystemId, fileSystemId)
+				}
+
+				if resp.StorageCapacity != aws.Int64Value(storageCapacity) {
+					t.Fatalf("StorageCapacity mismatches. actual: %v expected: %v", resp.StorageCapacity, storageCapacity)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: bad diskIops",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				badDiskIops := "Mode=USER_PROVISIONED,Iops=VALUE1"
+				req := FileSystemOptions{
+					DeploymentType:        deploymentType,
+					ThroughputCapacity:    throughputCapacity,
+					StorageCapacity:       storageCapacity,
+					SubnetIds:             subnetIds,
+					DiskIopsConfiguration: aws.String(badDiskIops),
+				}
+
+				ctx := context.Background()
+				_, err := c.CreateFileSystem(ctx, volumeName, req)
+
+				if err == nil {
+					t.Fatal("CreateFileSystem is not failed")
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: bad rootVolumeConfig",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				badRootVolumeConfig := "ReadOnly=INVALID"
+				req := FileSystemOptions{
+					DeploymentType:          deploymentType,
+					ThroughputCapacity:      throughputCapacity,
+					StorageCapacity:         storageCapacity,
+					SubnetIds:               subnetIds,
+					RootVolumeConfiguration: aws.String(badRootVolumeConfig),
+				}
+
+				ctx := context.Background()
+				_, err := c.CreateFileSystem(ctx, volumeName, req)
+
+				if err == nil {
+					t.Fatal("CreateFileSystem is not failed")
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: CreateFileSystemWithContext return ErrCodeIncompatibleParameterError error",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				req := FileSystemOptions{
+					DeploymentType:     deploymentType,
+					ThroughputCapacity: throughputCapacity,
+					StorageCapacity:    storageCapacity,
+					SubnetIds:          subnetIds,
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().CreateFileSystemWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New(fsx.ErrCodeIncompatibleParameterError))
+				_, err := c.CreateFileSystem(ctx, volumeName, req)
+				if err == nil {
+					t.Fatal("CreateFileSystem is not failed")
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: CreateFileSystemWithContext return error",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				req := FileSystemOptions{
+					DeploymentType:     deploymentType,
+					ThroughputCapacity: throughputCapacity,
+					StorageCapacity:    storageCapacity,
+					SubnetIds:          subnetIds,
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().CreateFileSystemWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New("CreateFileSystemWithContext failed"))
+				_, err := c.CreateFileSystem(ctx, volumeName, req)
+				if err == nil {
+					t.Fatal("CreateFileSystem is not failed")
+				}
+
+				mockCtl.Finish()
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, tc.testFunc)
+	}
+}
+
+func TestDeleteFileSystem(t *testing.T) {
+	var (
+		fileSystemId = "fs-123456789abcdefgh"
+	)
+	testCases := []struct {
+		name     string
+		testFunc func(t *testing.T)
+	}{
+		{
+			name: "success: normal",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				output := &fsx.DeleteFileSystemOutput{}
+				describeOutput := &fsx.DescribeFileSystemsOutput{
+					FileSystems: []*fsx.FileSystem{
+						{
+							FileSystemId: &fileSystemId,
+							Tags: []*fsx.Tag{
+								{
+									Key:   aws.String(SkipFinalBackupTagKey),
+									Value: aws.String("true"),
+								},
+							},
+						},
+					},
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().DescribeFileSystemsWithContext(gomock.Eq(ctx), gomock.Any()).Return(describeOutput, nil)
+				mockFSx.EXPECT().DeleteFileSystemWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
+				err := c.DeleteFileSystem(ctx, fileSystemId)
+				if err != nil {
+					t.Fatalf("DeleteFileSystem is failed: %v", err)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "success: missing skipFinalBackup tag",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				output := &fsx.DeleteFileSystemOutput{}
+				describeOutput := &fsx.DescribeFileSystemsOutput{
+					FileSystems: []*fsx.FileSystem{
+						{
+							FileSystemId: &fileSystemId,
+						},
+					},
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().DescribeFileSystemsWithContext(gomock.Eq(ctx), gomock.Any()).Return(describeOutput, nil)
+				mockFSx.EXPECT().DeleteFileSystemWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
+				err := c.DeleteFileSystem(ctx, fileSystemId)
+				if err != nil {
+					t.Fatalf("DeleteFileSystem is failed: %v", err)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: DeleteFileSystemWithContext return error",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				describeOutput := &fsx.DescribeFileSystemsOutput{
+					FileSystems: []*fsx.FileSystem{
+						{
+							FileSystemId: &fileSystemId,
+							Tags: []*fsx.Tag{
+								{
+									Key:   aws.String(SkipFinalBackupTagKey),
+									Value: aws.String("true"),
+								},
+							},
+						},
+					},
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().DescribeFileSystemsWithContext(gomock.Eq(ctx), gomock.Any()).Return(describeOutput, nil)
+				mockFSx.EXPECT().DeleteFileSystemWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New("DeleteFileSystemWithContext failed"))
+				err := c.DeleteFileSystem(ctx, fileSystemId)
+				if err == nil {
+					t.Fatal("DeleteFileSystem is not failed")
+				}
+
+				mockCtl.Finish()
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, tc.testFunc)
+	}
+}
+
+func TestDescribeFileSystem(t *testing.T) {
+	var (
+		deploymentType     = aws.String("SINGLE_AZ_1")
+		throughputCapacity = aws.Int64(64)
+		storageCapacity    = aws.Int64(64)
+		fileSystemId       = aws.String("fs-1234567890abcdefgh")
+		dnsName            = aws.String("https://aws.com")
+		rootVolumeId       = aws.String("fsvol-03062e7ff37662dff")
+	)
+	testCases := []struct {
+		name     string
+		testFunc func(t *testing.T)
+	}{
+		{
+			name: "success: normal",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				output := &fsx.DescribeFileSystemsOutput{
+					FileSystems: []*fsx.FileSystem{
+						{
+							DNSName:         dnsName,
+							FileSystemId:    fileSystemId,
+							StorageCapacity: storageCapacity,
+							OpenZFSConfiguration: &fsx.OpenZFSFileSystemConfiguration{
+								DeploymentType:     deploymentType,
+								RootVolumeId:       rootVolumeId,
+								ThroughputCapacity: throughputCapacity,
+							},
+						},
+					},
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().DescribeFileSystemsWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
+				_, err := c.DescribeFileSystem(ctx, *fileSystemId)
+				if err != nil {
+					t.Fatalf("DeleteFileSystem is failed: %v", err)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: DescribeFileSystemWithContext return error",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().DescribeFileSystemsWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New("DescribeFileSystemsWithContext failed"))
+				_, err := c.DescribeFileSystem(ctx, *fileSystemId)
+				if err == nil {
+					t.Fatal("DescribeFileSystem is not failed")
+				}
+
+				mockCtl.Finish()
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, tc.testFunc)
+	}
+}
+
+func TestWaitForFileSystemAvailable(t *testing.T) {
+	var (
+		filesystemId = "fs-1234"
+	)
+	testCases := []struct {
+		name     string
+		testFunc func(t *testing.T)
+	}{
+		{
+			name: "success: filesystem available",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+				input := &fsx.DescribeFileSystemsInput{
+					FileSystemIds: []*string{aws.String(filesystemId)},
+				}
+				output := &fsx.DescribeFileSystemsOutput{
+					FileSystems: []*fsx.FileSystem{
+						{
+							FileSystemId: aws.String(filesystemId),
+							Lifecycle:    aws.String(fsx.FileSystemLifecycleAvailable),
+						},
+					},
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().DescribeFileSystemsWithContext(gomock.Eq(ctx), gomock.Eq(input)).Return(output, nil)
+				err := c.WaitForFileSystemAvailable(ctx, filesystemId)
+				if err != nil {
+					t.Fatalf("WaitForFileSystemAvailable failed: %v", err)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: filesystem failed",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+				input := &fsx.DescribeFileSystemsInput{
+					FileSystemIds: []*string{aws.String(filesystemId)},
+				}
+				output := &fsx.DescribeFileSystemsOutput{
+					FileSystems: []*fsx.FileSystem{
+						{
+							FileSystemId: aws.String(filesystemId),
+							Lifecycle:    aws.String(fsx.FileSystemLifecycleFailed),
+						},
+					},
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().DescribeFileSystemsWithContext(gomock.Eq(ctx), gomock.Eq(input)).Return(output, nil)
+				err := c.WaitForFileSystemAvailable(ctx, filesystemId)
+				if err == nil {
+					t.Fatal("WaitForFileSystemAvailable is not failed")
+				}
+
+				mockCtl.Finish()
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, tc.testFunc)
+	}
+}
+
+func TestCreateVolume(t *testing.T) {
+	var (
+		name                          = aws.String("subVolume")
+		copyTagsToSnapshots           = aws.Bool(false)
+		dataCompressionType           = aws.String("NONE")
+		nfsExports                    = aws.String("[{ClientConfigurations=[{Clients=*,Options=[crossmnt]}]}]")
+		parentVolumeId                = aws.String("fsvol-03062e7ff37662dff")
+		readOnly                      = aws.Bool(false)
+		recordSizeKiB                 = aws.Int64(128)
+		storageCapacityQuotaGiB       = aws.Int64(10)
+		storageCapacityReservationGiB = aws.Int64(10)
+		userAndGroupQuotas            = aws.String("[{Id=1,StorageCapacityQuotaGiB=10,Type=USER}]")
+		tags                          = aws.String("Tag1=Value1,Tag2=Value2")
+		volumeName                    = "volumeName"
+		fileSystemId                  = aws.String("fs-1234")
+		volumePath                    = aws.String("/subVolume")
+		volumeId                      = aws.String("fsvol-0987654321abcdefg")
+		dnsName                       = aws.String("https://aws.com")
+		snapshotResourceArn           = aws.String("arn:")
+	)
+	testCases := []struct {
+		name     string
+		testFunc func(t *testing.T)
+	}{
+		{
+			name: "success: all variables",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				req := VolumeOptions{
+					Name:                          name,
+					CopyTagsToSnapshots:           copyTagsToSnapshots,
+					DataCompressionType:           dataCompressionType,
+					NfsExports:                    nfsExports,
+					ParentVolumeId:                parentVolumeId,
+					ReadOnly:                      readOnly,
+					RecordSizeKiB:                 recordSizeKiB,
+					StorageCapacityQuotaGiB:       storageCapacityQuotaGiB,
+					StorageCapacityReservationGiB: storageCapacityReservationGiB,
+					UserAndGroupQuotas:            userAndGroupQuotas,
+					Tags:                          tags,
+				}
+				output := &fsx.CreateVolumeOutput{
+					Volume: &fsx.Volume{
+						FileSystemId: fileSystemId,
+						OpenZFSConfiguration: &fsx.OpenZFSVolumeConfiguration{
+							ParentVolumeId:                parentVolumeId,
+							StorageCapacityQuotaGiB:       storageCapacityQuotaGiB,
+							StorageCapacityReservationGiB: storageCapacityReservationGiB,
+							VolumePath:                    volumePath,
+						},
+						VolumeId: volumeId,
+					},
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().CreateVolumeWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
+				resp, err := c.CreateVolume(ctx, volumeName, req)
+				if err != nil {
+					t.Fatalf("CreateVolume is failed: %v", err)
+				}
+
+				if resp == nil {
+					t.Fatal("resp is nil")
+				}
+
+				if resp.FileSystemId != aws.StringValue(fileSystemId) {
+					t.Fatalf("FileSystemId mismatches. actual: %v expected: %v", resp.FileSystemId, dnsName)
+				}
+
+				if resp.StorageCapacityQuotaGiB != aws.Int64Value(storageCapacityQuotaGiB) {
+					t.Fatalf("StorageCapacityQuotaGiB mismatches. actual: %v expected: %v", resp.StorageCapacityQuotaGiB, storageCapacityQuotaGiB)
+				}
+
+				if resp.StorageCapacityReservationGiB != aws.Int64Value(storageCapacityReservationGiB) {
+					t.Fatalf("StorageCapacityReservationGiB mismatches. actual: %v expected: %v", resp.StorageCapacityReservationGiB, storageCapacityReservationGiB)
+				}
+
+				if resp.VolumePath != aws.StringValue(volumePath) {
+					t.Fatalf("VolumePath mismatches. actual: %v expected: %v", resp.VolumePath, volumePath)
+				}
+
+				if resp.VolumeId != aws.StringValue(volumeId) {
+					t.Fatalf("VolumeId mismatches. actual: %v expected: %v", resp.VolumeId, volumeId)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "success: required variables",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				req := VolumeOptions{
+					Name:           name,
+					ParentVolumeId: parentVolumeId,
+				}
+
+				output := &fsx.CreateVolumeOutput{
+					Volume: &fsx.Volume{
+						FileSystemId: fileSystemId,
+						OpenZFSConfiguration: &fsx.OpenZFSVolumeConfiguration{
+							ParentVolumeId:                parentVolumeId,
+							StorageCapacityQuotaGiB:       storageCapacityQuotaGiB,
+							StorageCapacityReservationGiB: storageCapacityReservationGiB,
+							VolumePath:                    volumePath,
+						},
+						VolumeId: volumeId,
+					},
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().CreateVolumeWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
+				resp, err := c.CreateVolume(ctx, volumeName, req)
+				if err != nil {
+					t.Fatalf("CreateVolume is failed: %v", err)
+				}
+
+				if resp == nil {
+					t.Fatal("resp is nil")
+				}
+
+				if resp.FileSystemId != aws.StringValue(fileSystemId) {
+					t.Fatalf("FileSystemId mismatches. actual: %v expected: %v", resp.FileSystemId, dnsName)
+				}
+
+				if resp.StorageCapacityQuotaGiB != aws.Int64Value(storageCapacityQuotaGiB) {
+					t.Fatalf("StorageCapacityQuotaGiB mismatches. actual: %v expected: %v", resp.StorageCapacityQuotaGiB, storageCapacityQuotaGiB)
+				}
+
+				if resp.StorageCapacityReservationGiB != aws.Int64Value(storageCapacityReservationGiB) {
+					t.Fatalf("StorageCapacityReservationGiB mismatches. actual: %v expected: %v", resp.StorageCapacityReservationGiB, storageCapacityReservationGiB)
+				}
+
+				if resp.VolumePath != aws.StringValue(volumePath) {
+					t.Fatalf("VolumePath mismatches. actual: %v expected: %v", resp.VolumePath, volumePath)
+				}
+
+				if resp.VolumeId != aws.StringValue(volumeId) {
+					t.Fatalf("VolumeId mismatches. actual: %v expected: %v", resp.VolumeId, volumeId)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "success: snapshot",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				req := VolumeOptions{
+					Name:           name,
+					ParentVolumeId: parentVolumeId,
+					SnapshotARN:    snapshotResourceArn,
+				}
+
+				output := &fsx.CreateVolumeOutput{
+					Volume: &fsx.Volume{
+						FileSystemId: fileSystemId,
+						OpenZFSConfiguration: &fsx.OpenZFSVolumeConfiguration{
+							ParentVolumeId:                parentVolumeId,
+							StorageCapacityQuotaGiB:       storageCapacityQuotaGiB,
+							StorageCapacityReservationGiB: storageCapacityReservationGiB,
+							VolumePath:                    volumePath,
+						},
+						VolumeId: volumeId,
+					},
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().CreateVolumeWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
+				resp, err := c.CreateVolume(ctx, volumeName, req)
+				if err != nil {
+					t.Fatalf("CreateVolume is failed: %v", err)
+				}
+
+				if resp == nil {
+					t.Fatal("resp is nil")
+				}
+
+				if resp.FileSystemId != aws.StringValue(fileSystemId) {
+					t.Fatalf("FileSystemId mismatches. actual: %v expected: %v", resp.FileSystemId, dnsName)
+				}
+
+				if resp.StorageCapacityQuotaGiB != aws.Int64Value(storageCapacityQuotaGiB) {
+					t.Fatalf("StorageCapacityQuotaGiB mismatches. actual: %v expected: %v", resp.StorageCapacityQuotaGiB, storageCapacityQuotaGiB)
+				}
+
+				if resp.StorageCapacityReservationGiB != aws.Int64Value(storageCapacityReservationGiB) {
+					t.Fatalf("StorageCapacityReservationGiB mismatches. actual: %v expected: %v", resp.StorageCapacityReservationGiB, storageCapacityReservationGiB)
+				}
+
+				if resp.VolumePath != aws.StringValue(volumePath) {
+					t.Fatalf("VolumePath mismatches. actual: %v expected: %v", resp.VolumePath, volumePath)
+				}
+
+				if resp.VolumeId != aws.StringValue(volumeId) {
+					t.Fatalf("VolumeId mismatches. actual: %v expected: %v", resp.VolumeId, volumeId)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: bad userAndGroupQuotas",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				badUserAndGroupQuotas := "[{Type=User,Id=INVALID,StorageCapacityQuotaGib=10}]"
+				req := VolumeOptions{
+					Name:               name,
+					ParentVolumeId:     parentVolumeId,
+					UserAndGroupQuotas: aws.String(badUserAndGroupQuotas),
+				}
+
+				ctx := context.Background()
+				_, err := c.CreateVolume(ctx, volumeName, req)
+
+				if err == nil {
+					t.Fatal("CreateVolume is not failed")
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: CreateVolumeWithContext return ErrCodeIncompatibleParameterError error",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				req := VolumeOptions{
+					Name:           name,
+					ParentVolumeId: parentVolumeId,
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().CreateVolumeWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New(fsx.ErrCodeIncompatibleParameterError))
+				_, err := c.CreateVolume(ctx, volumeName, req)
+				if err == nil {
+					t.Fatal("CreateVolume is not failed")
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: CreateVolumeWithContext return error",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				req := VolumeOptions{
+					Name:           name,
+					ParentVolumeId: parentVolumeId,
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().CreateVolumeWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New("CreateFileSystemWithContext failed"))
+				_, err := c.CreateVolume(ctx, volumeName, req)
+				if err == nil {
+					t.Fatal("CreateVolume is not failed")
+				}
+
+				mockCtl.Finish()
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, tc.testFunc)
+	}
+}
+
+func TestDeleteVolume(t *testing.T) {
+	var (
+		volumeId = "fsvol-0987654321abcdefg"
+	)
+	testCases := []struct {
+		name     string
+		testFunc func(t *testing.T)
+	}{
+		{
+			name: "success: normal",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				output := &fsx.DeleteVolumeOutput{}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().DeleteVolumeWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
+				err := c.DeleteVolume(ctx, volumeId)
+				if err != nil {
+					t.Fatalf("DeleteVolume is failed: %v", err)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: DeleteVolumeWithContext return error",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().DeleteVolumeWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New("DeleteVolumeWithContext failed"))
+				err := c.DeleteVolume(ctx, volumeId)
+				if err == nil {
+					t.Fatal("DeleteVolume is not failed")
+				}
+
+				mockCtl.Finish()
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, tc.testFunc)
+	}
+}
+
+func TestDescribeVolume(t *testing.T) {
+	var (
+		fileSystemId                  = aws.String("fs-1234567890abcdefgh")
+		parentVolumeId                = aws.String("fsvol-03062e7ff37662dff")
+		storageCapacityQuotaGiB       = aws.Int64(10)
+		storageCapacityReservationGiB = aws.Int64(10)
+		volumePath                    = aws.String("/subVolume")
+		volumeId                      = aws.String("fsvol-0987654321abcdefg")
+	)
+	testCases := []struct {
+		name     string
+		testFunc func(t *testing.T)
+	}{
+		{
+			name: "success: normal",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				output := &fsx.DescribeVolumesOutput{
+					Volumes: []*fsx.Volume{
+						{
+							FileSystemId: fileSystemId,
+							OpenZFSConfiguration: &fsx.OpenZFSVolumeConfiguration{
+								ParentVolumeId:                parentVolumeId,
+								StorageCapacityQuotaGiB:       storageCapacityQuotaGiB,
+								StorageCapacityReservationGiB: storageCapacityReservationGiB,
+								VolumePath:                    volumePath,
+							},
+							VolumeId: volumeId,
+						},
+					},
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().DescribeVolumesWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
+				_, err := c.DescribeVolume(ctx, *volumeId)
+				if err != nil {
+					t.Fatalf("DescribeVolume is failed: %v", err)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: DescribeVolumesWithContext return error",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().DescribeVolumesWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New("DescribeVolumesWithContext failed"))
+				_, err := c.DescribeVolume(ctx, *volumeId)
+				if err == nil {
+					t.Fatal("DescribeVolume is not failed")
+				}
+
+				mockCtl.Finish()
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, tc.testFunc)
+	}
+}
+
+func TestWaitForVolumeAvailable(t *testing.T) {
+	var (
+		volumeId = "fsvol-1234"
+	)
+	testCases := []struct {
+		name     string
+		testFunc func(t *testing.T)
+	}{
+		{
+			name: "success: volume available",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				input := &fsx.DescribeVolumesInput{
+					VolumeIds: []*string{aws.String(volumeId)},
+				}
+				output := &fsx.DescribeVolumesOutput{
+					Volumes: []*fsx.Volume{
+						{
+							VolumeId:  aws.String(volumeId),
+							Lifecycle: aws.String(fsx.VolumeLifecycleAvailable),
+						},
+					},
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().DescribeVolumesWithContext(gomock.Eq(ctx), gomock.Eq(input)).Return(output, nil)
+				err := c.WaitForVolumeAvailable(ctx, volumeId)
+				if err != nil {
+					t.Fatalf("WaitForVolumeAvailable failed: %v", err)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: volume failed",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				input := &fsx.DescribeVolumesInput{
+					VolumeIds: []*string{aws.String(volumeId)},
+				}
+				output := &fsx.DescribeVolumesOutput{
+					Volumes: []*fsx.Volume{
+						{
+							FileSystemId: aws.String(volumeId),
+							Lifecycle:    aws.String(fsx.VolumeLifecycleFailed),
+						},
+					},
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().DescribeVolumesWithContext(gomock.Eq(ctx), gomock.Eq(input)).Return(output, nil)
+				err := c.WaitForVolumeAvailable(ctx, volumeId)
+				if err == nil {
+					t.Fatal("WaitForVolumeAvailable is not failed")
+				}
+
+				mockCtl.Finish()
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, tc.testFunc)
+	}
+}
 
 func TestCreateSnapshot(t *testing.T) {
 	var (
@@ -255,6 +1268,73 @@ func TestDeleteSnapshot(t *testing.T) {
 	}
 }
 
+func TestDescribeSnapshot(t *testing.T) {
+	var (
+		creationTime = aws.Time(time.Now())
+		resourceARN  = aws.String("arn:")
+		snapshotId   = aws.String("fsvolsnap-1234")
+		volumeId     = aws.String("fsvol-0987654321abcdefg")
+	)
+	testCases := []struct {
+		name     string
+		testFunc func(t *testing.T)
+	}{
+		{
+			name: "success: normal",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				output := &fsx.DescribeSnapshotsOutput{
+					Snapshots: []*fsx.Snapshot{
+						{
+							CreationTime: creationTime,
+							ResourceARN:  resourceARN,
+							SnapshotId:   snapshotId,
+							VolumeId:     volumeId,
+						},
+					},
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().DescribeSnapshotsWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
+				_, err := c.DescribeSnapshot(ctx, *snapshotId)
+				if err != nil {
+					t.Fatalf("DescribeSnapshot is failed: %v", err)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: DescribeSnapshotsWithContext return error",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().DescribeSnapshotsWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New("DescribeSnapshotsWithContext failed"))
+				_, err := c.DescribeSnapshot(ctx, *snapshotId)
+				if err == nil {
+					t.Fatal("DescribeSnapshot is not failed")
+				}
+
+				mockCtl.Finish()
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, tc.testFunc)
+	}
+}
+
 func TestWaitForSnapshotAvailable(t *testing.T) {
 	var (
 		snapshotId = "fsvolsnap-1234"
@@ -345,14 +1425,249 @@ func TestWaitForSnapshotAvailable(t *testing.T) {
 	}
 }
 
+func TestParseDiskIopsConfiguration(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    string
+		expected *fsx.DiskIopsConfiguration
+		error    bool
+	}{
+		{
+			name:  "success: normal configuration",
+			input: "Mode=USER_PROVISIONED,Iops=300",
+			expected: &fsx.DiskIopsConfiguration{
+				Iops: aws.Int64(300),
+				Mode: aws.String(fsx.DiskIopsConfigurationModeUserProvisioned),
+			},
+			error: false,
+		},
+		{
+			name:  "failure: invalid format",
+			input: "ModeUSER_PROVISIONED,Iops=INVALID",
+			error: true,
+		},
+		{
+			name:  "failure: iops not a number",
+			input: "Mode=USER_PROVISIONED,Iops=INVALID",
+			error: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockCtl := gomock.NewController(t)
+			mockFSx := mocks.NewMockFSx(mockCtl)
+			c := &cloud{
+				fsx: mockFSx,
+			}
+
+			actual, err := c.parseDiskIopsConfiguration(tc.input)
+
+			if err != nil && tc.error == false || err == nil && tc.error == true {
+				t.Fatalf("ParseDiskIopsConfiguration got wrong result. Error mismatch.")
+			}
+
+			if !reflect.DeepEqual(actual, tc.expected) {
+				t.Fatalf("ParseDiskIopsConfiguration got wrong result. actual: %s, expected: %s", actual, tc.expected)
+			}
+		})
+	}
+}
+
+func TestParseRootVolumeConfiguration(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    string
+		expected *fsx.OpenZFSCreateRootVolumeConfiguration
+		error    bool
+	}{
+		{
+			name:  "success: normal configuration",
+			input: "CopyTagsToSnapshots=true,DataCompressionType=NONE,ReadOnly=false,RecordSizeKiB=128",
+			expected: &fsx.OpenZFSCreateRootVolumeConfiguration{
+				CopyTagsToSnapshots: aws.Bool(true),
+				DataCompressionType: aws.String("NONE"),
+				ReadOnly:            aws.Bool(false),
+				RecordSizeKiB:       aws.Int64(128),
+			},
+			error: false,
+		},
+		{
+			name:  "failure: invalid format",
+			input: "CopyTagsToSnapshotDataCompressionType=NONE,ReadOnly=128,RecordSizeKiB=128",
+			error: true,
+		},
+		{
+			name:  "failure: CopyTagsToSnapshots not a bool",
+			input: "CopyTagsToSnapshots=INVALID",
+			error: true,
+		},
+		{
+			name:  "failure: ReadOnly not a bool",
+			input: "ReadOnly=INVALID",
+			error: true,
+		},
+		{
+			name:  "failure: RecordSizeKiB not a number",
+			input: "RecordSizeKiB=INVALID",
+			error: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockCtl := gomock.NewController(t)
+			mockFSx := mocks.NewMockFSx(mockCtl)
+			c := &cloud{
+				fsx: mockFSx,
+			}
+
+			actual, err := c.parseRootVolumeConfiguration(tc.input)
+
+			if err != nil && tc.error == false || err == nil && tc.error == true {
+				t.Fatalf("ParseRootVolumeConfiguration got wrong result. Error mismatch.")
+			}
+
+			if !reflect.DeepEqual(actual, tc.expected) {
+				t.Fatalf("ParseRootVolumeConfiguration got wrong result. actual: %s, expected: %s", actual, tc.expected)
+			}
+		})
+	}
+}
+
+func TestParseNfsExports(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    string
+		expected []*fsx.OpenZFSNfsExport
+		error    bool
+	}{
+		{
+			name:  "success: normal configuration",
+			input: "[{ClientConfigurations=[{Clients=*,Options=[sync,crossmnt]},{Clients=192.0.2.0/24,Options=[async]}]},{ClientConfigurations=[{Clients=*,Options=[sync,crossmnt]}]}]",
+			expected: []*fsx.OpenZFSNfsExport{
+				{
+					ClientConfigurations: []*fsx.OpenZFSClientConfiguration{
+						{
+							Clients: aws.String("*"),
+							Options: []*string{aws.String("sync"), aws.String("crossmnt")},
+						},
+						{
+							Clients: aws.String("192.0.2.0/24"),
+							Options: []*string{aws.String("async")},
+						},
+					},
+				},
+				{
+					ClientConfigurations: []*fsx.OpenZFSClientConfiguration{
+						{
+							Clients: aws.String("*"),
+							Options: []*string{aws.String("sync"), aws.String("crossmnt")},
+						},
+					},
+				},
+			},
+			error: false,
+		},
+		{
+			name:  "failure: invalid format",
+			input: "NfsExports=[[[[{ClientConfigurations=[{Clients=*,Options=[rw,crossmnt]}]}]",
+			error: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockCtl := gomock.NewController(t)
+			mockFSx := mocks.NewMockFSx(mockCtl)
+			c := &cloud{
+				fsx: mockFSx,
+			}
+
+			actual, err := c.parseNfsExports(tc.input)
+
+			if err != nil && tc.error == false || err == nil && tc.error == true {
+				t.Fatalf("ParseNfsExports got wrong result. Error mismatch.")
+			}
+
+			if !reflect.DeepEqual(actual, tc.expected) {
+				t.Fatalf("ParseNfsExports got wrong result. actual: %s, expected: %s", actual, tc.expected)
+			}
+		})
+	}
+}
+
+func TestParseUserAndGroupQuotas(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    string
+		expected []*fsx.OpenZFSUserOrGroupQuota
+		error    bool
+	}{
+		{
+			name:  "success: normal configuration",
+			input: "[{Id=1,StorageCapacityQuotaGiB=10,Type=User},{Id=2,StorageCapacityQuotaGiB=5,Type=Group}]",
+			expected: []*fsx.OpenZFSUserOrGroupQuota{
+				{
+					Id:                      aws.Int64(1),
+					StorageCapacityQuotaGiB: aws.Int64(10),
+					Type:                    aws.String("User"),
+				},
+				{
+					Id:                      aws.Int64(2),
+					StorageCapacityQuotaGiB: aws.Int64(5),
+					Type:                    aws.String("Group"),
+				},
+			},
+			error: false,
+		},
+		{
+			name:  "failure: invalid format",
+			input: "[{Id:1,StorageCapacityQuotaGiB=10,Type=User}]",
+			error: true,
+		},
+		{
+			name:  "failure: Id not a number",
+			input: "[{Id=INVALID,StorageCapacityQuotaGiB=10,Type=User}]",
+			error: true,
+		},
+		{
+			name:  "failure: StorageCapacityQuotaGiB not a number",
+			input: "[{Id=INVALID,StorageCapacityQuotaGiB=INVALID,Type=User}]",
+			error: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockCtl := gomock.NewController(t)
+			mockFSx := mocks.NewMockFSx(mockCtl)
+			c := &cloud{
+				fsx: mockFSx,
+			}
+
+			actual, err := c.parseUserAndGroupQuotas(tc.input)
+
+			if err != nil && tc.error == false || err == nil && tc.error == true {
+				t.Fatalf("ParseUserAndGroupQuotas got wrong result. Error mismatch.")
+			}
+
+			if !reflect.DeepEqual(actual, tc.expected) {
+				t.Fatalf("ParseUserAndGroupQuotas got wrong result. actual: %s, expected: %s", actual, tc.expected)
+			}
+		})
+	}
+}
+
 func TestParseTags(t *testing.T) {
 	testCases := []struct {
 		name     string
 		tags     string
 		expected []*fsx.Tag
+		error    bool
 	}{
 		{
-			name: "ParseTags normal tags",
+			name: "success: normal tags",
 			tags: "Key1=Value1,Key2=Value2",
 			expected: []*fsx.Tag{
 				{
@@ -364,37 +1679,45 @@ func TestParseTags(t *testing.T) {
 					Value: aws.String("Value2"),
 				},
 			},
+			error: false,
 		},
 		{
-			name: "ParseTags one improperly formatted tag",
-			tags: "Key1=Value1,Key2Value2",
-			expected: []*fsx.Tag{
-				{
-					Key:   aws.String("Key1"),
-					Value: aws.String("Value1"),
-				},
-			},
-		},
-		{
-			name: "ParseTags missing value",
+			name: "success: missing value",
 			tags: "Key1=",
 			expected: []*fsx.Tag{
 				{
 					Key:   aws.String("Key1"),
-					Value: aws.String(""),
+					Value: nil,
 				},
 			},
+			error: false,
 		},
 		{
-			name:     "ParseTags empty tags",
+			name:     "failure: empty tags",
 			tags:     "",
 			expected: nil,
+			error:    true,
+		},
+		{
+			name:     "failure: improperly formatted tag",
+			tags:     "Key1=Value1,Key2Value2",
+			expected: nil,
+			error:    true,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actual := parseTags(tc.tags)
+			mockCtl := gomock.NewController(t)
+			mockFSx := mocks.NewMockFSx(mockCtl)
+			c := &cloud{
+				fsx: mockFSx,
+			}
+
+			actual, err := c.parseTags(tc.tags)
+			if err != nil && tc.error == false || err == nil && tc.error == true {
+				t.Fatalf("ParseTags got wrong result. Error mismatch.")
+			}
 
 			if !reflect.DeepEqual(actual, tc.expected) {
 				t.Fatalf("ParseTags got wrong result. actual: %s, expected: %s", actual, tc.expected)
