@@ -19,6 +19,7 @@ import (
 	"context"
 	"errors"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/fsx"
 	"github.com/golang/mock/gomock"
 	"reflect"
@@ -264,6 +265,158 @@ func TestCreateFileSystem(t *testing.T) {
 				_, err := c.CreateFileSystem(ctx, volumeName, req)
 				if err == nil {
 					t.Fatal("CreateFileSystem is not failed")
+				}
+
+				mockCtl.Finish()
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, tc.testFunc)
+	}
+}
+
+func TestResizeFileSystem(t *testing.T) {
+	var (
+		fileSystemId         = "fs-1234"
+		currentSizeGiB int64 = 100
+		newSizeGiB     int64 = 150
+	)
+	testCases := []struct {
+		name     string
+		testFunc func(t *testing.T)
+	}{
+		{
+			name: "success: normal",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				updateOutput := &fsx.UpdateFileSystemOutput{
+					FileSystem: &fsx.FileSystem{
+						FileSystemId:    aws.String(fileSystemId),
+						StorageCapacity: aws.Int64(newSizeGiB),
+					},
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().UpdateFileSystemWithContext(gomock.Eq(ctx), gomock.Any()).Return(updateOutput, nil)
+				resp, err := c.ResizeFileSystem(ctx, fileSystemId, newSizeGiB)
+				if err != nil {
+					t.Fatalf("ResizeFileSystem is failed: %v", err)
+				}
+
+				if resp == nil {
+					t.Fatal("resp is nil")
+				}
+
+				if *resp != newSizeGiB {
+					t.Fatalf("newSizeGiB mismatches. actual: %v expected: %v", resp, newSizeGiB)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "success: existing administrativeAction",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				describeOutput := &fsx.DescribeFileSystemsOutput{
+					FileSystems: []*fsx.FileSystem{
+						{
+							AdministrativeActions: []*fsx.AdministrativeAction{
+								{
+									AdministrativeActionType: aws.String(fsx.AdministrativeActionTypeFileSystemUpdate),
+									TargetFileSystemValues: &fsx.FileSystem{
+										StorageCapacity: aws.Int64(newSizeGiB),
+									},
+								},
+							},
+							FileSystemId:    aws.String(fileSystemId),
+							StorageCapacity: aws.Int64(currentSizeGiB),
+						},
+					},
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().UpdateFileSystemWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, awserr.New(fsx.ErrCodeBadRequest, "Unable to perform the storage capacity update. There is an update already in progress.", errors.New("")))
+				mockFSx.EXPECT().DescribeFileSystemsWithContext(gomock.Eq(ctx), gomock.Any()).Return(describeOutput, nil)
+				resp, err := c.ResizeFileSystem(ctx, fileSystemId, newSizeGiB)
+				if err != nil {
+					t.Fatalf("ResizeFileSystem is failed: %v", err)
+				}
+
+				if resp == nil {
+					t.Fatal("resp is nil")
+				}
+
+				if *resp != newSizeGiB {
+					t.Fatalf("newSizeGiB mismatches. actual: %v expected: %v", resp, newSizeGiB)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: update error",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().UpdateFileSystemWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New(""))
+				_, err := c.ResizeFileSystem(ctx, fileSystemId, newSizeGiB)
+				if err == nil {
+					t.Fatalf("ResizeFileSystem is not failed")
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: existing administrativeAction with incorrect capacity",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				describeOutput := &fsx.DescribeFileSystemsOutput{
+					FileSystems: []*fsx.FileSystem{
+						{
+							AdministrativeActions: []*fsx.AdministrativeAction{
+								{
+									AdministrativeActionType: aws.String(fsx.AdministrativeActionTypeFileSystemUpdate),
+									TargetFileSystemValues: &fsx.FileSystem{
+										StorageCapacity: aws.Int64(currentSizeGiB),
+									},
+								},
+							},
+							FileSystemId:    aws.String(fileSystemId),
+							StorageCapacity: aws.Int64(currentSizeGiB),
+						},
+					},
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().UpdateFileSystemWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, awserr.New(fsx.ErrCodeBadRequest, "Unable to perform the storage capacity update. There is an update already in progress.", errors.New("")))
+				mockFSx.EXPECT().DescribeFileSystemsWithContext(gomock.Eq(ctx), gomock.Any()).Return(describeOutput, nil)
+				_, err := c.ResizeFileSystem(ctx, fileSystemId, newSizeGiB)
+				if err == nil {
+					t.Fatalf("ResizeFileSystem is not failed")
 				}
 
 				mockCtl.Finish()
@@ -525,6 +678,97 @@ func TestWaitForFileSystemAvailable(t *testing.T) {
 				err := c.WaitForFileSystemAvailable(ctx, filesystemId)
 				if err == nil {
 					t.Fatal("WaitForFileSystemAvailable is not failed")
+				}
+
+				mockCtl.Finish()
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, tc.testFunc)
+	}
+}
+
+func TestWaitForFileSystemResize(t *testing.T) {
+	var (
+		filesystemId       = "fs-1234"
+		resizeGiB    int64 = 100
+	)
+	testCases := []struct {
+		name     string
+		testFunc func(t *testing.T)
+	}{
+		{
+			name: "success: resize complete",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				output := &fsx.DescribeFileSystemsOutput{
+					FileSystems: []*fsx.FileSystem{
+						{
+							AdministrativeActions: []*fsx.AdministrativeAction{
+								{
+									AdministrativeActionType: aws.String(fsx.AdministrativeActionTypeFileSystemUpdate),
+									Status:                   aws.String(fsx.StatusCompleted),
+									TargetFileSystemValues: &fsx.FileSystem{
+										StorageCapacity: aws.Int64(resizeGiB),
+									},
+								},
+							},
+							FileSystemId: aws.String(filesystemId),
+						},
+					},
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().DescribeFileSystemsWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
+				err := c.WaitForFileSystemResize(ctx, filesystemId, resizeGiB)
+				if err != nil {
+					t.Fatalf("WaitForFileSystemResize failed: %v", err)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: resize failed",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				output := &fsx.DescribeFileSystemsOutput{
+					FileSystems: []*fsx.FileSystem{
+						{
+							AdministrativeActions: []*fsx.AdministrativeAction{
+								{
+									AdministrativeActionType: aws.String(fsx.AdministrativeActionTypeFileSystemUpdate),
+									Status:                   aws.String(fsx.StatusFailed),
+									TargetFileSystemValues: &fsx.FileSystem{
+										StorageCapacity: aws.Int64(resizeGiB),
+									},
+									FailureDetails: &fsx.AdministrativeActionFailureDetails{
+										Message: aws.String("Update failed"),
+									},
+								},
+							},
+							FileSystemId: aws.String(filesystemId),
+						},
+					},
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().DescribeFileSystemsWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
+				err := c.WaitForFileSystemResize(ctx, filesystemId, resizeGiB)
+				if err == nil {
+					t.Fatalf("WaitForFileSystemResize is not failed: %v", err)
 				}
 
 				mockCtl.Finish()
@@ -834,6 +1078,165 @@ func TestCreateVolume(t *testing.T) {
 	}
 }
 
+func TestResizeVolume(t *testing.T) {
+	var (
+		volumeId             = "fsvol-1234"
+		currentSizeGiB int64 = 100
+		newSizeGiB     int64 = 150
+	)
+	testCases := []struct {
+		name     string
+		testFunc func(t *testing.T)
+	}{
+		{
+			name: "success: normal",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				updateOutput := &fsx.UpdateVolumeOutput{
+					Volume: &fsx.Volume{
+						VolumeId: aws.String(volumeId),
+						OpenZFSConfiguration: &fsx.OpenZFSVolumeConfiguration{
+							StorageCapacityQuotaGiB:       aws.Int64(newSizeGiB),
+							StorageCapacityReservationGiB: aws.Int64(newSizeGiB),
+						},
+					},
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().UpdateVolumeWithContext(gomock.Eq(ctx), gomock.Any()).Return(updateOutput, nil)
+				resp, err := c.ResizeVolume(ctx, volumeId, newSizeGiB)
+				if err != nil {
+					t.Fatalf("ResizeVolume is failed: %v", err)
+				}
+
+				if resp == nil {
+					t.Fatal("resp is nil")
+				}
+
+				if *resp != newSizeGiB {
+					t.Fatalf("newSizeGiB mismatches. actual: %v expected: %v", resp, newSizeGiB)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "success: existing administrativeAction",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				describeOutput := &fsx.DescribeVolumesOutput{
+					Volumes: []*fsx.Volume{
+						{
+							AdministrativeActions: []*fsx.AdministrativeAction{
+								{
+									AdministrativeActionType: aws.String(fsx.AdministrativeActionTypeVolumeUpdate),
+									TargetVolumeValues: &fsx.Volume{
+										OpenZFSConfiguration: &fsx.OpenZFSVolumeConfiguration{
+											StorageCapacityQuotaGiB:       aws.Int64(newSizeGiB),
+											StorageCapacityReservationGiB: aws.Int64(newSizeGiB),
+										},
+									},
+								},
+							},
+							FileSystemId: aws.String(volumeId),
+						},
+					},
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().UpdateVolumeWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, awserr.New(fsx.ErrCodeBadRequest, "Unable to update the volume because there are existing pending actions for the volume", errors.New("")))
+				mockFSx.EXPECT().DescribeVolumesWithContext(gomock.Eq(ctx), gomock.Any()).Return(describeOutput, nil)
+				resp, err := c.ResizeVolume(ctx, volumeId, newSizeGiB)
+				if err != nil {
+					t.Fatalf("ResizeVolume is failed: %v", err)
+				}
+
+				if resp == nil {
+					t.Fatal("resp is nil")
+				}
+
+				if *resp != newSizeGiB {
+					t.Fatalf("newSizeGiB mismatches. actual: %v expected: %v", resp, newSizeGiB)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: update error",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().UpdateVolumeWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New(""))
+				_, err := c.ResizeVolume(ctx, volumeId, newSizeGiB)
+				if err == nil {
+					t.Fatalf("ResizeVolume is not failed")
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: existing administrativeAction with incorrect capacity",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				describeOutput := &fsx.DescribeVolumesOutput{
+					Volumes: []*fsx.Volume{
+						{
+							AdministrativeActions: []*fsx.AdministrativeAction{
+								{
+									AdministrativeActionType: aws.String(fsx.AdministrativeActionTypeVolumeUpdate),
+									TargetVolumeValues: &fsx.Volume{
+										OpenZFSConfiguration: &fsx.OpenZFSVolumeConfiguration{
+											StorageCapacityQuotaGiB:       aws.Int64(currentSizeGiB),
+											StorageCapacityReservationGiB: aws.Int64(currentSizeGiB),
+										},
+									},
+								},
+							},
+							FileSystemId: aws.String(volumeId),
+						},
+					},
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().UpdateVolumeWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, awserr.New(fsx.ErrCodeBadRequest, "Unable to update the volume because there are existing pending actions for the volume", errors.New("")))
+				mockFSx.EXPECT().DescribeVolumesWithContext(gomock.Eq(ctx), gomock.Any()).Return(describeOutput, nil)
+				_, err := c.ResizeVolume(ctx, volumeId, newSizeGiB)
+				if err == nil {
+					t.Fatalf("ResizeFileSystem is not failed")
+				}
+
+				mockCtl.Finish()
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, tc.testFunc)
+	}
+}
+
 func TestDeleteVolume(t *testing.T) {
 	var (
 		volumeId = "fsvol-0987654321abcdefg"
@@ -1027,6 +1430,103 @@ func TestWaitForVolumeAvailable(t *testing.T) {
 				err := c.WaitForVolumeAvailable(ctx, volumeId)
 				if err == nil {
 					t.Fatal("WaitForVolumeAvailable is not failed")
+				}
+
+				mockCtl.Finish()
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, tc.testFunc)
+	}
+}
+
+func TestWaitForVolumeResize(t *testing.T) {
+	var (
+		volumeId        = "fsvol-1234"
+		resizeGiB int64 = 100
+	)
+	testCases := []struct {
+		name     string
+		testFunc func(t *testing.T)
+	}{
+		{
+			name: "success: resize complete",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				output := &fsx.DescribeVolumesOutput{
+					Volumes: []*fsx.Volume{
+						{
+							AdministrativeActions: []*fsx.AdministrativeAction{
+								{
+									AdministrativeActionType: aws.String(fsx.AdministrativeActionTypeVolumeUpdate),
+									Status:                   aws.String(fsx.StatusCompleted),
+									TargetVolumeValues: &fsx.Volume{
+										OpenZFSConfiguration: &fsx.OpenZFSVolumeConfiguration{
+											StorageCapacityQuotaGiB:       aws.Int64(resizeGiB),
+											StorageCapacityReservationGiB: aws.Int64(resizeGiB),
+										},
+									},
+								},
+							},
+							VolumeId: aws.String(volumeId),
+						},
+					},
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().DescribeVolumesWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
+				err := c.WaitForVolumeResize(ctx, volumeId, resizeGiB)
+				if err != nil {
+					t.Fatalf("WaitForVolumeResize failed: %v", err)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: resize failed",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				output := &fsx.DescribeVolumesOutput{
+					Volumes: []*fsx.Volume{
+						{
+							AdministrativeActions: []*fsx.AdministrativeAction{
+								{
+									AdministrativeActionType: aws.String(fsx.AdministrativeActionTypeVolumeUpdate),
+									Status:                   aws.String(fsx.StatusFailed),
+									TargetVolumeValues: &fsx.Volume{
+										OpenZFSConfiguration: &fsx.OpenZFSVolumeConfiguration{
+											StorageCapacityQuotaGiB:       aws.Int64(resizeGiB),
+											StorageCapacityReservationGiB: aws.Int64(resizeGiB),
+										},
+									},
+									FailureDetails: &fsx.AdministrativeActionFailureDetails{
+										Message: aws.String("Update failed"),
+									},
+								},
+							},
+							VolumeId: aws.String(volumeId),
+						},
+					},
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().DescribeVolumesWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
+				err := c.WaitForVolumeResize(ctx, volumeId, resizeGiB)
+				if err == nil {
+					t.Fatalf("WaitForVolumeResize is not failed: %v", err)
 				}
 
 				mockCtl.Finish()

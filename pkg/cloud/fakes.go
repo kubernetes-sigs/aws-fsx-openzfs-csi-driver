@@ -74,19 +74,29 @@ func (c *FakeCloudProvider) CreateFileSystem(ctx context.Context, volumeName str
 	return fs, nil
 }
 
-func (c *FakeCloudProvider) DeleteFileSystem(ctx context.Context, volumeID string) error {
-	delete(c.fileSystems, volumeID)
+func (c *FakeCloudProvider) ResizeFileSystem(ctx context.Context, fileSystemId string, newSizeGiB int64) (*int64, error) {
+	for _, fs := range c.fileSystems {
+		if fs.FileSystemId == fileSystemId {
+			fs.StorageCapacity = newSizeGiB
+			return &newSizeGiB, nil
+		}
+	}
+	return nil, ErrNotFound
+}
+
+func (c *FakeCloudProvider) DeleteFileSystem(ctx context.Context, filesystemId string) error {
+	delete(c.fileSystems, filesystemId)
 	for name, fs := range c.fileSystems {
-		if fs.FileSystemId == volumeID {
+		if fs.FileSystemId == filesystemId {
 			delete(c.fileSystems, name)
 		}
 	}
 	return nil
 }
 
-func (c *FakeCloudProvider) DescribeFileSystem(ctx context.Context, volumeID string) (*FileSystem, error) {
+func (c *FakeCloudProvider) DescribeFileSystem(ctx context.Context, filesystemId string) (*FileSystem, error) {
 	for _, fs := range c.fileSystems {
-		if fs.FileSystemId == volumeID {
+		if fs.FileSystemId == filesystemId {
 			return fs, nil
 		}
 	}
@@ -94,6 +104,10 @@ func (c *FakeCloudProvider) DescribeFileSystem(ctx context.Context, volumeID str
 }
 
 func (c *FakeCloudProvider) WaitForFileSystemAvailable(ctx context.Context, fileSystemId string) error {
+	return nil
+}
+
+func (c *FakeCloudProvider) WaitForFileSystemResize(ctx context.Context, fileSystemId string, newSizeGiB int64) error {
 	return nil
 }
 
@@ -125,19 +139,30 @@ func (c *FakeCloudProvider) CreateVolume(ctx context.Context, volumeName string,
 	return v, nil
 }
 
-func (c *FakeCloudProvider) DeleteVolume(ctx context.Context, volumeID string) (err error) {
-	delete(c.volumes, volumeID)
+func (c *FakeCloudProvider) ResizeVolume(ctx context.Context, volumeId string, newSizeGiB int64) (*int64, error) {
+	for _, v := range c.volumes {
+		if v.VolumeId == volumeId {
+			v.StorageCapacityQuotaGiB = newSizeGiB
+			v.StorageCapacityReservationGiB = newSizeGiB
+			return &newSizeGiB, nil
+		}
+	}
+	return nil, ErrNotFound
+}
+
+func (c *FakeCloudProvider) DeleteVolume(ctx context.Context, volumeId string) (err error) {
+	delete(c.volumes, volumeId)
 	for name, v := range c.volumes {
-		if v.VolumeId == volumeID {
+		if v.VolumeId == volumeId {
 			delete(c.volumes, name)
 		}
 	}
 	return nil
 }
 
-func (c *FakeCloudProvider) DescribeVolume(ctx context.Context, volumeID string) (*Volume, error) {
+func (c *FakeCloudProvider) DescribeVolume(ctx context.Context, volumeId string) (*Volume, error) {
 	for _, v := range c.volumes {
-		if v.VolumeId == volumeID {
+		if v.VolumeId == volumeId {
 			return v, nil
 		}
 	}
@@ -145,6 +170,10 @@ func (c *FakeCloudProvider) DescribeVolume(ctx context.Context, volumeID string)
 }
 
 func (c *FakeCloudProvider) WaitForVolumeAvailable(ctx context.Context, volumeId string) error {
+	return nil
+}
+
+func (c *FakeCloudProvider) WaitForVolumeResize(ctx context.Context, volumeId string, newSizeGiB int64) error {
 	return nil
 }
 
@@ -180,9 +209,9 @@ func (c *FakeCloudProvider) DeleteSnapshot(ctx context.Context, snapshotId strin
 	return nil
 }
 
-func (c *FakeCloudProvider) DescribeSnapshot(ctx context.Context, snapshotID string) (*Snapshot, error) {
+func (c *FakeCloudProvider) DescribeSnapshot(ctx context.Context, snapshotId string) (*Snapshot, error) {
 	for _, s := range c.snapshots {
-		if s.SnapshotID == snapshotID {
+		if s.SnapshotID == snapshotId {
 			return s, nil
 		}
 	}

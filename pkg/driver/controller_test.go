@@ -84,6 +84,7 @@ func TestCreateVolume(t *testing.T) {
 
 				driver := &Driver{
 					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
 					cloud:    mockCloud,
 				}
 
@@ -162,6 +163,7 @@ func TestCreateVolume(t *testing.T) {
 
 				driver := &Driver{
 					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
 					cloud:    mockCloud,
 				}
 
@@ -242,6 +244,7 @@ func TestCreateVolume(t *testing.T) {
 
 				driver := &Driver{
 					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
 					cloud:    mockCloud,
 				}
 
@@ -336,6 +339,7 @@ func TestCreateVolume(t *testing.T) {
 
 				driver := &Driver{
 					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
 					cloud:    mockCloud,
 				}
 
@@ -380,6 +384,7 @@ func TestCreateVolume(t *testing.T) {
 
 				driver := &Driver{
 					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
 					cloud:    mockCloud,
 				}
 
@@ -427,6 +432,7 @@ func TestCreateVolume(t *testing.T) {
 
 				driver := &Driver{
 					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
 					cloud:    mockCloud,
 				}
 
@@ -475,6 +481,7 @@ func TestCreateVolume(t *testing.T) {
 
 				driver := &Driver{
 					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
 					cloud:    mockCloud,
 				}
 
@@ -529,6 +536,7 @@ func TestCreateVolume(t *testing.T) {
 
 				driver := &Driver{
 					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
 					cloud:    mockCloud,
 				}
 
@@ -571,6 +579,7 @@ func TestCreateVolume(t *testing.T) {
 
 				driver := &Driver{
 					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
 					cloud:    mockCloud,
 				}
 
@@ -621,6 +630,7 @@ func TestCreateVolume(t *testing.T) {
 
 				driver := &Driver{
 					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
 					cloud:    mockCloud,
 				}
 
@@ -672,6 +682,7 @@ func TestCreateVolume(t *testing.T) {
 
 				driver := &Driver{
 					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
 					cloud:    mockCloud,
 				}
 
@@ -725,6 +736,7 @@ func TestCreateVolume(t *testing.T) {
 
 				driver := &Driver{
 					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
 					cloud:    mockCloud,
 				}
 
@@ -771,6 +783,7 @@ func TestCreateVolume(t *testing.T) {
 
 				driver := &Driver{
 					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
 					cloud:    mockCloud,
 				}
 
@@ -819,6 +832,7 @@ func TestDeleteVolume(t *testing.T) {
 
 				driver := &Driver{
 					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
 					cloud:    mockCloud,
 				}
 
@@ -845,6 +859,7 @@ func TestDeleteVolume(t *testing.T) {
 
 				driver := &Driver{
 					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
 					cloud:    mockCloud,
 				}
 
@@ -871,6 +886,7 @@ func TestDeleteVolume(t *testing.T) {
 
 				driver := &Driver{
 					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
 					cloud:    mockCloud,
 				}
 
@@ -897,6 +913,7 @@ func TestDeleteVolume(t *testing.T) {
 
 				driver := &Driver{
 					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
 					cloud:    mockCloud,
 				}
 
@@ -923,6 +940,7 @@ func TestDeleteVolume(t *testing.T) {
 
 				driver := &Driver{
 					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
 					cloud:    mockCloud,
 				}
 
@@ -949,6 +967,7 @@ func TestDeleteVolume(t *testing.T) {
 
 				driver := &Driver{
 					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
 					cloud:    mockCloud,
 				}
 
@@ -981,6 +1000,7 @@ func TestControllerGetCapabilities(t *testing.T) {
 
 	driver := &Driver{
 		endpoint: endpoint,
+		inFlight: internal.NewInFlight(),
 		cloud:    mockCloud,
 	}
 
@@ -1017,6 +1037,7 @@ func TestValidateVolumeCapabilities(t *testing.T) {
 
 				driver := &Driver{
 					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
 					cloud:    mockCloud,
 				}
 
@@ -1053,6 +1074,7 @@ func TestValidateVolumeCapabilities(t *testing.T) {
 
 				driver := &Driver{
 					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
 					cloud:    mockCloud,
 				}
 
@@ -1089,6 +1111,7 @@ func TestValidateVolumeCapabilities(t *testing.T) {
 
 				driver := &Driver{
 					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
 					cloud:    mockCloud,
 				}
 
@@ -1115,6 +1138,7 @@ func TestValidateVolumeCapabilities(t *testing.T) {
 
 				driver := &Driver{
 					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
 					cloud:    mockCloud,
 				}
 
@@ -1377,6 +1401,348 @@ func TestDeleteSnapshot(t *testing.T) {
 				_, err := driver.DeleteSnapshot(ctx, req)
 				if err == nil {
 					t.Fatalf("DeleteSnapshot is not failed: %v", err)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, tc.testFunc)
+	}
+}
+
+func TestControllerExpandVolume(t *testing.T) {
+	var (
+		dnsName               = "dnsName"
+		endpoint              = "endpoint"
+		filesystemId          = "fs-1234"
+		volumeId              = "fsvol-1234"
+		storageCapacity int64 = 100
+		currentBytes          = util.GiBToBytes(storageCapacity)
+		newCapacity     int64 = 150
+		requiredBytes         = util.GiBToBytes(newCapacity)
+		limitBytes            = util.GiBToBytes(newCapacity)
+		volumePath            = "/"
+	)
+	testCases := []struct {
+		name     string
+		testFunc func(t *testing.T)
+	}{
+		{
+			name: "success: filesystem",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockCloud := mocks.NewMockCloud(mockCtl)
+
+				driver := &Driver{
+					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
+					cloud:    mockCloud,
+				}
+
+				req := &csi.ControllerExpandVolumeRequest{
+					VolumeId: filesystemId,
+					CapacityRange: &csi.CapacityRange{
+						RequiredBytes: requiredBytes,
+						LimitBytes:    limitBytes,
+					},
+				}
+				filesystem := &cloud.FileSystem{
+					DnsName:         dnsName,
+					FileSystemId:    filesystemId,
+					StorageCapacity: storageCapacity,
+				}
+
+				ctx := context.Background()
+				mockCloud.EXPECT().DescribeFileSystem(gomock.Eq(ctx), gomock.Eq(filesystemId)).Return(filesystem, nil)
+				mockCloud.EXPECT().ResizeFileSystem(gomock.Eq(ctx), gomock.Eq(filesystemId), gomock.Any()).Return(&newCapacity, nil)
+				mockCloud.EXPECT().WaitForFileSystemResize(gomock.Eq(ctx), gomock.Eq(filesystemId), newCapacity).Return(nil)
+
+				resp, err := driver.ControllerExpandVolume(ctx, req)
+				if err != nil {
+					t.Fatalf("ControllerExpandVolume failed: %v", err)
+				}
+
+				if resp.CapacityBytes != requiredBytes {
+					t.Fatal("resp.CapacityBytes is not equal to requiredBytes")
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "success: volume",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockCloud := mocks.NewMockCloud(mockCtl)
+
+				driver := &Driver{
+					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
+					cloud:    mockCloud,
+				}
+
+				req := &csi.ControllerExpandVolumeRequest{
+					VolumeId: volumeId,
+					CapacityRange: &csi.CapacityRange{
+						RequiredBytes: requiredBytes,
+						LimitBytes:    limitBytes,
+					},
+				}
+				volume := &cloud.Volume{
+					FileSystemId:                  filesystemId,
+					VolumeId:                      volumeId,
+					StorageCapacityQuotaGiB:       storageCapacity,
+					StorageCapacityReservationGiB: storageCapacity,
+					VolumePath:                    volumePath,
+				}
+
+				ctx := context.Background()
+				mockCloud.EXPECT().DescribeVolume(gomock.Eq(ctx), gomock.Eq(volumeId)).Return(volume, nil)
+				mockCloud.EXPECT().ResizeVolume(gomock.Eq(ctx), gomock.Eq(volumeId), gomock.Any()).Return(&newCapacity, nil)
+				mockCloud.EXPECT().WaitForVolumeResize(gomock.Eq(ctx), gomock.Eq(volumeId), newCapacity).Return(nil)
+
+				resp, err := driver.ControllerExpandVolume(ctx, req)
+				if err != nil {
+					t.Fatalf("ControllerExpandVolume failed: %v", err)
+				}
+
+				if resp.CapacityBytes != requiredBytes {
+					t.Fatal("resp.CapacityBytes is not equal to requiredBytes")
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "success: newCapacity less than currentCapacity",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockCloud := mocks.NewMockCloud(mockCtl)
+				var lowerBytes int64 = 1
+
+				driver := &Driver{
+					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
+					cloud:    mockCloud,
+				}
+
+				req := &csi.ControllerExpandVolumeRequest{
+					VolumeId: filesystemId,
+					CapacityRange: &csi.CapacityRange{
+						RequiredBytes: lowerBytes,
+						LimitBytes:    limitBytes,
+					},
+				}
+				filesystem := &cloud.FileSystem{
+					DnsName:         dnsName,
+					FileSystemId:    filesystemId,
+					StorageCapacity: storageCapacity,
+				}
+
+				ctx := context.Background()
+				mockCloud.EXPECT().DescribeFileSystem(gomock.Eq(ctx), gomock.Eq(filesystemId)).Return(filesystem, nil)
+
+				resp, err := driver.ControllerExpandVolume(ctx, req)
+				if err != nil {
+					t.Fatalf("ControllerExpandVolume failed: %v", err)
+				}
+
+				if resp.CapacityBytes != currentBytes {
+					t.Fatal("resp.CapacityBytes is not equal to currentBytes")
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: required capacity greater than limit",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockCloud := mocks.NewMockCloud(mockCtl)
+
+				driver := &Driver{
+					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
+					cloud:    mockCloud,
+				}
+
+				req := &csi.ControllerExpandVolumeRequest{
+					VolumeId: filesystemId,
+					CapacityRange: &csi.CapacityRange{
+						RequiredBytes: requiredBytes,
+						LimitBytes:    1,
+					},
+				}
+
+				ctx := context.Background()
+
+				_, err := driver.ControllerExpandVolume(ctx, req)
+				if err == nil {
+					t.Fatalf("ControllerExpandVolume success: %v", err)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: missing volumeId",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockCloud := mocks.NewMockCloud(mockCtl)
+
+				driver := &Driver{
+					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
+					cloud:    mockCloud,
+				}
+
+				req := &csi.ControllerExpandVolumeRequest{
+					CapacityRange: &csi.CapacityRange{
+						RequiredBytes: requiredBytes,
+						LimitBytes:    limitBytes,
+					},
+				}
+
+				ctx := context.Background()
+
+				_, err := driver.ControllerExpandVolume(ctx, req)
+				if err == nil {
+					t.Fatalf("ControllerExpandVolume success: %v", err)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: missing capacity range",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockCloud := mocks.NewMockCloud(mockCtl)
+
+				driver := &Driver{
+					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
+					cloud:    mockCloud,
+				}
+
+				req := &csi.ControllerExpandVolumeRequest{
+					VolumeId: filesystemId,
+				}
+
+				ctx := context.Background()
+
+				_, err := driver.ControllerExpandVolume(ctx, req)
+				if err == nil {
+					t.Fatalf("ControllerExpandVolume success: %v", err)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: describe throws error",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockCloud := mocks.NewMockCloud(mockCtl)
+
+				driver := &Driver{
+					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
+					cloud:    mockCloud,
+				}
+
+				req := &csi.ControllerExpandVolumeRequest{
+					VolumeId: filesystemId,
+					CapacityRange: &csi.CapacityRange{
+						RequiredBytes: requiredBytes,
+						LimitBytes:    limitBytes,
+					},
+				}
+
+				ctx := context.Background()
+				mockCloud.EXPECT().DescribeFileSystem(gomock.Eq(ctx), gomock.Eq(filesystemId)).Return(nil, errors.New(""))
+
+				_, err := driver.ControllerExpandVolume(ctx, req)
+				if err == nil {
+					t.Fatalf("ControllerExpandVolume success: %v", err)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: resize throws error",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockCloud := mocks.NewMockCloud(mockCtl)
+
+				driver := &Driver{
+					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
+					cloud:    mockCloud,
+				}
+
+				req := &csi.ControllerExpandVolumeRequest{
+					VolumeId: filesystemId,
+					CapacityRange: &csi.CapacityRange{
+						RequiredBytes: requiredBytes,
+						LimitBytes:    limitBytes,
+					},
+				}
+				filesystem := &cloud.FileSystem{
+					DnsName:         dnsName,
+					FileSystemId:    filesystemId,
+					StorageCapacity: storageCapacity,
+				}
+
+				ctx := context.Background()
+				mockCloud.EXPECT().DescribeFileSystem(gomock.Eq(ctx), gomock.Eq(filesystemId)).Return(filesystem, nil)
+				mockCloud.EXPECT().ResizeFileSystem(gomock.Eq(ctx), gomock.Eq(filesystemId), gomock.Any()).Return(nil, errors.New(""))
+
+				_, err := driver.ControllerExpandVolume(ctx, req)
+				if err == nil {
+					t.Fatalf("ControllerExpandVolume success: %v", err)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: wait throws error",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockCloud := mocks.NewMockCloud(mockCtl)
+
+				driver := &Driver{
+					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
+					cloud:    mockCloud,
+				}
+
+				req := &csi.ControllerExpandVolumeRequest{
+					VolumeId: filesystemId,
+					CapacityRange: &csi.CapacityRange{
+						RequiredBytes: requiredBytes,
+						LimitBytes:    limitBytes,
+					},
+				}
+				filesystem := &cloud.FileSystem{
+					DnsName:         dnsName,
+					FileSystemId:    filesystemId,
+					StorageCapacity: storageCapacity,
+				}
+
+				ctx := context.Background()
+				mockCloud.EXPECT().DescribeFileSystem(gomock.Eq(ctx), gomock.Eq(filesystemId)).Return(filesystem, nil)
+				mockCloud.EXPECT().ResizeFileSystem(gomock.Eq(ctx), gomock.Eq(filesystemId), gomock.Any()).Return(&newCapacity, nil)
+				mockCloud.EXPECT().WaitForFileSystemResize(gomock.Eq(ctx), gomock.Eq(filesystemId), newCapacity).Return(errors.New(""))
+
+				_, err := driver.ControllerExpandVolume(ctx, req)
+				if err == nil {
+					t.Fatalf("ControllerExpandVolume success: %v", err)
 				}
 
 				mockCtl.Finish()
