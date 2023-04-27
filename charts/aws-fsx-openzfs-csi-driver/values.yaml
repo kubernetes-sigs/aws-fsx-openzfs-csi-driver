@@ -1,0 +1,212 @@
+# Default values for aws-fsx-openzfs-csi-driver.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+image:
+  # TODO: replace this temporary private ECR and regenerate the manifests when we are ready to release
+  repository: 633339324534.dkr.ecr.us-east-1.amazonaws.com/aws-fsx-openzfs-csi-driver
+  # Overrides the image tag whose default is v{{ .Chart.AppVersion }}
+  tag: v0.0.24
+  pullPolicy: IfNotPresent
+
+csidriver:
+  fsGroupPolicy: ReadWriteOnceWithFSType
+
+# -- Custom labels to add into metadata
+customLabels: {}
+# k8s-app: aws-fsx-openzfs-csi-driver
+
+sidecars:
+  livenessProbe:
+    image:
+      pullPolicy: IfNotPresent
+      repository: public.ecr.aws/eks-distro/kubernetes-csi/livenessprobe
+      tag: "v2.9.0-eks-1-26-latest"
+    resources: {}
+    securityContext:
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+  nodeDriverRegistrar:
+    env: []
+    image:
+      pullPolicy: IfNotPresent
+      repository: public.ecr.aws/eks-distro/kubernetes-csi/node-driver-registrar
+      tag: "v2.7.0-eks-1-26-latest"
+    logLevel: 2
+    resources: {}
+    securityContext:
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+  provisioner:
+    env: []
+    image:
+      pullPolicy: IfNotPresent
+      repository: public.ecr.aws/eks-distro/kubernetes-csi/external-provisioner
+      tag: "v3.4.0-eks-1-26-latest"
+    logLevel: 2
+    resources: {}
+    # Tune leader lease election for csi-provisioner.
+    # Leader election is on by default.
+    leaderElection:
+      enabled: true
+      # Optional values to tune lease behavior.
+      # The arguments provided must be in an acceptable time.ParseDuration format.
+      # Ref: https://pkg.go.dev/flag#Duration
+      # leaseDuration: "15s"
+      # renewDeadline: "10s"
+      # retryPeriod: "5s"
+    securityContext:
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+  resizer:
+    env: []
+    image:
+      pullPolicy: IfNotPresent
+      repository: public.ecr.aws/eks-distro/kubernetes-csi/external-resizer
+      tag: "v1.7.0-eks-1-26-latest"
+    logLevel: 2
+    resources: {}
+    securityContext:
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+  snapshotter:
+    # Enables the snapshotter sidecar even if the snapshot CRDs are not installed
+    forceEnable: false
+    env: []
+    image:
+      pullPolicy: IfNotPresent
+      repository: public.ecr.aws/eks-distro/kubernetes-csi/external-snapshotter/csi-snapshotter
+      tag: "v6.2.1-eks-1-26-latest"
+    logLevel: 2
+    resources: {}
+    securityContext:
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+
+imagePullSecrets: []
+nameOverride:
+fullnameOverride:
+
+controller:
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 1
+          preference:
+            matchExpressions:
+              - key: eks.amazonaws.com/compute-type
+                operator: NotIn
+                values:
+                  - fargate
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                    - fsx-openzfs-csi-controller
+            topologyKey: kubernetes.io/hostname
+          weight: 100
+  env: []
+  # Use envFrom to reference ConfigMaps and Secrets across all containers in the deployment
+  envFrom: []
+  logLevel: 2
+  nodeSelector: {}
+  podAnnotations: {}
+  podLabels: {}
+  priorityClassName: system-cluster-critical
+  replicaCount: 2
+  resources: {}
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  # type: RollingUpdate
+  # rollingUpdate:
+  #   maxSurge: 0
+  #   maxUnavailable: 1
+  serviceAccount:
+    # A service account will be created for you if set to true. Set to false if you want to use your own.
+    create: true
+    name: fsx-openzfs-csi-controller-sa
+    annotations: {}
+  tolerations:
+    - key: CriticalAddonsOnly
+      operator: Exists
+    - effect: NoExecute
+      operator: Exists
+      tolerationSeconds: 300
+  # securityContext on the controller pod
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+  volumes: []
+  volumeMounts: []
+  # securityContext on the controller container (see sidecars for securityContext on sidecar containers)
+  containerSecurityContext:
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+
+  # containers to be run before the controller's container starts.
+  #
+  # Example:
+  #
+  # - name: wait
+  #   image: busybox
+  #   command: [ 'sh', '-c', "sleep 20" ]
+  initContainers: []
+
+node:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: eks.amazonaws.com/compute-type
+                operator: NotIn
+                values:
+                  - fargate
+  dnsPolicy: ClusterFirst
+  dnsConfig: {}
+  # Example config which uses the AWS nameservers
+  # dnsPolicy: "None"
+  # dnsConfig:
+  #   nameservers:
+  #     - 169.254.169.253
+  env: []
+  envFrom: []
+  kubeletPath: /var/lib/kubelet
+  logLevel: 2
+  priorityClassName:
+  nodeSelector: {}
+  podAnnotations: {}
+  podLabels: {}
+  resources: {}
+  tolerateAllTaints: true
+  tolerations:
+    - operator: Exists
+      effect: NoExecute
+      tolerationSeconds: 300
+  serviceAccount:
+    create: true
+    name: fsx-openzfs-csi-node-sa
+    annotations: {}
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: "10%"
+  # securityContext on the node pod
+  securityContext:
+    # The node pod must be run as root to bind to the registration/driver sockets
+    runAsNonRoot: false
+    runAsUser: 0
+    runAsGroup: 0
+    fsGroup: 0
+  # securityContext on the node container (see sidecars for securityContext on sidecar containers)
+  containerSecurityContext:
+    readOnlyRootFilesystem: true
+    privileged: true

@@ -82,3 +82,26 @@ test:
 .PHONY: clean
 clean:
 	rm -rf .*image-* bin/
+
+bin /tmp/helm /tmp/kubeval:
+	@mkdir -p $@
+
+bin/helm: | /tmp/helm bin
+	@curl -o /tmp/helm/helm.tar.gz -sSL https://get.helm.sh/helm-v3.11.2-${GOOS}-amd64.tar.gz
+	@tar -zxf /tmp/helm/helm.tar.gz -C bin --strip-components=1
+	@rm -rf /tmp/helm/*
+
+.PHONY: verify-kustomize
+verify: verify-kustomize
+verify-kustomize:
+	@ echo; echo "### $@:"
+	@ ./hack/verify-kustomize
+
+.PHONY: generate-kustomize
+generate-kustomize: bin/helm
+	cd charts/aws-fsx-openzfs-csi-driver && ../../bin/helm template kustomize . -s templates/controller-deployment.yaml --api-versions 'snapshot.storage.k8s.io/v1' | sed -e "/namespace: /d" > ../../deploy/kubernetes/base/controller-deployment.yaml
+	cd charts/aws-fsx-openzfs-csi-driver && ../../bin/helm template kustomize . -s templates/csidriver.yaml > ../../deploy/kubernetes/base/csidriver.yaml
+	cd charts/aws-fsx-openzfs-csi-driver && ../../bin/helm template kustomize . -s templates/node-daemonset.yaml | sed -e "/namespace: /d" > ../../deploy/kubernetes/base/node-daemonset.yaml
+	cd charts/aws-fsx-openzfs-csi-driver && ../../bin/helm template kustomize . -s templates/poddisruptionbudget-controller.yaml --api-versions 'policy/v1/PodDisruptionBudget' | sed -e "/namespace: /d" > ../../deploy/kubernetes/base/poddisruptionbudget-controller.yaml
+	cd charts/aws-fsx-openzfs-csi-driver && ../../bin/helm template kustomize . -s templates/controller-serviceaccount.yaml | sed -e "/namespace: /d" > ../../deploy/kubernetes/base/controller-serviceaccount.yaml
+	cd charts/aws-fsx-openzfs-csi-driver && ../../bin/helm template kustomize . -s templates/node-serviceaccount.yaml | sed -e "/namespace: /d" > ../../deploy/kubernetes/base/node-serviceaccount.yaml

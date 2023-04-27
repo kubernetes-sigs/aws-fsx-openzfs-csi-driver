@@ -1,7 +1,12 @@
 ---
+# Source: aws-fsx-openzfs-csi-driver/templates/csidriver.yaml
 apiVersion: storage.k8s.io/v1
 kind: CSIDriver
 metadata:
   name: fsx.openzfs.csi.aws.com
+  labels:
+    app.kubernetes.io/name: aws-fsx-openzfs-csi-driver
 spec:
   attachRequired: false
+  podInfoOnMount: false
+  fsGroupPolicy: ReadWriteOnceWithFSType
