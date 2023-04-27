@@ -35,6 +35,7 @@ var (
 	controllerCaps = []csi.ControllerServiceCapability_RPC_Type{
 		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
 		csi.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT,
+		csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
 	}
 )
 
@@ -80,6 +81,13 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 	if len(volName) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume name not provided")
 	}
+
+	// check if a request is already in-flight
+	if ok := d.inFlight.Insert(volName); !ok {
+		msg := fmt.Sprintf("CreateVolume: "+internal.VolumeOperationAlreadyExistsErrorMsg, volName)
+		return nil, status.Error(codes.Aborted, msg)
+	}
+	defer d.inFlight.Delete(volName)
 
 	volCaps := req.GetVolumeCapabilities()
 	if len(volCaps) == 0 {
@@ -301,6 +309,13 @@ func (d *Driver) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest)
 		return nil, status.Error(codes.InvalidArgument, "VolumeId is empty")
 	}
 
+	// check if a request is already in-flight
+	if ok := d.inFlight.Insert(volumeID); !ok {
+		msg := fmt.Sprintf("DeleteVolume: "+internal.VolumeOperationAlreadyExistsErrorMsg, volumeID)
+		return nil, status.Error(codes.Aborted, msg)
+	}
+	defer d.inFlight.Delete(volumeID)
+
 	splitVolumeId := strings.SplitN(volumeID, "-", 2)
 	if splitVolumeId[0] == cloud.FilesystemPrefix {
 		err = d.cloud.DeleteFileSystem(ctx, volumeID)
@@ -353,7 +368,7 @@ func (d *Driver) ValidateVolumeCapabilities(ctx context.Context, req *csi.Valida
 
 	if err != nil {
 		if err == cloud.ErrNotFound {
-			return nil, status.Error(codes.NotFound, "Volume not found")
+			return nil, status.Errorf(codes.NotFound, "Volume not found with ID %q", volumeID)
 		}
 		return nil, status.Errorf(codes.Internal, "Could not get volume with ID %q: %v", volumeID, err)
 	}
@@ -485,7 +500,98 @@ func (d *Driver) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsReques
 }
 
 func (d *Driver) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
+	klog.V(4).Infof("ControllerExpandVolume: called with args %+v", *req)
+
+	volumeID := req.GetVolumeId()
+	if len(volumeID) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
+	}
+
+	// check if a request is already in-flight
+	if ok := d.inFlight.Insert(volumeID); !ok {
+		msg := fmt.Sprintf("ControllerExpandVolume: "+internal.VolumeOperationAlreadyExistsErrorMsg, volumeID)
+		return nil, status.Error(codes.Aborted, msg)
+	}
+	defer d.inFlight.Delete(volumeID)
+
+	capRange := req.GetCapacityRange()
+	if capRange == nil {
+		return nil, status.Error(codes.InvalidArgument, "Capacity range not provided")
+	}
+	if capRange.GetLimitBytes() > 0 && capRange.GetRequiredBytes() > capRange.GetLimitBytes() {
+		return nil, status.Errorf(codes.OutOfRange, "Requested storage capacity of %d bytes exceeds capacity limit of %d bytes.", capRange.GetRequiredBytes(), capRange.GetLimitBytes())
+	}
+
+	newCapacity := util.BytesToGiB(capRange.GetRequiredBytes())
+
+	splitVolumeId := strings.SplitN(volumeID, "-", 2)
+	if splitVolumeId[0] == cloud.FilesystemPrefix {
+		fs, err := d.cloud.DescribeFileSystem(ctx, volumeID)
+		if err != nil {
+			if err == cloud.ErrNotFound {
+				return nil, status.Errorf(codes.NotFound, "Filesystem not found with ID %q", volumeID)
+			}
+			return nil, status.Errorf(codes.Internal, "Could not get filesystem with ID %q: %v", volumeID, err)
+		}
+
+		if newCapacity <= fs.StorageCapacity {
+			// Current capacity is sufficient to satisfy the request
+			klog.V(4).Infof("ControllerExpandVolume: current filesystem capacity of %d GiB matches or exceeds requested storage capacity of %d GiB, returning with success", fs.StorageCapacity, newCapacity)
+			return &csi.ControllerExpandVolumeResponse{
+				CapacityBytes:         util.GiBToBytes(fs.StorageCapacity),
+				NodeExpansionRequired: false,
+			}, nil
+		}
+
+		finalCapacity, err := d.cloud.ResizeFileSystem(ctx, volumeID, newCapacity)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "resize failed: %v", err)
+		}
+
+		err = d.cloud.WaitForFileSystemResize(ctx, volumeID, *finalCapacity)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "filesystem is not resized: %v", err)
+		}
+
+		return &csi.ControllerExpandVolumeResponse{
+			CapacityBytes:         util.GiBToBytes(*finalCapacity),
+			NodeExpansionRequired: false,
+		}, nil
+	}
+	if splitVolumeId[0] == cloud.VolumePrefix {
+		v, err := d.cloud.DescribeVolume(ctx, volumeID)
+		if err != nil {
+			if err == cloud.ErrNotFound {
+				return nil, status.Errorf(codes.NotFound, "Volume not found with ID %q", volumeID)
+			}
+			return nil, status.Errorf(codes.Internal, "Could not get volume with ID %q: %v", volumeID, err)
+		}
+
+		if newCapacity <= v.StorageCapacityQuotaGiB {
+			// Current capacity is sufficient to satisfy the request
+			klog.V(4).Infof("ControllerExpandVolume: current volume capacity of %d GiB matches or exceeds requested storage capacity of %d GiB, returning with success", v.StorageCapacityQuotaGiB, newCapacity)
+			return &csi.ControllerExpandVolumeResponse{
+				CapacityBytes:         util.GiBToBytes(v.StorageCapacityQuotaGiB),
+				NodeExpansionRequired: false,
+			}, nil
+		}
+
+		finalCapacity, err := d.cloud.ResizeVolume(ctx, volumeID, newCapacity)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "resize failed: %v", err)
+		}
+
+		err = d.cloud.WaitForVolumeResize(ctx, volumeID, *finalCapacity)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "volume is not resized: %v", err)
+		}
+
+		return &csi.ControllerExpandVolumeResponse{
+			CapacityBytes:         util.GiBToBytes(*finalCapacity),
+			NodeExpansionRequired: false,
+		}, nil
+	}
+	return nil, status.Errorf(codes.NotFound, "Volume not found with ID %q", volumeID)
 }
 
 func (d *Driver) ControllerGetVolume(ctx context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {

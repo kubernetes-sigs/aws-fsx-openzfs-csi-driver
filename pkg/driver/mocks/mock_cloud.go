@@ -167,6 +167,36 @@ func (mr *MockCloudMockRecorder) DescribeVolume(arg0, arg1 interface{}) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeVolume", reflect.TypeOf((*MockCloud)(nil).DescribeVolume), arg0, arg1)
 }
 
+// ResizeFileSystem mocks base method.
+func (m *MockCloud) ResizeFileSystem(arg0 context.Context, arg1 string, arg2 int64) (*int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ResizeFileSystem", arg0, arg1, arg2)
+	ret0, _ := ret[0].(*int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ResizeFileSystem indicates an expected call of ResizeFileSystem.
+func (mr *MockCloudMockRecorder) ResizeFileSystem(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResizeFileSystem", reflect.TypeOf((*MockCloud)(nil).ResizeFileSystem), arg0, arg1, arg2)
+}
+
+// ResizeVolume mocks base method.
+func (m *MockCloud) ResizeVolume(arg0 context.Context, arg1 string, arg2 int64) (*int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ResizeVolume", arg0, arg1, arg2)
+	ret0, _ := ret[0].(*int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ResizeVolume indicates an expected call of ResizeVolume.
+func (mr *MockCloudMockRecorder) ResizeVolume(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResizeVolume", reflect.TypeOf((*MockCloud)(nil).ResizeVolume), arg0, arg1, arg2)
+}
+
 // WaitForFileSystemAvailable mocks base method.
 func (m *MockCloud) WaitForFileSystemAvailable(arg0 context.Context, arg1 string) error {
 	m.ctrl.T.Helper()
@@ -179,6 +209,20 @@ func (m *MockCloud) WaitForFileSystemAvailable(arg0 context.Context, arg1 string
 func (mr *MockCloudMockRecorder) WaitForFileSystemAvailable(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForFileSystemAvailable", reflect.TypeOf((*MockCloud)(nil).WaitForFileSystemAvailable), arg0, arg1)
+}
+
+// WaitForFileSystemResize mocks base method.
+func (m *MockCloud) WaitForFileSystemResize(arg0 context.Context, arg1 string, arg2 int64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WaitForFileSystemResize", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// WaitForFileSystemResize indicates an expected call of WaitForFileSystemResize.
+func (mr *MockCloudMockRecorder) WaitForFileSystemResize(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForFileSystemResize", reflect.TypeOf((*MockCloud)(nil).WaitForFileSystemResize), arg0, arg1, arg2)
 }
 
 // WaitForSnapshotAvailable mocks base method.
@@ -207,4 +251,18 @@ func (m *MockCloud) WaitForVolumeAvailable(arg0 context.Context, arg1 string) er
 func (mr *MockCloudMockRecorder) WaitForVolumeAvailable(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForVolumeAvailable", reflect.TypeOf((*MockCloud)(nil).WaitForVolumeAvailable), arg0, arg1)
+}
+
+// WaitForVolumeResize mocks base method.
+func (m *MockCloud) WaitForVolumeResize(arg0 context.Context, arg1 string, arg2 int64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WaitForVolumeResize", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// WaitForVolumeResize indicates an expected call of WaitForVolumeResize.
+func (mr *MockCloudMockRecorder) WaitForVolumeResize(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForVolumeResize", reflect.TypeOf((*MockCloud)(nil).WaitForVolumeResize), arg0, arg1, arg2)
 }

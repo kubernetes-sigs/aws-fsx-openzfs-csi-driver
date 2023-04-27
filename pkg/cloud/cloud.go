@@ -164,13 +164,17 @@ type FSx interface {
 
 type Cloud interface {
 	CreateFileSystem(ctx context.Context, fileSystemId string, fileSystemOptions FileSystemOptions) (*FileSystem, error)
+	ResizeFileSystem(ctx context.Context, fileSystemId string, newSizeGiB int64) (*int64, error)
 	DeleteFileSystem(ctx context.Context, fileSystemId string) error
 	DescribeFileSystem(ctx context.Context, fileSystemId string) (*FileSystem, error)
 	WaitForFileSystemAvailable(ctx context.Context, fileSystemId string) error
+	WaitForFileSystemResize(ctx context.Context, fileSystemId string, resizeGiB int64) error
 	CreateVolume(ctx context.Context, volumeId string, volumeOptions VolumeOptions) (*Volume, error)
+	ResizeVolume(ctx context.Context, volumeId string, newSizeGiB int64) (*int64, error)
 	DeleteVolume(ctx context.Context, volumeId string) error
 	DescribeVolume(ctx context.Context, volumeId string) (*Volume, error)
 	WaitForVolumeAvailable(ctx context.Context, volumeId string) error
+	WaitForVolumeResize(ctx context.Context, volumeId string, resizeGiB int64) error
 	CreateSnapshot(ctx context.Context, snapshotOptions SnapshotOptions) (snapshot *Snapshot, err error)
 	DeleteSnapshot(ctx context.Context, snapshotId string) error
 	DescribeSnapshot(ctx context.Context, snapshotId string) (*Snapshot, error)
@@ -279,6 +283,31 @@ func (c *cloud) CreateFileSystem(ctx context.Context, fileSystemId string, fileS
 	}, nil
 }
 
+func (c *cloud) ResizeFileSystem(ctx context.Context, fileSystemId string, newSizeGiB int64) (*int64, error) {
+	input := &fsx.UpdateFileSystemInput{
+		FileSystemId:    aws.String(fileSystemId),
+		StorageCapacity: aws.Int64(newSizeGiB),
+	}
+
+	_, err := c.fsx.UpdateFileSystemWithContext(ctx, input)
+	if err != nil {
+		if awsErr, ok := err.(awserr.Error); ok {
+			if awsErr.Code() == fsx.ErrCodeBadRequest &&
+				awsErr.Message() == "Unable to perform the storage capacity update. There is an update already in progress." {
+				// If a previous request timed out and was successful, don't error
+				_, err = c.getUpdateResizeFilesystemAdministrativeAction(ctx, fileSystemId, newSizeGiB)
+				if err != nil {
+					return nil, err
+				}
+			}
+		} else {
+			return nil, fmt.Errorf("UpdateFileSystem failed: %v", err)
+		}
+	}
+
+	return &newSizeGiB, nil
+}
+
 func (c *cloud) DeleteFileSystem(ctx context.Context, fileSystemId string) error {
 	fs, err := c.getFileSystem(ctx, fileSystemId)
 	if err != nil {
@@ -289,8 +318,7 @@ func (c *cloud) DeleteFileSystem(ctx context.Context, fileSystemId string) error
 	for _, tag := range fs.Tags {
 		if *tag.Key == SkipFinalBackupTagKey {
 			if tag.Value != nil {
-				//If the tag was manually modified and is no longer a bool, set the behavior to the CSI driver default of true
-				skipFinalBackup, err = util.StringToBoolPointer(*tag.Value)
+				skipFinalBackup, _ = util.StringToBoolPointer(*tag.Value)
 			}
 			break
 		}
@@ -356,6 +384,26 @@ func (c *cloud) WaitForFileSystemAvailable(ctx context.Context, fileSystemId str
 			return false, nil
 		default:
 			return true, fmt.Errorf("unexpected state for filesystem %s: %q", fileSystemId, *fs.Lifecycle)
+		}
+	})
+
+	return err
+}
+
+func (c *cloud) WaitForFileSystemResize(ctx context.Context, fileSystemId string, resizeGiB int64) error {
+	err := wait.Poll(PollCheckInterval, PollCheckTimeout, func() (done bool, err error) {
+		updateAction, err := c.getUpdateResizeFilesystemAdministrativeAction(ctx, fileSystemId, resizeGiB)
+		if err != nil {
+			return true, err
+		}
+		klog.V(2).Infof("WaitForFileSystemResize filesystem %q update status is: %q", fileSystemId, *updateAction.Status)
+		switch *updateAction.Status {
+		case fsx.StatusPending, fsx.StatusInProgress:
+			return false, nil
+		case fsx.StatusUpdatedOptimizing, fsx.StatusCompleted:
+			return true, nil
+		default:
+			return true, fmt.Errorf("update failed for filesystem %s: %q", fileSystemId, *updateAction.FailureDetails.Message)
 		}
 	})
 
@@ -449,6 +497,34 @@ func (c *cloud) CreateVolume(ctx context.Context, volumeId string, volumeOptions
 	}, nil
 }
 
+func (c *cloud) ResizeVolume(ctx context.Context, volumeId string, newSizeGiB int64) (*int64, error) {
+	input := &fsx.UpdateVolumeInput{
+		VolumeId: aws.String(volumeId),
+		OpenZFSConfiguration: &fsx.UpdateOpenZFSVolumeConfiguration{
+			StorageCapacityQuotaGiB:       aws.Int64(newSizeGiB),
+			StorageCapacityReservationGiB: aws.Int64(newSizeGiB),
+		},
+	}
+
+	_, err := c.fsx.UpdateVolumeWithContext(ctx, input)
+	if err != nil {
+		if awsErr, ok := err.(awserr.Error); ok {
+			if awsErr.Code() == fsx.ErrCodeBadRequest &&
+				awsErr.Message() == "Unable to update the volume because there are existing pending actions for the volume" {
+				// If a previous request timed out and was successful, don't error
+				_, err = c.getUpdateResizeVolumeAdministrativeAction(ctx, volumeId, newSizeGiB)
+				if err != nil {
+					return nil, err
+				}
+			}
+		} else {
+			return nil, fmt.Errorf("UpdateFileSystem failed: %v", err)
+		}
+	}
+
+	return &newSizeGiB, nil
+}
+
 func (c *cloud) DeleteVolume(ctx context.Context, volumeId string) error {
 	input := fsx.DeleteVolumeInput{
 		VolumeId: aws.String(volumeId),
@@ -495,6 +571,26 @@ func (c *cloud) WaitForVolumeAvailable(ctx context.Context, volumeId string) err
 			return false, nil
 		default:
 			return true, fmt.Errorf("unexpected state for volume %s: %q", volumeId, *v.Lifecycle)
+		}
+	})
+
+	return err
+}
+
+func (c *cloud) WaitForVolumeResize(ctx context.Context, volumeId string, resizeGiB int64) error {
+	err := wait.Poll(PollCheckInterval, PollCheckTimeout, func() (done bool, err error) {
+		updateAction, err := c.getUpdateResizeVolumeAdministrativeAction(ctx, volumeId, resizeGiB)
+		if err != nil {
+			return true, err
+		}
+		klog.V(2).Infof("WaitForVolumeResize volume %q update status is: %q", volumeId, *updateAction.Status)
+		switch *updateAction.Status {
+		case fsx.StatusPending, fsx.StatusInProgress:
+			return false, nil
+		case fsx.StatusUpdatedOptimizing, fsx.StatusCompleted:
+			return true, nil
+		default:
+			return true, fmt.Errorf("update failed for volume %s: %q", volumeId, *updateAction.FailureDetails.Message)
 		}
 	})
 
@@ -711,6 +807,57 @@ func (c *cloud) getVolumeId(ctx context.Context, volumeId string) (*string, erro
 	} else {
 		return nil, fmt.Errorf("volume id %s is improperly formatted", volumeId)
 	}
+}
+
+// getUpdateResizeFilesystemAdministrativeAction retrieves the AdministrativeAction associated with a file system update with the
+// given target storage capacity, if one exists.
+func (c *cloud) getUpdateResizeFilesystemAdministrativeAction(ctx context.Context, fileSystemId string, resizeGiB int64) (*fsx.AdministrativeAction, error) {
+	fs, err := c.getFileSystem(ctx, fileSystemId)
+	if err != nil {
+		return nil, fmt.Errorf("DescribeFileSystems failed: %v", err)
+	}
+
+	if len(fs.AdministrativeActions) == 0 {
+		return nil, fmt.Errorf("there is no update on filesystem %s", fileSystemId)
+	}
+
+	// AdministrativeActions are sorted from newest to oldest
+	for _, action := range fs.AdministrativeActions {
+		if *action.AdministrativeActionType == fsx.AdministrativeActionTypeFileSystemUpdate &&
+			action.TargetFileSystemValues.StorageCapacity != nil &&
+			*action.TargetFileSystemValues.StorageCapacity == resizeGiB {
+			return action, nil
+		}
+	}
+
+	return nil, fmt.Errorf("there is no update with storage capacity of %d GiB on filesystem %s", resizeGiB, fileSystemId)
+}
+
+// getUpdateResizeVolumeAdministrativeAction retrieves the AdministrativeAction associated with a volume update with the
+// given target storage capacity, if one exists.
+func (c *cloud) getUpdateResizeVolumeAdministrativeAction(ctx context.Context, volumeId string, resizeGiB int64) (*fsx.AdministrativeAction, error) {
+	v, err := c.getVolume(ctx, volumeId)
+	if err != nil {
+		return nil, fmt.Errorf("DescribeVolumes failed: %v", err)
+	}
+
+	if len(v.AdministrativeActions) == 0 {
+		return nil, fmt.Errorf("there is no update on volume %s", volumeId)
+	}
+
+	// AdministrativeActions are sorted from newest to oldest
+	for _, action := range v.AdministrativeActions {
+		if *action.AdministrativeActionType == fsx.AdministrativeActionTypeVolumeUpdate &&
+			action.TargetVolumeValues.OpenZFSConfiguration != nil &&
+			action.TargetVolumeValues.OpenZFSConfiguration.StorageCapacityQuotaGiB != nil &&
+			*action.TargetVolumeValues.OpenZFSConfiguration.StorageCapacityQuotaGiB == resizeGiB &&
+			action.TargetVolumeValues.OpenZFSConfiguration.StorageCapacityReservationGiB != nil &&
+			*action.TargetVolumeValues.OpenZFSConfiguration.StorageCapacityReservationGiB == resizeGiB {
+			return action, nil
+		}
+	}
+
+	return nil, fmt.Errorf("there is no update with storage capacity of %d GiB on volume %s", resizeGiB, volumeId)
 }
 
 func (c *cloud) parseDiskIopsConfiguration(input string) (*fsx.DiskIopsConfiguration, error) {
