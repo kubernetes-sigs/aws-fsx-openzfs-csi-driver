@@ -1,0 +1,22 @@
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: fsx-sc-restore
+provisioner: fsx.openzfs.csi.aws.com
+parameters:
+  volumeType: "volume" #REQUIRED
+  parentVolumeId: "fsvol-03062e7ff37662dff" #REQUIRED
+  copyTagsToSnapshots: "false"
+  dataCompressionType: "NONE"
+  nfsExports: "[{ClientConfigurations=[{Clients=*,Options=[rw,crossmnt]}]}]"
+  readOnly: "false"
+  recordSizeKiB: "128"
+  userAndGroupQuotas: "[{Id=1,StorageCapacityQuotaGiB=10,Type=USER}]"
+  tags: "Tag1=Value1,Tag2=Value2"
+reclaimPolicy: Delete
+allowVolumeExpansion: true
+mountOptions:
+  - nfsvers=4.1
+  - rsize=1048576
+  - wsize=1048576
+  - timeo=600

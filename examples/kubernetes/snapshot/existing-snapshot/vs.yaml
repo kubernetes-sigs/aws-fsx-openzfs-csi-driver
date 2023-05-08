@@ -1,0 +1,9 @@
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshot
+metadata:
+  name: fsx-vs
+  namespace: default
+spec:
+  volumeSnapshotClassName: fsx-snapshot-class
+  source:
+    volumeSnapshotContentName: fsx-snapshot-content

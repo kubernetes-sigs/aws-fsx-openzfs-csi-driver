@@ -1,0 +1,14 @@
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotContent
+metadata:
+  name: fsx-snapshot-content
+spec:
+  volumeSnapshotRef:
+    kind: VolumeSnapshot
+    name: fsx-vs
+    namespace: default
+  source:
+    snapshotHandle: fsvolsnap-0809d8f1df40a7427
+  driver: fsx.openzfs.csi.aws.com
+  deletionPolicy: Delete
+  volumeSnapshotClassName: fsx-snapshot-class

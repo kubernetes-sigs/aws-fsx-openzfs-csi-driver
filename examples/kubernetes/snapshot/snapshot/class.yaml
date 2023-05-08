@@ -1,0 +1,8 @@
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: fsx-snapshot-class
+driver: fsx.openzfs.csi.aws.com
+deletionPolicy: Delete
+parameters:
+  tags: "Tag1=Value1,Tag2=Value2"
