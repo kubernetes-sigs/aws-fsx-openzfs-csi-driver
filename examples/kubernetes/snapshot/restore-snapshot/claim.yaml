@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: fsx-restored-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: fsx-sc-restore
+  resources:
+    requests:
+      storage: 10Gi
+  dataSource:
+    name: fsx-vs
+    kind: VolumeSnapshot
+    apiGroup: snapshot.storage.k8s.io

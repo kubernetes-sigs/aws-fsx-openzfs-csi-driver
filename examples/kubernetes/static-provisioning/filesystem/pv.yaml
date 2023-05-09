@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: fsx-pv
+spec:
+  capacity:
+    storage: 64Gi
+  accessModes:
+    - ReadWriteMany
+  mountOptions:
+    - nfsvers=4.1
+    - rsize=1048576
+    - wsize=1048576
+    - timeo=600
+  persistentVolumeReclaimPolicy: Delete
+  csi:
+    driver: fsx.openzfs.csi.aws.com
+    volumeHandle: "fsvol-0281aee0779ea975e"
+    volumeAttributes:
+      dnsName: "fs-078106df77a01f1f7.fsx.us-east-1.aws.internal"
+      volumeType: "filesystem"
