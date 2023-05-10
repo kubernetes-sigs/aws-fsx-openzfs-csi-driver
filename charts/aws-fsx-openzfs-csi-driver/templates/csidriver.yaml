@@ -1,0 +1,10 @@
+apiVersion: {{ ternary "storage.k8s.io/v1" "storage.k8s.io/v1beta1" (semverCompare ">=1.18.0-0" .Capabilities.KubeVersion.Version) }}
+kind: CSIDriver
+metadata:
+  name: fsx.openzfs.csi.aws.com
+  labels:
+    {{- include "aws-fsx-openzfs-csi-driver.labels" . | nindent 4 }}
+spec:
+  attachRequired: false
+  podInfoOnMount: false
+  fsGroupPolicy: {{ .Values.csidriver.fsGroupPolicy }}

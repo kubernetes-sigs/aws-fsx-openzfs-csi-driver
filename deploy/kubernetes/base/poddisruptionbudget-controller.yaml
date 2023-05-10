@@ -1,0 +1,14 @@
+---
+# Source: aws-fsx-openzfs-csi-driver/templates/poddisruptionbudget-controller.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: fsx-openzfs-csi-controller
+  labels:
+    app.kubernetes.io/name: aws-fsx-openzfs-csi-driver
+spec:
+  selector:
+    matchLabels:
+      app: fsx-openzfs-csi-controller
+      app.kubernetes.io/name: aws-fsx-openzfs-csi-driver
+  maxUnavailable: 1
