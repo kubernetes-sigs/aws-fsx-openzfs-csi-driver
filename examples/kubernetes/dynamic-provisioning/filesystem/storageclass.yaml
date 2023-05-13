@@ -8,8 +8,9 @@ parameters:
   deploymentType: "SINGLE_AZ_1" #REQUIRED
   throughputCapacity: "64" #REQUIRED
   subnetIds: "subnet-0eabfaa81fb22bcaf" #REQUIRED
-  skipFinalBackup: "true" #REQUIRED
-  kmsKey: "12345678-90ab-cdef-ghij-klmnopqrstuv"
+  skipFinalBackupOnDeletion: "true" #REQUIRED, SET ON DELETION
+  optionsOnDeletion: "[DELETE_CHILD_VOLUMES_AND_SNAPSHOTS]" #SET ON DELETION
+  kmsKeyId: "12345678-90ab-cdef-ghij-klmnopqrstuv"
   automaticBackupRetentionDays: "1"
   copyTagsToBackups: "false"
   copyTagsToVolumes: "false"
