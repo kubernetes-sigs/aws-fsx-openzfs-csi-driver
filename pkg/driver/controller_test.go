@@ -1288,6 +1288,61 @@ func TestCreateSnapshot(t *testing.T) {
 			},
 		},
 		{
+			name: "success: required parameters",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockCloud := mocks.NewMockCloud(mockCtl)
+
+				driver := &Driver{
+					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
+					cloud:    mockCloud,
+				}
+
+				req := &csi.CreateSnapshotRequest{
+					SourceVolumeId: fsVolumeId,
+					Name:           snapshotName,
+					Parameters:     map[string]string{},
+				}
+
+				ctx := context.Background()
+				snapshot := &cloud.Snapshot{
+					SnapshotID:     snapshotId,
+					SourceVolumeID: fsRootVolumeId,
+					CreationTime:   creationTime,
+				}
+				mockCloud.EXPECT().CreateSnapshot(gomock.Eq(ctx), gomock.Any()).Return(snapshot, nil)
+				mockCloud.EXPECT().WaitForSnapshotAvailable(gomock.Eq(ctx), gomock.Eq(snapshotId)).Return(nil)
+
+				resp, err := driver.CreateSnapshot(ctx, req)
+				if err != nil {
+					t.Fatalf("CreateSnapshot failed: %v", err)
+				}
+
+				if resp.Snapshot == nil {
+					t.Fatal("resp.Snapshot is nil")
+				}
+
+				if resp.Snapshot.SnapshotId != snapshotId {
+					t.Fatalf("SnapshotId mismatches. actual: %v expected %v", resp.Snapshot.SnapshotId, snapshotId)
+				}
+
+				if resp.Snapshot.SourceVolumeId != fsRootVolumeId {
+					t.Fatalf("SourceVolumeId mismatches. actual: %v expected %v", resp.Snapshot.SourceVolumeId, fsRootVolumeId)
+				}
+
+				if resp.Snapshot.CreationTime.String() != timestamppb.New(creationTime).String() {
+					t.Fatalf("CreationTime mismatches. actual: %v expected %v", resp.Snapshot.CreationTime, timestamppb.New(creationTime))
+				}
+
+				if !resp.Snapshot.ReadyToUse {
+					t.Fatal("Snapshot is not ready to use")
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
 			name: "fail: snapshot name not provided",
 			testFunc: func(t *testing.T) {
 				mockCtl := gomock.NewController(t)
@@ -1328,6 +1383,35 @@ func TestCreateSnapshot(t *testing.T) {
 				req := &csi.CreateSnapshotRequest{
 					Name:       snapshotName,
 					Parameters: map[string]string{"tags": tags},
+				}
+
+				ctx := context.Background()
+				_, err := driver.CreateSnapshot(ctx, req)
+				if err == nil {
+					t.Fatal("CreateSnapshot is not failed")
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: invalid parameter",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockCloud := mocks.NewMockCloud(mockCtl)
+
+				driver := &Driver{
+					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
+					cloud:    mockCloud,
+				}
+
+				req := &csi.CreateSnapshotRequest{
+					Name: snapshotName,
+					Parameters: map[string]string{
+						"tags": tags,
+						"key":  "value",
+					},
 				}
 
 				ctx := context.Background()
