@@ -19,6 +19,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -66,6 +67,7 @@ const (
 	volumeParamsReadOnly                      = "readOnly"
 	volumeParamsRecordSizeKiB                 = "recordSizeKiB"
 	volumeParamsUserAndGroupQuotas            = "userAndGroupQuotas"
+	snapshotParamsTags                        = "tags"
 )
 
 const (
@@ -424,9 +426,9 @@ func (d *Driver) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequ
 		return nil, status.Error(codes.InvalidArgument, "Snapshot volume source ID not provided")
 	}
 
+	snapshotParams := req.Parameters
 	snapshotName := req.GetName()
 	volumeID := req.GetSourceVolumeId()
-	tags := req.Parameters["tags"]
 
 	// check if a request is already in-flight
 	if ok := d.inFlight.Insert(snapshotName); !ok {
@@ -438,7 +440,15 @@ func (d *Driver) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequ
 	opts := cloud.SnapshotOptions{
 		SnapshotName:   &snapshotName,
 		SourceVolumeId: &volumeID,
-		Tags:           &tags,
+	}
+
+	for key, value := range snapshotParams {
+		switch key {
+		case snapshotParamsTags:
+			opts.Tags = aws.String(value)
+		default:
+			return nil, status.Errorf(codes.InvalidArgument, "invalid parameter of %s: %s", key, value)
+		}
 	}
 
 	snapshot, err := d.cloud.CreateSnapshot(ctx, opts)
