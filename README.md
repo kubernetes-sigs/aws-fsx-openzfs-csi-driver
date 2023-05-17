@@ -1,42 +1,42 @@
-**WARNING**: This driver is in pre ALPHA currently. This means that there may potentially be backwards compatible breaking changes moving forward. Do NOT use this driver in a production environment in its current state.
+**WARNING**: This driver is currently in a **PRE-ALPHA stage**. This means that there may be backwards compatible breaking changes moving forward. Do NOT use this driver in a production environment in its current state.
 
-**DISCLAIMER**: This is not an officially supported Amazon product
+**DISCLAIMER**: This is not an officially supported Amazon product.
 
 ## Amazon FSx for OpenZFS CSI Driver
-### Overview
+[![Go Report Card](https://goreportcard.com/badge/github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver)](https://goreportcard.com/report/github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver)
 
+### Overview
 The [Amazon FSx for OpenZFS](https://aws.amazon.com/fsx/openzfs/) Container Storage Interface (CSI) Driver provides a [CSI](https://github.com/container-storage-interface/spec/blob/master/spec.md) interface used by container orchestrators to manage the lifecycle of Amazon FSx for OpenZFS file systems and volumes.
 
-This driver is in alpha stage. Basic volume operations that are functional include NodePublishVolume/NodeUnpublishVolume.
+### Features
+* **Static Provisioning** - Associate an externally-created FSx for OpenZFS file system or volume with a [PersistentVolume](https://kubernetes.io/docs/concepts/storage/persistent-volumes/) (PV) for consumption within Kubernetes.
+* **Dynamic Provisioning** - Automatically create FSx for OpenZFS file systems or volumes and associated [PersistentVolumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/) (PV) from [PersistentVolumeClaims](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#dynamic)) (PVC). Parameters can be passed via a [StorageClass](https://kubernetes.io/docs/concepts/storage/storage-classes/#the-storageclass-resource) for fine-grained control over volume creation.
+* **Mount Options** - NFS Mount options can be specified in the [PersistentVolume](https://kubernetes.io/docs/concepts/storage/persistent-volumes/) (PV) resource to define how the volume should be mounted.
+* **Volume Snapshots** - Create and restore [snapshots](https://kubernetes.io/docs/concepts/storage/volume-snapshots/) taken from a volume in Kubernetes.
+* **Volume Resizing** - Expand the Persistent Volume by specifying a new size in the [PersistentVolumeClaim](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#expanding-persistent-volumes-claims) (PVC).
 
-### CSI Specification Compatibility Matrix
-| AWS FSx for OpenZFS CSI Driver \ CSI Version | v1.x.x |
-|----------------------------------------------|--------|
-| master branch                                | yes    |
-
-### Kubernetes Version Compatibility Matrix
-| AWS FSx for OpenZFS CSI Driver \ Kubernetes Version | v1.17+ |
-|-----------------------------------------------------|--------|
-| master branch                                       | yes    |
-
-## Features
-* Dynamic Provisioning - Automatically create FSx OpenZFS file systems and volumes based on configurations. These can then be mounted to a given pod.
-* Static Provisioning - An FSx for OpenZFS file system or volume needs to be created manually first, then it could be mounted inside container as a volume using the driver.
-* Mount Options - NFS mount options can be specified in a storage class to define how the volume should be mounted.
-
-## CSI Interfaces
-* Controller Service: ControllerGetCapabilities, CreateVolume, DeleteVolume, CreateSnapshot, DeleteSnapshot
+### CSI Interfaces
+* Controller Service: ControllerGetCapabilities, CreateVolume, DeleteVolume, CreateSnapshot, DeleteSnapshot, ControllerExpandVolume
 * Node Service: NodePublishVolume, NodeUnpublishVolume, NodeGetCapabilities, NodeGetInfo, NodeGetId
 * Identity Service: GetPluginInfo, GetPluginCapabilities, Probe
 
-## Development
-Please go through [CSI Spec](https://github.com/container-storage-interface/spec/blob/master/spec.md) and [General CSI driver development guideline](https://kubernetes-csi.github.io/docs/Development.html) to get some basic understanding of CSI driver before you start.
+### Support
 
-### Requirements
-* Golang 1.9+
+Support will be provided for the latest version and one prior version. Bugs or vulnerabilities found in the latest version will be backported to the previous release in a new minor version.
 
-### Testing
-To execute all unit tests, run: `make test`
+This policy is non-binding and subject to change.
 
-## License
+### Compatibility
+
+The FSx for OpenZFS CSI Driver is compatible with Kubernetes versions v1.17+ and implements the CSI Specification v1.1.0.
+
+### Documentation
+
+* [Driver Installation](docs/install.md)
+* [StorageClass Parameters](docs/parameters.md)
+* [Volume Tagging](docs/tagging.md)
+* [Kubernetes Examples](/examples/kubernetes)
+* [Development and Contributing](CONTRIBUTING.md)
+
+### License
 This library is licensed under the Apache 2.0 License. 
