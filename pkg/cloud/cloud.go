@@ -49,8 +49,10 @@ const (
 const (
 	// VolumeNameTagKey is the key value that refers to the volume's name.
 	VolumeNameTagKey = "CSIVolumeName"
-	// SkipFinalBackupTagKey is the key value that stores whether or not a user wants to SkipFinalBackup during delete
-	SkipFinalBackupTagKey = "CSISkipFinalBackup"
+	// SkipFinalBackupOnDeletionTagKey is the key value that stores whether a user wants to SkipFinalBackup during delete
+	SkipFinalBackupOnDeletionTagKey = "CSISkipFinalBackupOnDeletion"
+	// OptionsOnDeletionTagKey is the key value that stores the Options the user wishes to configure when the file system or volume is deleted.
+	OptionsOnDeletionTagKey = "CSIOptionsOnDeletion"
 	// SnapshotNameTagKey is the key value that refers to the snapshot's name.
 	SnapshotNameTagKey = "CSIVolumeSnapshotName"
 	// AwsFsxOpenZfsDriverTagKey is the tag to identify if a volume/snapshot is managed by the openzfs csi driver
@@ -103,7 +105,8 @@ type FileSystemOptions struct {
 	StorageCapacity               *int64
 	SubnetIds                     []string
 	Tags                          *string
-	SkipFinalBackup               *bool
+	OptionsOnDeletion             *string
+	SkipFinalBackupOnDeletion     *bool
 }
 
 // Volume represents an OpenZFS volume
@@ -129,6 +132,7 @@ type VolumeOptions struct {
 	UserAndGroupQuotas            *string
 	Tags                          *string
 	SnapshotARN                   *string
+	OptionsOnDeletion             *string
 }
 
 // Snapshot represents an OpenZFS volume snapshot
@@ -160,6 +164,7 @@ type FSx interface {
 	CreateSnapshotWithContext(aws.Context, *fsx.CreateSnapshotInput, ...request.Option) (*fsx.CreateSnapshotOutput, error)
 	DeleteSnapshotWithContext(aws.Context, *fsx.DeleteSnapshotInput, ...request.Option) (*fsx.DeleteSnapshotOutput, error)
 	DescribeSnapshotsWithContext(aws.Context, *fsx.DescribeSnapshotsInput, ...request.Option) (*fsx.DescribeSnapshotsOutput, error)
+	ListTagsForResource(*fsx.ListTagsForResourceInput) (*fsx.ListTagsForResourceOutput, error)
 }
 
 type Cloud interface {
@@ -247,11 +252,31 @@ func (c *cloud) CreateFileSystem(ctx context.Context, fileSystemId string, fileS
 		tags = append(tags, userTags...)
 	}
 
-	//Store SkipFinalBackup as a tag, so we can retrieve it during delete
-	if fileSystemOptions.SkipFinalBackup != nil {
+	// Store OptionsOnDeletion and SkipFinalBackupOnDeletion
+	// as tags on the file system so we can retrieve them at deletion time.
+	if fileSystemOptions.OptionsOnDeletion != nil {
+		// Values in FSx tags cannot contain bracket characters or commas,
+		// so we must trim the brackets from the user provided string and use spaces to delimit different options
+		optionsOnDeletion := strings.Trim(*fileSystemOptions.OptionsOnDeletion, "[]")
+		optionsOnDeletion = strings.ReplaceAll(optionsOnDeletion, ",", " ")
+
+		// Validate the user provided options
+		for _, option := range strings.Split(optionsOnDeletion, " ") {
+			if !util.Contains(fsx.DeleteFileSystemOpenZFSOption_Values(), option) {
+				return nil, fmt.Errorf("%s is not a valid deletion option", option)
+			}
+		}
+
 		tags = append(tags, &fsx.Tag{
-			Key:   aws.String(SkipFinalBackupTagKey),
-			Value: util.BoolToStringPointer(*fileSystemOptions.SkipFinalBackup),
+			Key:   aws.String(OptionsOnDeletionTagKey),
+			Value: aws.String(optionsOnDeletion),
+		})
+	}
+
+	if fileSystemOptions.SkipFinalBackupOnDeletion != nil {
+		tags = append(tags, &fsx.Tag{
+			Key:   aws.String(SkipFinalBackupOnDeletionTagKey),
+			Value: util.BoolToStringPointer(*fileSystemOptions.SkipFinalBackupOnDeletion),
 		})
 	}
 
@@ -315,12 +340,19 @@ func (c *cloud) DeleteFileSystem(ctx context.Context, fileSystemId string) error
 	}
 
 	var skipFinalBackup *bool
+	var options []*string
 	for _, tag := range fs.Tags {
-		if *tag.Key == SkipFinalBackupTagKey {
-			if tag.Value != nil {
-				skipFinalBackup, _ = util.StringToBoolPointer(*tag.Value)
+		if *tag.Key == OptionsOnDeletionTagKey && tag.Value != nil {
+			// Only add valid deletion options to prevent errors if the user altered the tag value
+			for _, option := range strings.Split(*tag.Value, " ") {
+				if util.Contains(fsx.DeleteFileSystemOpenZFSOption_Values(), option) {
+					options = append(options, aws.String(option))
+				} else {
+					klog.V(2).InfoS("Ignoring invalid deletion option", "option", option)
+				}
 			}
-			break
+		} else if *tag.Key == SkipFinalBackupOnDeletionTagKey && tag.Value != nil {
+			skipFinalBackup, _ = util.StringToBoolPointer(*tag.Value)
 		}
 	}
 
@@ -336,6 +368,7 @@ func (c *cloud) DeleteFileSystem(ctx context.Context, fileSystemId string) error
 
 	openZFSConfiguration := &fsx.DeleteFileSystemOpenZFSConfiguration{
 		FinalBackupTags: finalBackupTags,
+		Options:         options,
 		SkipFinalBackup: skipFinalBackup,
 	}
 
@@ -470,6 +503,25 @@ func (c *cloud) CreateVolume(ctx context.Context, volumeId string, volumeOptions
 		tags = append(tags, userTags...)
 	}
 
+	// Store OptionsOnDeletion as a tag on the volume so we can retrieve it at deletion time.
+	if volumeOptions.OptionsOnDeletion != nil {
+		// Values in FSx tags cannot contain bracket characters or commas,
+		// so we must trim the brackets from the user provided string and use spaces to delimit different options
+		optionsOnDeletion := strings.Trim(*volumeOptions.OptionsOnDeletion, "[]")
+		optionsOnDeletion = strings.ReplaceAll(optionsOnDeletion, ",", " ")
+		// Validate the user provided options
+		for _, option := range strings.Split(optionsOnDeletion, " ") {
+			if !util.Contains(fsx.DeleteOpenZFSVolumeOption_Values(), option) {
+				return nil, fmt.Errorf("%s is not a valid volume deletion option", option)
+			}
+		}
+
+		tags = append(tags, &fsx.Tag{
+			Key:   aws.String(OptionsOnDeletionTagKey),
+			Value: aws.String(optionsOnDeletion),
+		})
+	}
+
 	input := fsx.CreateVolumeInput{
 		ClientRequestToken:   aws.String(volumeId),
 		Name:                 volumeOptions.Name,
@@ -526,11 +578,43 @@ func (c *cloud) ResizeVolume(ctx context.Context, volumeId string, newSizeGiB in
 }
 
 func (c *cloud) DeleteVolume(ctx context.Context, volumeId string) error {
-	input := fsx.DeleteVolumeInput{
-		VolumeId: aws.String(volumeId),
+	v, err := c.getVolume(ctx, volumeId)
+	if err != nil {
+		return err
 	}
 
-	_, err := c.fsx.DeleteVolumeWithContext(ctx, &input)
+	tags, err := c.getTagsForResource(*v.ResourceARN)
+	if err != nil {
+		return err
+	}
+
+	var options []*string
+	for _, tag := range tags {
+		if *tag.Key == OptionsOnDeletionTagKey {
+			if tag.Value != nil {
+				// Only add valid deletion options to prevent errors if the user altered the tag value
+				for _, option := range strings.Split(*tag.Value, " ") {
+					if util.Contains(fsx.DeleteOpenZFSVolumeOption_Values(), option) {
+						options = append(options, aws.String(option))
+					} else {
+						klog.V(2).InfoS("Ignoring invalid deletion option", "option", option)
+					}
+				}
+			}
+			break
+		}
+	}
+
+	openZFSConfiguration := &fsx.DeleteVolumeOpenZFSConfiguration{
+		Options: options,
+	}
+
+	input := fsx.DeleteVolumeInput{
+		VolumeId:             aws.String(volumeId),
+		OpenZFSConfiguration: openZFSConfiguration,
+	}
+
+	_, err = c.fsx.DeleteVolumeWithContext(ctx, &input)
 	if err != nil {
 		if awsErr, ok := err.(awserr.Error); ok {
 			if awsErr.Code() == fsx.ErrCodeVolumeNotFound {
@@ -782,6 +866,19 @@ func (c *cloud) getSnapshot(ctx context.Context, snapshotId string) (*fsx.Snapsh
 	}
 
 	return output.Snapshots[0], nil
+}
+
+func (c *cloud) getTagsForResource(resourceARN string) ([]*fsx.Tag, error) {
+	input := &fsx.ListTagsForResourceInput{
+		ResourceARN: aws.String(resourceARN),
+	}
+
+	output, err := c.fsx.ListTagsForResource(input)
+	if err != nil {
+		return nil, err
+	}
+
+	return output.Tags, nil
 }
 
 // getVolumeId Parses the volumeId to determine if it is the id of a file system or an OpenZFS volume.

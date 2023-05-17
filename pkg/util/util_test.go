@@ -129,3 +129,49 @@ func TestMapValues(t *testing.T) {
 		})
 	}
 }
+
+func TestContains(t *testing.T) {
+	testCases := []struct {
+		name     string
+		slice    []string
+		element  string
+		expected bool
+	}{
+		{
+			name: "Success: element in slice",
+			slice: []string{
+				"element1",
+				"element2",
+				"element3",
+			},
+			element:  "element3",
+			expected: true,
+		},
+		{
+			name: "Success: element not in slice",
+			slice: []string{
+				"element1",
+				"element2",
+				"element3",
+			},
+			element:  "element4",
+			expected: false,
+		},
+		{
+			name:     "Success: slice is empty",
+			slice:    []string{},
+			element:  "element4",
+			expected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := Contains(tc.slice, tc.element)
+
+			if actual != tc.expected {
+				t.Fatalf("Contains got wrong result. actual: %v, expected: %v", actual, tc.expected)
+			}
+		})
+	}
+}

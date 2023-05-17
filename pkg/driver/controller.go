@@ -44,7 +44,6 @@ const (
 	volumeContextVolumeType                   = "volumeType"
 	volumeContextDnsName                      = "dnsName"
 	volumeContextVolumePath                   = "volumePath"
-	volumeContextSkipFinalBackup              = "skipFinalBackup"
 	volumeParamsVolumeType                    = "volumeType"
 	volumeParamsKmsKeyId                      = "kmsKeyId"
 	volumeParamsAutomaticBackupRetentionDays  = "automaticBackupRetentionDays"
@@ -59,15 +58,24 @@ const (
 	volumeParamsSecurityGroupIds              = "securityGroupIds"
 	volumeParamsSubnetIds                     = "subnetIds"
 	volumeParamsTags                          = "tags"
-	volumeParamsSkipFinalBackup               = "skipFinalBackup"
+	volumeParamsOptionsOnDeletion             = "optionsOnDeletion"
+	volumeParamsSkipFinalBackupOnDeletion     = "skipFinalBackupOnDeletion"
 	volumeParamsCopyTagsToSnapshots           = "copyTagsToSnapshots"
 	volumeParamsDataCompressionType           = "dataCompressionType"
-	volumeParamsNfsExports                    = "NfsExports"
+	volumeParamsNfsExports                    = "nfsExports"
 	volumeParamsParentVolumeId                = "parentVolumeId"
 	volumeParamsReadOnly                      = "readOnly"
 	volumeParamsRecordSizeKiB                 = "recordSizeKiB"
 	volumeParamsUserAndGroupQuotas            = "userAndGroupQuotas"
 	snapshotParamsTags                        = "tags"
+)
+
+// The external-provisioner automatically configures reserved parameter keys on the CreateVolumeRequest:
+// https://kubernetes-csi.github.io/docs/external-provisioner.html#storageclass-parameters
+// Each of these parameter keys have the same prefix, "csi.storage.k8s.io".
+// We will store this prefix as a constant to avoid throwing an error when we encounter these parameters.
+const (
+	reservedVolumeParamsPrefix = "csi.storage.k8s.io"
 )
 
 const (
@@ -115,8 +123,8 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 			return nil, status.Error(codes.InvalidArgument, "Snapshots are not available at the filesystem level. Set volumeType to volume.")
 		}
 
-		if _, ok := volumeParams[volumeParamsSkipFinalBackup]; !ok {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid parameter of %s: %s", volumeParamsSkipFinalBackup, "field required")
+		if _, ok := volumeParams[volumeParamsSkipFinalBackupOnDeletion]; !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid parameter of %s: %s", volumeParamsSkipFinalBackupOnDeletion, "field required")
 		}
 
 		fsOptions := cloud.FileSystemOptions{
@@ -124,55 +132,62 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 		}
 
 		for key, value := range volumeParams {
-			switch key {
-			case volumeParamsKmsKeyId:
-				fsOptions.KmsKeyId = util.StringToStringPointer(value)
-			case volumeParamsAutomaticBackupRetentionDays:
+			switch {
+			case key == volumeParamsKmsKeyId:
+				fsOptions.KmsKeyId = aws.String(value)
+			case key == volumeParamsAutomaticBackupRetentionDays:
 				i, err := util.StringToIntPointer(value)
 				if err != nil {
 					return nil, status.Errorf(codes.InvalidArgument, "invalid parameter of %s: %s", volumeParamsAutomaticBackupRetentionDays, err)
 				}
 				fsOptions.AutomaticBackupRetentionDays = i
-			case volumeParamsCopyTagsToBackups:
+			case key == volumeParamsCopyTagsToBackups:
 				boolVal, err := util.StringToBoolPointer(value)
 				if err != nil {
 					return nil, status.Errorf(codes.InvalidArgument, "invalid parameter of %s: %s", volumeParamsCopyTagsToBackups, err)
 				}
 				fsOptions.CopyTagsToBackups = boolVal
-			case volumeParamsCopyTagsToVolumes:
+			case key == volumeParamsCopyTagsToVolumes:
 				boolVal, err := util.StringToBoolPointer(value)
 				if err != nil {
 					return nil, status.Errorf(codes.InvalidArgument, "invalid parameter of %s: %s", volumeParamsCopyTagsToVolumes, err)
 				}
 				fsOptions.CopyTagsToVolumes = boolVal
-			case volumeParamsDailyAutomaticBackupStartTime:
-				fsOptions.DailyAutomaticBackupStartTime = util.StringToStringPointer(value)
-			case volumeParamsDeploymentType:
-				fsOptions.DeploymentType = util.StringToStringPointer(value)
-			case volumeParamsDiskIopsConfiguration:
-				fsOptions.DiskIopsConfiguration = util.StringToStringPointer(value)
-			case volumeParamsRootVolumeConfiguration:
-				fsOptions.RootVolumeConfiguration = util.StringToStringPointer(value)
-			case volumeParamsThroughputCapacity:
+			case key == volumeParamsDailyAutomaticBackupStartTime:
+				fsOptions.DailyAutomaticBackupStartTime = aws.String(value)
+			case key == volumeParamsDeploymentType:
+				fsOptions.DeploymentType = aws.String(value)
+			case key == volumeParamsDiskIopsConfiguration:
+				fsOptions.DiskIopsConfiguration = aws.String(value)
+			case key == volumeParamsRootVolumeConfiguration:
+				fsOptions.RootVolumeConfiguration = aws.String(value)
+			case key == volumeParamsThroughputCapacity:
 				i, err := util.StringToIntPointer(value)
 				if err != nil {
 					return nil, status.Errorf(codes.InvalidArgument, "invalid parameter of %s: %s", volumeParamsThroughputCapacity, err)
 				}
 				fsOptions.ThroughputCapacity = i
-			case volumeParamsWeeklyMaintenanceStartTime:
-				fsOptions.WeeklyMaintenanceStartTime = util.StringToStringPointer(value)
-			case volumeParamsSecurityGroupIds:
+			case key == volumeParamsWeeklyMaintenanceStartTime:
+				fsOptions.WeeklyMaintenanceStartTime = aws.String(value)
+			case key == volumeParamsSecurityGroupIds:
 				fsOptions.SecurityGroupIds = util.SplitCommasAndRemoveOuterBrackets(value)
-			case volumeParamsSubnetIds:
+			case key == volumeParamsSubnetIds:
 				fsOptions.SubnetIds = util.SplitCommasAndRemoveOuterBrackets(value)
-			case volumeParamsTags:
-				fsOptions.Tags = util.StringToStringPointer(value)
-			case volumeParamsSkipFinalBackup:
+			case key == volumeParamsTags:
+				fsOptions.Tags = aws.String(value)
+			case key == volumeParamsOptionsOnDeletion:
+				fsOptions.OptionsOnDeletion = aws.String(value)
+			case key == volumeParamsSkipFinalBackupOnDeletion:
 				boolVal, err := util.StringToBoolPointer(value)
 				if err != nil {
-					return nil, status.Errorf(codes.InvalidArgument, "invalid parameter of %s: %s", volumeParamsSkipFinalBackup, err)
+					return nil, status.Errorf(codes.InvalidArgument, "invalid parameter of %s: %s", volumeParamsSkipFinalBackupOnDeletion, err)
 				}
-				fsOptions.SkipFinalBackup = boolVal
+				fsOptions.SkipFinalBackupOnDeletion = boolVal
+			case key == volumeParamsVolumeType:
+			case strings.HasPrefix(key, reservedVolumeParamsPrefix):
+				continue
+			default:
+				return nil, status.Errorf(codes.InvalidArgument, "invalid parameter of %s: %s", key, value)
 			}
 		}
 
@@ -199,13 +214,13 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 				CapacityBytes: util.GiBToBytes(fs.StorageCapacity),
 				VolumeId:      fs.FileSystemId,
 				VolumeContext: map[string]string{
-					volumeContextDnsName:         fs.DnsName,
-					volumeContextVolumeType:      volumeType,
-					volumeContextSkipFinalBackup: volumeParams[volumeParamsSkipFinalBackup],
+					volumeContextDnsName:    fs.DnsName,
+					volumeContextVolumeType: volumeType,
 				},
 			},
 		}, nil
 	}
+
 	if volumeType == volVolumeType {
 		var snapshotArn *string
 		volumeSource := req.GetVolumeContentSource()
@@ -234,35 +249,42 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 		}
 
 		for key, value := range volumeParams {
-			switch key {
-			case volumeParamsCopyTagsToSnapshots:
+			switch {
+			case key == volumeParamsCopyTagsToSnapshots:
 				boolVal, err := util.StringToBoolPointer(value)
 				if err != nil {
 					return nil, status.Errorf(codes.InvalidArgument, "invalid parameter of %s: %s", volumeParamsCopyTagsToSnapshots, err)
 				}
 				volOptions.CopyTagsToSnapshots = boolVal
-			case volumeParamsDataCompressionType:
-				volOptions.DataCompressionType = util.StringToStringPointer(value)
-			case volumeParamsNfsExports:
-				volOptions.NfsExports = util.StringToStringPointer(value)
-			case volumeParamsParentVolumeId:
-				volOptions.ParentVolumeId = util.StringToStringPointer(value)
-			case volumeParamsReadOnly:
+			case key == volumeParamsDataCompressionType:
+				volOptions.DataCompressionType = aws.String(value)
+			case key == volumeParamsNfsExports:
+				volOptions.NfsExports = aws.String(value)
+			case key == volumeParamsParentVolumeId:
+				volOptions.ParentVolumeId = aws.String(value)
+			case key == volumeParamsReadOnly:
 				boolVal, err := util.StringToBoolPointer(value)
 				if err != nil {
 					return nil, status.Errorf(codes.InvalidArgument, "invalid parameter of %s: %s", volumeParamsReadOnly, err)
 				}
 				volOptions.ReadOnly = boolVal
-			case volumeParamsRecordSizeKiB:
+			case key == volumeParamsRecordSizeKiB:
 				i, err := util.StringToIntPointer(value)
 				if err != nil {
 					return nil, status.Errorf(codes.InvalidArgument, "invalid parameter of %s: %s", volumeParamsRecordSizeKiB, err)
 				}
 				volOptions.RecordSizeKiB = i
-			case volumeParamsUserAndGroupQuotas:
-				volOptions.UserAndGroupQuotas = util.StringToStringPointer(value)
-			case volumeParamsTags:
-				volOptions.Tags = util.StringToStringPointer(value)
+			case key == volumeParamsUserAndGroupQuotas:
+				volOptions.UserAndGroupQuotas = aws.String(value)
+			case key == volumeParamsTags:
+				volOptions.Tags = aws.String(value)
+			case key == volumeParamsOptionsOnDeletion:
+				volOptions.OptionsOnDeletion = aws.String(value)
+			case key == volumeParamsVolumeType:
+			case strings.HasPrefix(key, reservedVolumeParamsPrefix):
+				continue
+			default:
+				return nil, status.Errorf(codes.InvalidArgument, "invalid parameter of %s: %s", key, value)
 			}
 		}
 
@@ -568,6 +590,7 @@ func (d *Driver) ControllerExpandVolume(ctx context.Context, req *csi.Controller
 			NodeExpansionRequired: false,
 		}, nil
 	}
+
 	if splitVolumeId[0] == cloud.VolumePrefix {
 		v, err := d.cloud.DescribeVolume(ctx, volumeID)
 		if err != nil {

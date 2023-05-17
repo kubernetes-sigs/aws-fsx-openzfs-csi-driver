@@ -47,7 +47,8 @@ func TestCreateFileSystem(t *testing.T) {
 		fileSystemId                  = aws.String("fs-1234")
 		dnsName                       = aws.String("https://aws.com")
 		volumeName                    = "volumeName"
-		skipFinalBackup               = aws.Bool(true)
+		optionsOnDeletion             = aws.String("[DELETE_CHILD_VOLUMES_AND_SNAPSHOTS]")
+		skipFinalBackupOnDeletion     = aws.Bool(true)
 	)
 	testCases := []struct {
 		name     string
@@ -77,7 +78,8 @@ func TestCreateFileSystem(t *testing.T) {
 					StorageCapacity:               storageCapacity,
 					SubnetIds:                     subnetIds,
 					Tags:                          tags,
-					SkipFinalBackup:               skipFinalBackup,
+					OptionsOnDeletion:             optionsOnDeletion,
+					SkipFinalBackupOnDeletion:     skipFinalBackupOnDeletion,
 				}
 				output := &fsx.CreateFileSystemOutput{
 					FileSystem: &fsx.FileSystem{
@@ -431,7 +433,9 @@ func TestResizeFileSystem(t *testing.T) {
 
 func TestDeleteFileSystem(t *testing.T) {
 	var (
-		fileSystemId = "fs-123456789abcdefgh"
+		fileSystemId              = "fs-123456789abcdefgh"
+		optionsOnDeletion         = "DELETE_CHILD_VOLUMES_AND_SNAPSHOTS"
+		skipFinalBackupOnDeletion = "true"
 	)
 	testCases := []struct {
 		name     string
@@ -453,8 +457,12 @@ func TestDeleteFileSystem(t *testing.T) {
 							FileSystemId: &fileSystemId,
 							Tags: []*fsx.Tag{
 								{
-									Key:   aws.String(SkipFinalBackupTagKey),
-									Value: aws.String("true"),
+									Key:   aws.String(OptionsOnDeletionTagKey),
+									Value: aws.String(optionsOnDeletion),
+								},
+								{
+									Key:   aws.String(SkipFinalBackupOnDeletionTagKey),
+									Value: aws.String(skipFinalBackupOnDeletion),
 								},
 							},
 						},
@@ -473,7 +481,77 @@ func TestDeleteFileSystem(t *testing.T) {
 			},
 		},
 		{
-			name: "success: missing skipFinalBackup tag",
+			name: "success: missing optionsOnDeletion tag",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				output := &fsx.DeleteFileSystemOutput{}
+				describeOutput := &fsx.DescribeFileSystemsOutput{
+					FileSystems: []*fsx.FileSystem{
+						{
+							FileSystemId: &fileSystemId,
+							Tags: []*fsx.Tag{
+								{
+									Key:   aws.String(SkipFinalBackupOnDeletionTagKey),
+									Value: aws.String(skipFinalBackupOnDeletion),
+								},
+							},
+						},
+					},
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().DescribeFileSystemsWithContext(gomock.Eq(ctx), gomock.Any()).Return(describeOutput, nil)
+				mockFSx.EXPECT().DeleteFileSystemWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
+				err := c.DeleteFileSystem(ctx, fileSystemId)
+				if err != nil {
+					t.Fatalf("DeleteFileSystem is failed: %v", err)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "success: missing skipFinalBackupOnDeletion tag",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				output := &fsx.DeleteFileSystemOutput{}
+				describeOutput := &fsx.DescribeFileSystemsOutput{
+					FileSystems: []*fsx.FileSystem{
+						{
+							FileSystemId: &fileSystemId,
+							Tags: []*fsx.Tag{
+								{
+									Key:   aws.String(OptionsOnDeletionTagKey),
+									Value: aws.String(optionsOnDeletion),
+								},
+							},
+						},
+					},
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().DescribeFileSystemsWithContext(gomock.Eq(ctx), gomock.Any()).Return(describeOutput, nil)
+				mockFSx.EXPECT().DeleteFileSystemWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
+				err := c.DeleteFileSystem(ctx, fileSystemId)
+				if err != nil {
+					t.Fatalf("DeleteFileSystem is failed: %v", err)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "success: no tags",
 			testFunc: func(t *testing.T) {
 				mockCtl := gomock.NewController(t)
 				mockFSx := mocks.NewMockFSx(mockCtl)
@@ -516,8 +594,12 @@ func TestDeleteFileSystem(t *testing.T) {
 							FileSystemId: &fileSystemId,
 							Tags: []*fsx.Tag{
 								{
-									Key:   aws.String(SkipFinalBackupTagKey),
-									Value: aws.String("true"),
+									Key:   aws.String(OptionsOnDeletionTagKey),
+									Value: aws.String(optionsOnDeletion),
+								},
+								{
+									Key:   aws.String(SkipFinalBackupOnDeletionTagKey),
+									Value: aws.String(skipFinalBackupOnDeletion),
 								},
 							},
 						},
@@ -800,6 +882,7 @@ func TestCreateVolume(t *testing.T) {
 		volumeId                      = aws.String("fsvol-0987654321abcdefg")
 		dnsName                       = aws.String("https://aws.com")
 		snapshotResourceArn           = aws.String("arn:")
+		optionsOnDeletion             = aws.String("[DELETE_CHILD_VOLUMES_AND_SNAPSHOTS]")
 	)
 	testCases := []struct {
 		name     string
@@ -826,6 +909,7 @@ func TestCreateVolume(t *testing.T) {
 					StorageCapacityReservationGiB: storageCapacityReservationGiB,
 					UserAndGroupQuotas:            userAndGroupQuotas,
 					Tags:                          tags,
+					OptionsOnDeletion:             optionsOnDeletion,
 				}
 				output := &fsx.CreateVolumeOutput{
 					Volume: &fsx.Volume{
@@ -1239,7 +1323,9 @@ func TestResizeVolume(t *testing.T) {
 
 func TestDeleteVolume(t *testing.T) {
 	var (
-		volumeId = "fsvol-0987654321abcdefg"
+		volumeId          = "fsvol-0987654321abcdefg"
+		resourceARN       = "arn:aws:fsx:us-east-1:123456789012:volume/fs-1234abcd5678efgh9/fsvol-0987654321abcdefg"
+		optionsOnDeletion = "DELETE_CHILD_VOLUMES_AND_SNAPSHOTS"
 	)
 	testCases := []struct {
 		name     string
@@ -1255,8 +1341,60 @@ func TestDeleteVolume(t *testing.T) {
 				}
 
 				output := &fsx.DeleteVolumeOutput{}
+				describeOutput := &fsx.DescribeVolumesOutput{
+					Volumes: []*fsx.Volume{
+						{
+							VolumeId:    aws.String(volumeId),
+							ResourceARN: aws.String(resourceARN),
+						},
+					},
+				}
+				listTagsOutput := &fsx.ListTagsForResourceOutput{
+					Tags: []*fsx.Tag{
+						{
+							Key:   aws.String(OptionsOnDeletionTagKey),
+							Value: aws.String(optionsOnDeletion),
+						},
+					},
+				}
 
 				ctx := context.Background()
+				mockFSx.EXPECT().DescribeVolumesWithContext(gomock.Eq(ctx), gomock.Any()).Return(describeOutput, nil)
+				mockFSx.EXPECT().ListTagsForResource(gomock.Any()).Return(listTagsOutput, nil)
+				mockFSx.EXPECT().DeleteVolumeWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
+				err := c.DeleteVolume(ctx, volumeId)
+				if err != nil {
+					t.Fatalf("DeleteVolume is failed: %v", err)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "success: no tags",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				output := &fsx.DeleteVolumeOutput{}
+				describeOutput := &fsx.DescribeVolumesOutput{
+					Volumes: []*fsx.Volume{
+						{
+							VolumeId:    aws.String(volumeId),
+							ResourceARN: aws.String(resourceARN),
+						},
+					},
+				}
+				listTagsOutput := &fsx.ListTagsForResourceOutput{
+					Tags: []*fsx.Tag{},
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().DescribeVolumesWithContext(gomock.Eq(ctx), gomock.Any()).Return(describeOutput, nil)
+				mockFSx.EXPECT().ListTagsForResource(gomock.Any()).Return(listTagsOutput, nil)
 				mockFSx.EXPECT().DeleteVolumeWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
 				err := c.DeleteVolume(ctx, volumeId)
 				if err != nil {
@@ -1275,7 +1413,26 @@ func TestDeleteVolume(t *testing.T) {
 					fsx: mockFSx,
 				}
 
+				describeOutput := &fsx.DescribeVolumesOutput{
+					Volumes: []*fsx.Volume{
+						{
+							VolumeId:    aws.String(volumeId),
+							ResourceARN: aws.String(resourceARN),
+						},
+					},
+				}
+				listTagsOutput := &fsx.ListTagsForResourceOutput{
+					Tags: []*fsx.Tag{
+						{
+							Key:   aws.String(OptionsOnDeletionTagKey),
+							Value: aws.String(optionsOnDeletion),
+						},
+					},
+				}
+
 				ctx := context.Background()
+				mockFSx.EXPECT().DescribeVolumesWithContext(gomock.Eq(ctx), gomock.Any()).Return(describeOutput, nil)
+				mockFSx.EXPECT().ListTagsForResource(gomock.Any()).Return(listTagsOutput, nil)
 				mockFSx.EXPECT().DeleteVolumeWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New("DeleteVolumeWithContext failed"))
 				err := c.DeleteVolume(ctx, volumeId)
 				if err == nil {

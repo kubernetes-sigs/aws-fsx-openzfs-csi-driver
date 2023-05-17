@@ -51,7 +51,8 @@ func TestCreateVolume(t *testing.T) {
 		securityGroupIds                    = "sg-068000ccf82dfba88"
 		subnetIds                           = "subnet-0eabfaa81fb22bcaf"
 		tags                                = "Tag1=Value1,Tag2=Value2"
-		skipFinalBackup                     = "true"
+		optionsOnDeletion                   = "[DELETE_CHILD_VOLUMES_AND_SNAPSHOTS]"
+		skipFinalBackupOnDeletion           = "true"
 		copyTagsToSnapshots                 = "false"
 		dataCompressionType                 = "NONE"
 		nfsExports                          = "[{ClientConfigurations=[{Clients=*,Options=[rw,crossmnt]}]}]"
@@ -77,7 +78,7 @@ func TestCreateVolume(t *testing.T) {
 		testFunc func(t *testing.T)
 	}{
 		{
-			name: "success: filesystem",
+			name: "success: filesystem all parameters",
 			testFunc: func(t *testing.T) {
 				mockCtl := gomock.NewController(t)
 				mockCloud := mocks.NewMockCloud(mockCtl)
@@ -110,7 +111,8 @@ func TestCreateVolume(t *testing.T) {
 						volumeParamsSecurityGroupIds:              securityGroupIds,
 						volumeParamsSubnetIds:                     subnetIds,
 						volumeParamsTags:                          tags,
-						volumeParamsSkipFinalBackup:               skipFinalBackup,
+						volumeParamsOptionsOnDeletion:             optionsOnDeletion,
+						volumeParamsSkipFinalBackupOnDeletion:     skipFinalBackupOnDeletion,
 					},
 				}
 
@@ -148,15 +150,77 @@ func TestCreateVolume(t *testing.T) {
 					t.Fatalf("volumeContextDnsName mismatches. actual: %v expected %v", resp.Volume.VolumeContext[volumeContextDnsName], "filesystem")
 				}
 
-				if resp.Volume.VolumeContext[volumeContextSkipFinalBackup] != skipFinalBackup {
-					t.Fatalf("volumeContextSkipFinalBackup mismatches. actual: %v expected %v", resp.Volume.VolumeContext[volumeContextSkipFinalBackup], skipFinalBackup)
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "success: filesystem required parameters",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockCloud := mocks.NewMockCloud(mockCtl)
+
+				driver := &Driver{
+					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
+					cloud:    mockCloud,
+				}
+
+				req := &csi.CreateVolumeRequest{
+					Name: filesystemId,
+					CapacityRange: &csi.CapacityRange{
+						RequiredBytes: util.GiBToBytes(storageCapacity),
+						LimitBytes:    util.GiBToBytes(storageCapacity),
+					},
+					VolumeCapabilities: []*csi.VolumeCapability{stdVolCap},
+					Parameters: map[string]string{
+						volumeParamsVolumeType:                "filesystem",
+						volumeParamsDeploymentType:            deploymentType,
+						volumeParamsDiskIopsConfiguration:     diskIopsConfiguration,
+						volumeParamsThroughputCapacity:        throughputCapacity,
+						volumeParamsSubnetIds:                 subnetIds,
+						volumeParamsSkipFinalBackupOnDeletion: skipFinalBackupOnDeletion,
+					},
+				}
+
+				ctx := context.Background()
+				filesystem := &cloud.FileSystem{
+					DnsName:         dnsName,
+					FileSystemId:    filesystemId,
+					StorageCapacity: storageCapacity,
+				}
+				mockCloud.EXPECT().CreateFileSystem(gomock.Eq(ctx), gomock.Eq(filesystemId), gomock.Any()).Return(filesystem, nil)
+				mockCloud.EXPECT().WaitForFileSystemAvailable(gomock.Eq(ctx), gomock.Eq(filesystemId)).Return(nil)
+
+				resp, err := driver.CreateVolume(ctx, req)
+				if err != nil {
+					t.Fatalf("CreateVolume failed: %v", err)
+				}
+
+				if resp.Volume == nil {
+					t.Fatal("resp.Volume is nil")
+				}
+
+				if resp.Volume.CapacityBytes != util.GiBToBytes(storageCapacity) {
+					t.Fatalf("CapacityBytes mismatches. actual: %v expected %v", resp.Volume.CapacityBytes, util.GiBToBytes(storageCapacity))
+				}
+
+				if resp.Volume.VolumeId != filesystemId {
+					t.Fatalf("VolumeId mismatches. actual: %v expected %v", resp.Volume.VolumeId, filesystemId)
+				}
+
+				if resp.Volume.VolumeContext[volumeContextVolumeType] != "filesystem" {
+					t.Fatalf("volumeContextVolumeType mismatches. actual: %v expected %v", resp.Volume.VolumeContext[volumeContextVolumeType], "filesystem")
+				}
+
+				if resp.Volume.VolumeContext[volumeContextDnsName] != dnsName {
+					t.Fatalf("volumeContextDnsName mismatches. actual: %v expected %v", resp.Volume.VolumeContext[volumeContextDnsName], "filesystem")
 				}
 
 				mockCtl.Finish()
 			},
 		},
 		{
-			name: "success: volume",
+			name: "success: volume all parameters",
 			testFunc: func(t *testing.T) {
 				mockCtl := gomock.NewController(t)
 				mockCloud := mocks.NewMockCloud(mockCtl)
@@ -184,6 +248,7 @@ func TestCreateVolume(t *testing.T) {
 						volumeParamsRecordSizeKiB:       recordSizeKiB,
 						volumeParamsUserAndGroupQuotas:  userAndGroupQuotas,
 						volumeParamsTags:                tags,
+						volumeParamsOptionsOnDeletion:   optionsOnDeletion,
 					},
 				}
 				volume := &cloud.Volume{
@@ -226,11 +291,85 @@ func TestCreateVolume(t *testing.T) {
 				}
 
 				if resp.Volume.VolumeContext[volumeContextDnsName] != dnsName {
-					t.Fatalf("volumeContextVolumeType mismatches. actual: %v expected %v", resp.Volume.VolumeContext[volumeContextVolumeType], "filesystem")
+					t.Fatalf("volumeContextDnsName mismatches. actual: %v expected %v", resp.Volume.VolumeContext[volumeContextDnsName], dnsName)
 				}
 
 				if resp.Volume.VolumeContext[volumeContextVolumePath] != volumePath {
+					t.Fatalf("volumeContextVolumePath mismatches. actual: %v expected %v", resp.Volume.VolumeContext[volumeContextVolumePath], volumePath)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "success: volume required parameters",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockCloud := mocks.NewMockCloud(mockCtl)
+
+				driver := &Driver{
+					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
+					cloud:    mockCloud,
+				}
+
+				req := &csi.CreateVolumeRequest{
+					Name: volumeId,
+					CapacityRange: &csi.CapacityRange{
+						RequiredBytes: util.GiBToBytes(storageCapacity),
+						LimitBytes:    util.GiBToBytes(storageCapacity),
+					},
+					VolumeCapabilities: []*csi.VolumeCapability{stdVolCap},
+					Parameters: map[string]string{
+						volumeParamsVolumeType:     "volume",
+						volumeParamsParentVolumeId: parentVolumeId,
+					},
+				}
+				volume := &cloud.Volume{
+					FileSystemId:                  filesystemId,
+					StorageCapacityQuotaGiB:       storageCapacity,
+					StorageCapacityReservationGiB: storageCapacity,
+					VolumePath:                    volumePath,
+					VolumeId:                      volumeId,
+				}
+				filesystem := &cloud.FileSystem{
+					DnsName:         dnsName,
+					FileSystemId:    filesystemId,
+					StorageCapacity: storageCapacity,
+				}
+
+				ctx := context.Background()
+				mockCloud.EXPECT().CreateVolume(gomock.Eq(ctx), gomock.Eq(volumeId), gomock.Any()).Return(volume, nil)
+				mockCloud.EXPECT().WaitForVolumeAvailable(gomock.Eq(ctx), gomock.Eq(volumeId)).Return(nil)
+				mockCloud.EXPECT().DescribeFileSystem(gomock.Eq(ctx), gomock.Eq(filesystemId)).Return(filesystem, nil)
+
+				resp, err := driver.CreateVolume(ctx, req)
+				if err != nil {
+					t.Fatalf("CreateVolume failed: %v", err)
+				}
+
+				if resp.Volume == nil {
+					t.Fatal("resp.Volume is nil")
+				}
+
+				if resp.Volume.CapacityBytes != util.GiBToBytes(storageCapacity) {
+					t.Fatalf("CapacityBytes mismatches. actual: %v expected %v", resp.Volume.CapacityBytes, util.GiBToBytes(storageCapacity))
+				}
+
+				if resp.Volume.VolumeId != volumeId {
+					t.Fatalf("VolumeId mismatches. actual: %v expected %v", resp.Volume.VolumeId, volumeId)
+				}
+
+				if resp.Volume.VolumeContext[volumeContextVolumeType] != "volume" {
 					t.Fatalf("volumeContextVolumeType mismatches. actual: %v expected %v", resp.Volume.VolumeContext[volumeContextVolumeType], "filesystem")
+				}
+
+				if resp.Volume.VolumeContext[volumeContextDnsName] != dnsName {
+					t.Fatalf("volumeContextDnsName mismatches. actual: %v expected %v", resp.Volume.VolumeContext[volumeContextDnsName], dnsName)
+				}
+
+				if resp.Volume.VolumeContext[volumeContextVolumePath] != volumePath {
+					t.Fatalf("volumeContextVolumePath mismatches. actual: %v expected %v", resp.Volume.VolumeContext[volumeContextVolumePath], volumePath)
 				}
 
 				mockCtl.Finish()
@@ -265,6 +404,7 @@ func TestCreateVolume(t *testing.T) {
 						volumeParamsRecordSizeKiB:       recordSizeKiB,
 						volumeParamsUserAndGroupQuotas:  userAndGroupQuotas,
 						volumeParamsTags:                tags,
+						volumeParamsOptionsOnDeletion:   optionsOnDeletion,
 					},
 					VolumeContentSource: &csi.VolumeContentSource{
 						Type: &csi.VolumeContentSource_Snapshot{
@@ -325,7 +465,7 @@ func TestCreateVolume(t *testing.T) {
 				}
 
 				if resp.Volume.VolumeContext[volumeContextVolumePath] != volumePath {
-					t.Fatalf("volumeContextVolumeType mismatches. actual: %v expected %v", resp.Volume.VolumeContext[volumeContextVolumeType], "filesystem")
+					t.Fatalf("volumeContextVolumePath mismatches. actual: %v expected %v", resp.Volume.VolumeContext[volumeContextVolumePath], volumePath)
 				}
 
 				mockCtl.Finish()
@@ -364,6 +504,7 @@ func TestCreateVolume(t *testing.T) {
 						volumeParamsSecurityGroupIds:              securityGroupIds,
 						volumeParamsSubnetIds:                     subnetIds,
 						volumeParamsTags:                          tags,
+						volumeParamsOptionsOnDeletion:             optionsOnDeletion,
 					},
 				}
 
@@ -410,7 +551,53 @@ func TestCreateVolume(t *testing.T) {
 						volumeParamsSecurityGroupIds:              securityGroupIds,
 						volumeParamsSubnetIds:                     subnetIds,
 						volumeParamsTags:                          tags,
+						volumeParamsOptionsOnDeletion:             optionsOnDeletion,
+						volumeParamsSkipFinalBackupOnDeletion:     skipFinalBackupOnDeletion,
 						"key":                                     "value",
+					},
+				}
+
+				ctx := context.Background()
+
+				_, err := driver.CreateVolume(ctx, req)
+				if err == nil {
+					t.Fatal("CreateVolume is not failed")
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: volume invalid parameter",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockCloud := mocks.NewMockCloud(mockCtl)
+
+				driver := &Driver{
+					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
+					cloud:    mockCloud,
+				}
+
+				req := &csi.CreateVolumeRequest{
+					Name: volumeId,
+					CapacityRange: &csi.CapacityRange{
+						RequiredBytes: util.GiBToBytes(storageCapacity),
+						LimitBytes:    util.GiBToBytes(storageCapacity),
+					},
+					VolumeCapabilities: []*csi.VolumeCapability{stdVolCap},
+					Parameters: map[string]string{
+						volumeParamsVolumeType:          "volume",
+						volumeParamsCopyTagsToSnapshots: copyTagsToSnapshots,
+						volumeParamsDataCompressionType: dataCompressionType,
+						volumeParamsNfsExports:          nfsExports,
+						volumeParamsParentVolumeId:      parentVolumeId,
+						volumeParamsReadOnly:            readOnly,
+						volumeParamsRecordSizeKiB:       recordSizeKiB,
+						volumeParamsUserAndGroupQuotas:  userAndGroupQuotas,
+						volumeParamsTags:                tags,
+						volumeParamsOptionsOnDeletion:   optionsOnDeletion,
+						"key":                           "value",
 					},
 				}
 
@@ -458,7 +645,8 @@ func TestCreateVolume(t *testing.T) {
 						volumeParamsSecurityGroupIds:              securityGroupIds,
 						volumeParamsSubnetIds:                     subnetIds,
 						volumeParamsTags:                          tags,
-						volumeParamsSkipFinalBackup:               skipFinalBackup,
+						volumeParamsOptionsOnDeletion:             optionsOnDeletion,
+						volumeParamsSkipFinalBackupOnDeletion:     skipFinalBackupOnDeletion,
 					},
 				}
 
@@ -507,7 +695,8 @@ func TestCreateVolume(t *testing.T) {
 						volumeParamsSecurityGroupIds:              securityGroupIds,
 						volumeParamsSubnetIds:                     subnetIds,
 						volumeParamsTags:                          tags,
-						volumeParamsSkipFinalBackup:               skipFinalBackup,
+						volumeParamsOptionsOnDeletion:             optionsOnDeletion,
+						volumeParamsSkipFinalBackupOnDeletion:     skipFinalBackupOnDeletion,
 					},
 				}
 
@@ -557,6 +746,7 @@ func TestCreateVolume(t *testing.T) {
 						volumeParamsRecordSizeKiB:       recordSizeKiB,
 						volumeParamsUserAndGroupQuotas:  userAndGroupQuotas,
 						volumeParamsTags:                tags,
+						volumeParamsOptionsOnDeletion:   optionsOnDeletion,
 					},
 				}
 
@@ -600,6 +790,7 @@ func TestCreateVolume(t *testing.T) {
 						volumeParamsRecordSizeKiB:       recordSizeKiB,
 						volumeParamsUserAndGroupQuotas:  userAndGroupQuotas,
 						volumeParamsTags:                tags,
+						volumeParamsOptionsOnDeletion:   optionsOnDeletion,
 					},
 				}
 
@@ -651,6 +842,7 @@ func TestCreateVolume(t *testing.T) {
 						volumeParamsRecordSizeKiB:       recordSizeKiB,
 						volumeParamsUserAndGroupQuotas:  userAndGroupQuotas,
 						volumeParamsTags:                tags,
+						volumeParamsOptionsOnDeletion:   optionsOnDeletion,
 					},
 				}
 				volume := &cloud.Volume{
@@ -708,6 +900,8 @@ func TestCreateVolume(t *testing.T) {
 						volumeParamsSecurityGroupIds:              securityGroupIds,
 						volumeParamsSubnetIds:                     subnetIds,
 						volumeParamsTags:                          tags,
+						volumeParamsOptionsOnDeletion:             optionsOnDeletion,
+						volumeParamsSkipFinalBackupOnDeletion:     skipFinalBackupOnDeletion,
 					},
 					VolumeContentSource: &csi.VolumeContentSource{
 						Type: &csi.VolumeContentSource_Snapshot{
@@ -729,7 +923,7 @@ func TestCreateVolume(t *testing.T) {
 			},
 		},
 		{
-			name: "fail: skipFinalBackup not provided",
+			name: "fail: skipFinalBackupOnDeletion not provided",
 			testFunc: func(t *testing.T) {
 				mockCtl := gomock.NewController(t)
 				mockCloud := mocks.NewMockCloud(mockCtl)

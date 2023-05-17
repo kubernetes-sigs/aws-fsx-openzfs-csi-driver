@@ -216,6 +216,21 @@ func (mr *MockFSxMockRecorder) DescribeVolumesWithContext(arg0, arg1 interface{}
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeVolumesWithContext", reflect.TypeOf((*MockFSx)(nil).DescribeVolumesWithContext), varargs...)
 }
 
+// ListTagsForResource mocks base method.
+func (m *MockFSx) ListTagsForResource(arg0 *fsx.ListTagsForResourceInput) (*fsx.ListTagsForResourceOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListTagsForResource", arg0)
+	ret0, _ := ret[0].(*fsx.ListTagsForResourceOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListTagsForResource indicates an expected call of ListTagsForResource.
+func (mr *MockFSxMockRecorder) ListTagsForResource(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListTagsForResource", reflect.TypeOf((*MockFSx)(nil).ListTagsForResource), arg0)
+}
+
 // UpdateFileSystemWithContext mocks base method.
 func (m *MockFSx) UpdateFileSystemWithContext(arg0 context.Context, arg1 *fsx.UpdateFileSystemInput, arg2 ...request.Option) (*fsx.UpdateFileSystemOutput, error) {
 	m.ctrl.T.Helper()

@@ -13,6 +13,7 @@ parameters:
   recordSizeKiB: "128"
   userAndGroupQuotas: "[{Id=1,StorageCapacityQuotaGiB=10,Type=USER}]"
   tags: "Tag1=Value1,Tag2=Value2"
+  optionsOnDeletion: "[DELETE_CHILD_VOLUMES_AND_SNAPSHOTS]" #SET ON DELETION
 reclaimPolicy: Delete
 allowVolumeExpansion: true
 mountOptions:

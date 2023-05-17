@@ -60,10 +60,10 @@ func SplitCommasAndRemoveOuterBrackets(input string) []string {
 		input = strings.Trim(input, "{}")
 	}
 
-	leftCurly := []int{}
-	leftSquare := []int{}
+	var leftCurly []int
+	var leftSquare []int
 
-	slices := []string{}
+	var slices []string
 	lastComma := 0
 
 	for i, c := range input {
@@ -90,7 +90,7 @@ func SplitCommasAndRemoveOuterBrackets(input string) []string {
 
 	slices = append(slices, input[lastComma:])
 
-	values := []string{}
+	var values []string
 	for _, val := range slices {
 		if strings.HasPrefix(val, "{") {
 			val = strings.Trim(val, "{}")
@@ -125,10 +125,6 @@ func GiBToBytes(volumeSizeGiB int64) int64 {
 	return volumeSizeGiB * GiB
 }
 
-func StringToStringPointer(input string) *string {
-	return &input
-}
-
 func StringToIntPointer(input string) (*int64, error) {
 	output, err := strconv.ParseInt(input, 10, 64)
 	if err != nil {
@@ -148,4 +144,13 @@ func StringToBoolPointer(input string) (*bool, error) {
 func BoolToStringPointer(input bool) *string {
 	output := strconv.FormatBool(input)
 	return &output
+}
+
+func Contains(slice []string, element string) bool {
+	for _, value := range slice {
+		if value == element {
+			return true
+		}
+	}
+	return false
 }
