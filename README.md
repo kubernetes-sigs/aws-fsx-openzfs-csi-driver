@@ -10,7 +10,7 @@ The [Amazon FSx for OpenZFS](https://aws.amazon.com/fsx/openzfs/) Container Stor
 
 ### Features
 * **Static Provisioning** - Associate an externally-created FSx for OpenZFS file system or volume with a [PersistentVolume](https://kubernetes.io/docs/concepts/storage/persistent-volumes/) (PV) for consumption within Kubernetes.
-* **Dynamic Provisioning** - Automatically create FSx for OpenZFS file systems or volumes and associated [PersistentVolumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/) (PV) from [PersistentVolumeClaims](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#dynamic)) (PVC). Parameters can be passed via a [StorageClass](https://kubernetes.io/docs/concepts/storage/storage-classes/#the-storageclass-resource) for fine-grained control over volume creation.
+* **Dynamic Provisioning** - Automatically create FSx for OpenZFS file systems or volumes and associated [PersistentVolumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/) (PV) from [PersistentVolumeClaims](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#dynamic) (PVC). Parameters can be passed via a [StorageClass](https://kubernetes.io/docs/concepts/storage/storage-classes/#the-storageclass-resource) for fine-grained control over volume creation.
 * **Mount Options** - NFS Mount options can be specified in the [PersistentVolume](https://kubernetes.io/docs/concepts/storage/persistent-volumes/) (PV) resource to define how the volume should be mounted.
 * **Volume Snapshots** - Create and restore [snapshots](https://kubernetes.io/docs/concepts/storage/volume-snapshots/) taken from a volume in Kubernetes.
 * **Volume Resizing** - Expand the Persistent Volume by specifying a new size in the [PersistentVolumeClaim](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#expanding-persistent-volumes-claims) (PVC).
@@ -31,12 +31,13 @@ This policy is non-binding and subject to change.
 The FSx for OpenZFS CSI Driver is compatible with Kubernetes versions v1.17+ and implements the CSI Specification v1.1.0.
 
 ### Documentation
-
+Please read the FAQ before using the FSx for OpenZFS CSI Driver.
+* [FAQ](docs/FAQ.md)
 * [Driver Installation](docs/install.md)
 * [StorageClass Parameters](docs/parameters.md)
 * [Volume Tagging](docs/tagging.md)
-* [Kubernetes Examples](/examples/kubernetes)
+* [Guides and Examples](/examples/kubernetes)
 * [Development and Contributing](CONTRIBUTING.md)
 
 ### License
-This library is licensed under the Apache 2.0 License. 
+This library is licensed under the [Apache 2.0 License](LICENSE).

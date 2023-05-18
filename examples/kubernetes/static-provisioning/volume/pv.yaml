@@ -4,7 +4,7 @@ metadata:
   name: fsx-pv
 spec:
   capacity:
-    storage: 64Gi
+    storage: 1Gi
   accessModes:
     - ReadWriteMany
   mountOptions:
@@ -15,8 +15,8 @@ spec:
   persistentVolumeReclaimPolicy: Delete
   csi:
     driver: fsx.openzfs.csi.aws.com
-    volumeHandle: "fsvol-0281aee0779ea975e"
+    volumeHandle: "fsvol-0739c1035d272c266"
     volumeAttributes:
-      dnsName: "fs-078106df77a01f1f7.fsx.us-east-1.aws.internal"
-      volumePath: "fsx"
-      volumeType: "volume"
+      DNSName: "fs-0b1c1203ee2ac03a8.fsx.us-east-1.amazonaws.com"
+      VolumePath: "fsx/vol1"
+      ResourceType: "volume"

@@ -4,18 +4,20 @@ metadata:
   name: fsx-sc
 provisioner: fsx.openzfs.csi.aws.com
 parameters:
-  volumeType: "volume" #REQUIRED
-  parentVolumeId: "fsvol-03062e7ff37662dff" #REQUIRED
-  copyTagsToSnapshots: "false"
-  dataCompressionType: "NONE"
-  nfsExports: "[{ClientConfigurations=[{Clients=*,Options=[rw,crossmnt]}]}]"
-  readOnly: "false"
-  recordSizeKiB: "128"
-  userAndGroupQuotas: "[{Id=1,StorageCapacityQuotaGiB=10,Type=USER}]"
-  tags: "Tag1=Value1,Tag2=Value2"
-  optionsOnDeletion: "[DELETE_CHILD_VOLUMES_AND_SNAPSHOTS]" #SET ON DELETION
+  ResourceType: "volume" #REQUIRED
+  ParentVolumeId: '"fsvol-0739c1035d272c266"' #REQUIRED
+  CopyTagsToSnapshots: 'false'
+  DataCompressionType: '"NONE"'
+  NfsExports: '[{"ClientConfigurations": [{"Clients": "*", "Options": ["rw","crossmnt"]}]}]'
+  ReadOnly: 'false'
+  RecordSizeKiB: '128'
+  StorageCapacityReservationGiB: '-1'
+  StorageCapacityQuotaGiB: '-1'
+  UserAndGroupQuotas: '[{"Type": "USER", "Id": 1, "StorageCapacityQuotaGiB": 10}]'
+  Tags: '[{"Key": "OPENZFS", "Value": "OPENZFS"}]'
+  OptionsOnDeletion: '["DELETE_CHILD_VOLUMES_AND_SNAPSHOTS"]' #SET ON DELETION
 reclaimPolicy: Delete
-allowVolumeExpansion: true
+allowVolumeExpansion: false #Not supported for OpenZFS volumes
 mountOptions:
   - nfsvers=4.1
   - rsize=1048576
