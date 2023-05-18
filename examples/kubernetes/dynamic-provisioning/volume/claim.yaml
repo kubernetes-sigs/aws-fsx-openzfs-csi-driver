@@ -1,11 +1,11 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: fsx-restored-pvc
+  name: fsx-pvc
 spec:
   accessModes:
-    - ReadWriteOnce
-  storageClassName: fsx-sc-restore
+    - ReadWriteMany
+  storageClassName: fsx-sc
   resources:
     requests:
       # When dynamically provisioning FSx for OpenZFS volumes, the requested storage value is ignored.
@@ -13,7 +13,3 @@ spec:
       # configure the storage properties of the volume. These values are defined in the storage class.
       # The value below MUST be explicitly set to 1Gi, otherwise the creation will fail.
       storage: 1Gi
-  dataSource:
-    name: fsx-vs
-    kind: VolumeSnapshot
-    apiGroup: snapshot.storage.k8s.io

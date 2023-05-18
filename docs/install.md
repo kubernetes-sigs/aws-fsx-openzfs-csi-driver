@@ -55,6 +55,7 @@ See [here](https://docs.aws.amazon.com/eks/latest/userguide/create-node-role.htm
       "Effect": "Allow",
       "Action": [
         "fsx:CreateFileSystem",
+        "fsx:UpdateFileSystem",
         "fsx:DeleteFileSystem",
         "fsx:DescribeFileSystems",
         "fsx:CreateVolume",
@@ -73,8 +74,9 @@ See [here](https://docs.aws.amazon.com/eks/latest/userguide/create-node-role.htm
 ```
 
 ### Configure driver toleration settings
-By default, the driver controller tolerates taint `CriticalAddonsOnly` and has `tolerationSeconds` configured as `300`; and the driver node tolerates all taints. 
-If you don't want to deploy the driver node on all nodes, please set Helm `Value.node.tolerateAllTaints` to false before deployment. 
+By default, the driver controller tolerates taint `CriticalAddonsOnly` and has `tolerationSeconds` configured as `300`. 
+Additionally, the driver node tolerates all taints. 
+If you do not wish to deploy the driver node on all nodes, please set Helm `Value.node.tolerateAllTaints` to false before deployment. 
 Add policies to `Value.node.tolerations` to configure customized toleration for nodes.
 
 ### Deploy driver
