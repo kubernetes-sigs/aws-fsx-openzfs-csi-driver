@@ -939,14 +939,6 @@ func TestCreateVolume(t *testing.T) {
 					t.Fatalf("FileSystemId mismatches. actual: %v expected: %v", resp.FileSystemId, dnsName)
 				}
 
-				if resp.StorageCapacityQuotaGiB != aws.Int64Value(storageCapacityQuotaGiB) {
-					t.Fatalf("StorageCapacityQuotaGiB mismatches. actual: %v expected: %v", resp.StorageCapacityQuotaGiB, storageCapacityQuotaGiB)
-				}
-
-				if resp.StorageCapacityReservationGiB != aws.Int64Value(storageCapacityReservationGiB) {
-					t.Fatalf("StorageCapacityReservationGiB mismatches. actual: %v expected: %v", resp.StorageCapacityReservationGiB, storageCapacityReservationGiB)
-				}
-
 				if resp.VolumePath != aws.StringValue(volumePath) {
 					t.Fatalf("VolumePath mismatches. actual: %v expected: %v", resp.VolumePath, volumePath)
 				}
@@ -998,14 +990,6 @@ func TestCreateVolume(t *testing.T) {
 
 				if resp.FileSystemId != aws.StringValue(fileSystemId) {
 					t.Fatalf("FileSystemId mismatches. actual: %v expected: %v", resp.FileSystemId, dnsName)
-				}
-
-				if resp.StorageCapacityQuotaGiB != aws.Int64Value(storageCapacityQuotaGiB) {
-					t.Fatalf("StorageCapacityQuotaGiB mismatches. actual: %v expected: %v", resp.StorageCapacityQuotaGiB, storageCapacityQuotaGiB)
-				}
-
-				if resp.StorageCapacityReservationGiB != aws.Int64Value(storageCapacityReservationGiB) {
-					t.Fatalf("StorageCapacityReservationGiB mismatches. actual: %v expected: %v", resp.StorageCapacityReservationGiB, storageCapacityReservationGiB)
 				}
 
 				if resp.VolumePath != aws.StringValue(volumePath) {
@@ -1060,14 +1044,6 @@ func TestCreateVolume(t *testing.T) {
 
 				if resp.FileSystemId != aws.StringValue(fileSystemId) {
 					t.Fatalf("FileSystemId mismatches. actual: %v expected: %v", resp.FileSystemId, dnsName)
-				}
-
-				if resp.StorageCapacityQuotaGiB != aws.Int64Value(storageCapacityQuotaGiB) {
-					t.Fatalf("StorageCapacityQuotaGiB mismatches. actual: %v expected: %v", resp.StorageCapacityQuotaGiB, storageCapacityQuotaGiB)
-				}
-
-				if resp.StorageCapacityReservationGiB != aws.Int64Value(storageCapacityReservationGiB) {
-					t.Fatalf("StorageCapacityReservationGiB mismatches. actual: %v expected: %v", resp.StorageCapacityReservationGiB, storageCapacityReservationGiB)
 				}
 
 				if resp.VolumePath != aws.StringValue(volumePath) {

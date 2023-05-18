@@ -114,26 +114,13 @@ func (c *FakeCloudProvider) WaitForFileSystemResize(ctx context.Context, fileSys
 func (c *FakeCloudProvider) CreateVolume(ctx context.Context, volumeName string, volumeOptions VolumeOptions) (*Volume, error) {
 	v, exists := c.volumes[volumeName]
 	if exists {
-		if v.StorageCapacityReservationGiB == *volumeOptions.StorageCapacityReservationGiB {
-			return v, nil
-		} else {
-			return nil, ErrAlreadyExists
-		}
-	}
-
-	var storageCapacity int64
-	if volumeOptions.StorageCapacityQuotaGiB == nil {
-		storageCapacity = 10
-	} else {
-		storageCapacity = *volumeOptions.StorageCapacityQuotaGiB
+		return v, nil
 	}
 
 	v = &Volume{
-		FileSystemId:                  "fs-1234",
-		StorageCapacityQuotaGiB:       storageCapacity,
-		StorageCapacityReservationGiB: storageCapacity,
-		VolumePath:                    "/",
-		VolumeId:                      fmt.Sprintf("fsvol-%d", random.Uint64()),
+		FileSystemId: "fs-1234",
+		VolumePath:   "/",
+		VolumeId:     fmt.Sprintf("fsvol-%d", random.Uint64()),
 	}
 	c.volumes[volumeName] = v
 	return v, nil
@@ -142,8 +129,6 @@ func (c *FakeCloudProvider) CreateVolume(ctx context.Context, volumeName string,
 func (c *FakeCloudProvider) ResizeVolume(ctx context.Context, volumeId string, newSizeGiB int64) (*int64, error) {
 	for _, v := range c.volumes {
 		if v.VolumeId == volumeId {
-			v.StorageCapacityQuotaGiB = newSizeGiB
-			v.StorageCapacityReservationGiB = newSizeGiB
 			return &newSizeGiB, nil
 		}
 	}

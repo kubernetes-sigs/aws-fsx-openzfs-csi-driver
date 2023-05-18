@@ -66,16 +66,19 @@ const (
 	volumeParamsParentVolumeId                = "parentVolumeId"
 	volumeParamsReadOnly                      = "readOnly"
 	volumeParamsRecordSizeKiB                 = "recordSizeKiB"
+	volumeParamsStorageCapacityReservation    = "storageCapacityReservation"
+	volumeParamsStorageCapacityQuota          = "storageCapacityQuota"
 	volumeParamsUserAndGroupQuotas            = "userAndGroupQuotas"
 	snapshotParamsTags                        = "tags"
 )
 
-// The external-provisioner automatically configures reserved parameter keys on the CreateVolumeRequest:
-// https://kubernetes-csi.github.io/docs/external-provisioner.html#storageclass-parameters
-// Each of these parameter keys have the same prefix, "csi.storage.k8s.io".
+// The external-provisioner and external-snapshotter automatically configure reserved parameters on the
+// CreateVolumeRequest: https://kubernetes-csi.github.io/docs/external-provisioner.html#storageclass-parameters
+// and the CreateSnapshotRequest: https://kubernetes-csi.github.io/docs/external-snapshotter.html#volumesnapshotclass-parameters
+// Each of these parameter keys have the same prefix: "csi.storage.k8s.io".
 // We will store this prefix as a constant to avoid throwing an error when we encounter these parameters.
 const (
-	reservedVolumeParamsPrefix = "csi.storage.k8s.io"
+	reservedParamsPrefix = "csi.storage.k8s.io"
 )
 
 const (
@@ -120,7 +123,7 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 
 	if volumeType == fsVolumeType {
 		if req.GetVolumeContentSource() != nil {
-			return nil, status.Error(codes.InvalidArgument, "Snapshots are not available at the filesystem level. Set volumeType to volume.")
+			return nil, status.Error(codes.InvalidArgument, "Snapshots are not available at the file system level. Set volumeType to volume.")
 		}
 
 		if _, ok := volumeParams[volumeParamsSkipFinalBackupOnDeletion]; !ok {
@@ -184,10 +187,10 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 				}
 				fsOptions.SkipFinalBackupOnDeletion = boolVal
 			case key == volumeParamsVolumeType:
-			case strings.HasPrefix(key, reservedVolumeParamsPrefix):
+			case strings.HasPrefix(key, reservedParamsPrefix):
 				continue
 			default:
-				return nil, status.Errorf(codes.InvalidArgument, "invalid parameter of %s: %s", key, value)
+				return nil, status.Errorf(codes.InvalidArgument, "invalid parameter key %s for CreateVolume with volumeType %s", key, volumeType)
 			}
 		}
 
@@ -206,7 +209,7 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 
 		err = d.cloud.WaitForFileSystemAvailable(ctx, fs.FileSystemId)
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "Filesystem is not ready: %v", err)
+			return nil, status.Errorf(codes.Internal, "File system is not ready: %v", err)
 		}
 
 		return &csi.CreateVolumeResponse{
@@ -241,11 +244,17 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 			snapshotArn = &snapshot.ResourceARN
 		}
 
+		// When dynamically provisioning child volumes, we ignore the user-provided request for storage.
+		// The storage on the volume will be configured via the storageCapacityReservation and storageCapacityQuota
+		// parameters in the storage class. To prevent users from attempting to provision storage via this value,
+		// we force them to provide a default storage request on the PVC, which is 1GiB.
+		if *storageCapacity != util.DefaultVolumeStorageRequestGiB {
+			return nil, status.Errorf(codes.InvalidArgument, "Requesting storage is not supported for child volumes. Please request %vGi on the PVC.", util.DefaultVolumeStorageRequestGiB)
+		}
+
 		volOptions := cloud.VolumeOptions{
-			Name:                          &volName,
-			StorageCapacityQuotaGiB:       storageCapacity,
-			StorageCapacityReservationGiB: storageCapacity,
-			SnapshotARN:                   snapshotArn,
+			Name:        &volName,
+			SnapshotARN: snapshotArn,
 		}
 
 		for key, value := range volumeParams {
@@ -276,15 +285,27 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 				volOptions.RecordSizeKiB = i
 			case key == volumeParamsUserAndGroupQuotas:
 				volOptions.UserAndGroupQuotas = aws.String(value)
+			case key == volumeParamsStorageCapacityReservation:
+				i, err := util.StringToIntPointer(value)
+				if err != nil {
+					return nil, status.Errorf(codes.InvalidArgument, "invalid parameter of %s: %s", volumeParamsStorageCapacityReservation, err)
+				}
+				volOptions.StorageCapacityReservationGiB = i
+			case key == volumeParamsStorageCapacityQuota:
+				i, err := util.StringToIntPointer(value)
+				if err != nil {
+					return nil, status.Errorf(codes.InvalidArgument, "invalid parameter of %s: %s", volumeParamsStorageCapacityQuota, err)
+				}
+				volOptions.StorageCapacityQuotaGiB = i
 			case key == volumeParamsTags:
 				volOptions.Tags = aws.String(value)
 			case key == volumeParamsOptionsOnDeletion:
 				volOptions.OptionsOnDeletion = aws.String(value)
 			case key == volumeParamsVolumeType:
-			case strings.HasPrefix(key, reservedVolumeParamsPrefix):
+			case strings.HasPrefix(key, reservedParamsPrefix):
 				continue
 			default:
-				return nil, status.Errorf(codes.InvalidArgument, "invalid parameter of %s: %s", key, value)
+				return nil, status.Errorf(codes.InvalidArgument, "invalid parameter key %s for CreateVolume with volumeType %s", key, volumeType)
 			}
 		}
 
@@ -313,7 +334,7 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 
 		return &csi.CreateVolumeResponse{
 			Volume: &csi.Volume{
-				CapacityBytes: util.GiBToBytes(v.StorageCapacityReservationGiB),
+				CapacityBytes: util.GiBToBytes(util.DefaultVolumeStorageRequestGiB),
 				VolumeId:      v.VolumeId,
 				VolumeContext: map[string]string{
 					volumeContextDnsName:    fileSystem.DnsName,
@@ -465,11 +486,13 @@ func (d *Driver) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequ
 	}
 
 	for key, value := range snapshotParams {
-		switch key {
-		case snapshotParamsTags:
+		switch {
+		case key == snapshotParamsTags:
 			opts.Tags = aws.String(value)
+		case strings.HasPrefix(key, reservedParamsPrefix):
+			continue
 		default:
-			return nil, status.Errorf(codes.InvalidArgument, "invalid parameter of %s: %s", key, value)
+			return nil, status.Errorf(codes.InvalidArgument, "invalid parameter key %s for CreateSnapshot", key)
 		}
 	}
 
@@ -550,10 +573,6 @@ func (d *Driver) ControllerExpandVolume(ctx context.Context, req *csi.Controller
 	if capRange == nil {
 		return nil, status.Error(codes.InvalidArgument, "Capacity range not provided")
 	}
-	if capRange.GetLimitBytes() > 0 && capRange.GetRequiredBytes() > capRange.GetLimitBytes() {
-		return nil, status.Errorf(codes.OutOfRange, "Requested storage capacity of %d bytes exceeds capacity limit of %d bytes.", capRange.GetRequiredBytes(), capRange.GetLimitBytes())
-	}
-
 	newCapacity := util.BytesToGiB(capRange.GetRequiredBytes())
 
 	splitVolumeId := strings.SplitN(volumeID, "-", 2)
@@ -591,39 +610,15 @@ func (d *Driver) ControllerExpandVolume(ctx context.Context, req *csi.Controller
 		}, nil
 	}
 
+	// Run a no-op because volume expansion is not supported for child volumes
 	if splitVolumeId[0] == cloud.VolumePrefix {
-		v, err := d.cloud.DescribeVolume(ctx, volumeID)
-		if err != nil {
-			if err == cloud.ErrNotFound {
-				return nil, status.Errorf(codes.NotFound, "Volume not found with ID %q", volumeID)
-			}
-			return nil, status.Errorf(codes.Internal, "Could not get volume with ID %q: %v", volumeID, err)
-		}
-
-		if newCapacity <= v.StorageCapacityQuotaGiB {
-			// Current capacity is sufficient to satisfy the request
-			klog.V(4).Infof("ControllerExpandVolume: current volume capacity of %d GiB matches or exceeds requested storage capacity of %d GiB, returning with success", v.StorageCapacityQuotaGiB, newCapacity)
-			return &csi.ControllerExpandVolumeResponse{
-				CapacityBytes:         util.GiBToBytes(v.StorageCapacityQuotaGiB),
-				NodeExpansionRequired: false,
-			}, nil
-		}
-
-		finalCapacity, err := d.cloud.ResizeVolume(ctx, volumeID, newCapacity)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "resize failed: %v", err)
-		}
-
-		err = d.cloud.WaitForVolumeResize(ctx, volumeID, *finalCapacity)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "volume is not resized: %v", err)
-		}
-
+		klog.V(2).InfoS("Volume expansion is not supported for child volumes. Running no-op and returning success.")
 		return &csi.ControllerExpandVolumeResponse{
-			CapacityBytes:         util.GiBToBytes(*finalCapacity),
+			CapacityBytes:         util.GiBToBytes(util.DefaultVolumeStorageRequestGiB),
 			NodeExpansionRequired: false,
 		}, nil
 	}
+
 	return nil, status.Errorf(codes.NotFound, "Volume not found with ID %q", volumeID)
 }
 

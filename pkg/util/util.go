@@ -27,7 +27,8 @@ import (
 )
 
 const (
-	GiB = 1024 * 1024 * 1024
+	GiB                            = 1024 * 1024 * 1024
+	DefaultVolumeStorageRequestGiB = 1
 )
 
 func ParseEndpoint(endpoint string) (string, string, error) {

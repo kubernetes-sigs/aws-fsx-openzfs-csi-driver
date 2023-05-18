@@ -37,6 +37,7 @@ func TestCreateVolume(t *testing.T) {
 		volumeId                            = "volumeId"
 		endpoint                            = "endpoint"
 		storageCapacity               int64 = 64
+		volumeDefaultRequiredBytes          = util.GiBToBytes(util.DefaultVolumeStorageRequestGiB)
 		dnsName                             = "dnsName"
 		kmsKeyId                            = "1234abcd-12ab-34cd-56ef-1234567890ab"
 		automaticBackupRetentionDays        = "1"
@@ -60,6 +61,8 @@ func TestCreateVolume(t *testing.T) {
 		parentVolumeId                      = "fsvol-03062e7ff37662dff"
 		readOnly                            = "false"
 		recordSizeKiB                       = "128"
+		storageCapacityReservation          = "-1"
+		storageCapacityQuota                = "-1"
 		userAndGroupQuotas                  = "[{Type=User,Id=1,StorageCapacityQuotaGiB=10}]"
 		volumePath                          = "/"
 		snapshotArn                         = "arn:"
@@ -93,7 +96,6 @@ func TestCreateVolume(t *testing.T) {
 					Name: filesystemId,
 					CapacityRange: &csi.CapacityRange{
 						RequiredBytes: util.GiBToBytes(storageCapacity),
-						LimitBytes:    util.GiBToBytes(storageCapacity),
 					},
 					VolumeCapabilities: []*csi.VolumeCapability{stdVolCap},
 					Parameters: map[string]string{
@@ -169,7 +171,6 @@ func TestCreateVolume(t *testing.T) {
 					Name: filesystemId,
 					CapacityRange: &csi.CapacityRange{
 						RequiredBytes: util.GiBToBytes(storageCapacity),
-						LimitBytes:    util.GiBToBytes(storageCapacity),
 					},
 					VolumeCapabilities: []*csi.VolumeCapability{stdVolCap},
 					Parameters: map[string]string{
@@ -234,29 +235,28 @@ func TestCreateVolume(t *testing.T) {
 				req := &csi.CreateVolumeRequest{
 					Name: volumeId,
 					CapacityRange: &csi.CapacityRange{
-						RequiredBytes: util.GiBToBytes(storageCapacity),
-						LimitBytes:    util.GiBToBytes(storageCapacity),
+						RequiredBytes: volumeDefaultRequiredBytes,
 					},
 					VolumeCapabilities: []*csi.VolumeCapability{stdVolCap},
 					Parameters: map[string]string{
-						volumeParamsVolumeType:          "volume",
-						volumeParamsCopyTagsToSnapshots: copyTagsToSnapshots,
-						volumeParamsDataCompressionType: dataCompressionType,
-						volumeParamsNfsExports:          nfsExports,
-						volumeParamsParentVolumeId:      parentVolumeId,
-						volumeParamsReadOnly:            readOnly,
-						volumeParamsRecordSizeKiB:       recordSizeKiB,
-						volumeParamsUserAndGroupQuotas:  userAndGroupQuotas,
-						volumeParamsTags:                tags,
-						volumeParamsOptionsOnDeletion:   optionsOnDeletion,
+						volumeParamsVolumeType:                 "volume",
+						volumeParamsCopyTagsToSnapshots:        copyTagsToSnapshots,
+						volumeParamsDataCompressionType:        dataCompressionType,
+						volumeParamsNfsExports:                 nfsExports,
+						volumeParamsParentVolumeId:             parentVolumeId,
+						volumeParamsReadOnly:                   readOnly,
+						volumeParamsRecordSizeKiB:              recordSizeKiB,
+						volumeParamsUserAndGroupQuotas:         userAndGroupQuotas,
+						volumeParamsStorageCapacityReservation: storageCapacityReservation,
+						volumeParamsStorageCapacityQuota:       storageCapacityQuota,
+						volumeParamsTags:                       tags,
+						volumeParamsOptionsOnDeletion:          optionsOnDeletion,
 					},
 				}
 				volume := &cloud.Volume{
-					FileSystemId:                  filesystemId,
-					StorageCapacityQuotaGiB:       storageCapacity,
-					StorageCapacityReservationGiB: storageCapacity,
-					VolumePath:                    volumePath,
-					VolumeId:                      volumeId,
+					FileSystemId: filesystemId,
+					VolumePath:   volumePath,
+					VolumeId:     volumeId,
 				}
 				filesystem := &cloud.FileSystem{
 					DnsName:         dnsName,
@@ -278,8 +278,8 @@ func TestCreateVolume(t *testing.T) {
 					t.Fatal("resp.Volume is nil")
 				}
 
-				if resp.Volume.CapacityBytes != util.GiBToBytes(storageCapacity) {
-					t.Fatalf("CapacityBytes mismatches. actual: %v expected %v", resp.Volume.CapacityBytes, util.GiBToBytes(storageCapacity))
+				if resp.Volume.CapacityBytes != volumeDefaultRequiredBytes {
+					t.Fatalf("CapacityBytes mismatches. actual: %v expected %v", resp.Volume.CapacityBytes, volumeDefaultRequiredBytes)
 				}
 
 				if resp.Volume.VolumeId != volumeId {
@@ -316,8 +316,7 @@ func TestCreateVolume(t *testing.T) {
 				req := &csi.CreateVolumeRequest{
 					Name: volumeId,
 					CapacityRange: &csi.CapacityRange{
-						RequiredBytes: util.GiBToBytes(storageCapacity),
-						LimitBytes:    util.GiBToBytes(storageCapacity),
+						RequiredBytes: volumeDefaultRequiredBytes,
 					},
 					VolumeCapabilities: []*csi.VolumeCapability{stdVolCap},
 					Parameters: map[string]string{
@@ -326,11 +325,9 @@ func TestCreateVolume(t *testing.T) {
 					},
 				}
 				volume := &cloud.Volume{
-					FileSystemId:                  filesystemId,
-					StorageCapacityQuotaGiB:       storageCapacity,
-					StorageCapacityReservationGiB: storageCapacity,
-					VolumePath:                    volumePath,
-					VolumeId:                      volumeId,
+					FileSystemId: filesystemId,
+					VolumePath:   volumePath,
+					VolumeId:     volumeId,
 				}
 				filesystem := &cloud.FileSystem{
 					DnsName:         dnsName,
@@ -352,8 +349,8 @@ func TestCreateVolume(t *testing.T) {
 					t.Fatal("resp.Volume is nil")
 				}
 
-				if resp.Volume.CapacityBytes != util.GiBToBytes(storageCapacity) {
-					t.Fatalf("CapacityBytes mismatches. actual: %v expected %v", resp.Volume.CapacityBytes, util.GiBToBytes(storageCapacity))
+				if resp.Volume.CapacityBytes != volumeDefaultRequiredBytes {
+					t.Fatalf("CapacityBytes mismatches. actual: %v expected %v", resp.Volume.CapacityBytes, volumeDefaultRequiredBytes)
 				}
 
 				if resp.Volume.VolumeId != volumeId {
@@ -390,21 +387,22 @@ func TestCreateVolume(t *testing.T) {
 				req := &csi.CreateVolumeRequest{
 					Name: volumeId,
 					CapacityRange: &csi.CapacityRange{
-						RequiredBytes: util.GiBToBytes(storageCapacity),
-						LimitBytes:    util.GiBToBytes(storageCapacity),
+						RequiredBytes: volumeDefaultRequiredBytes,
 					},
 					VolumeCapabilities: []*csi.VolumeCapability{stdVolCap},
 					Parameters: map[string]string{
-						volumeParamsVolumeType:          "volume",
-						volumeParamsCopyTagsToSnapshots: copyTagsToSnapshots,
-						volumeParamsDataCompressionType: dataCompressionType,
-						volumeParamsNfsExports:          nfsExports,
-						volumeParamsParentVolumeId:      parentVolumeId,
-						volumeParamsReadOnly:            readOnly,
-						volumeParamsRecordSizeKiB:       recordSizeKiB,
-						volumeParamsUserAndGroupQuotas:  userAndGroupQuotas,
-						volumeParamsTags:                tags,
-						volumeParamsOptionsOnDeletion:   optionsOnDeletion,
+						volumeParamsVolumeType:                 "volume",
+						volumeParamsCopyTagsToSnapshots:        copyTagsToSnapshots,
+						volumeParamsDataCompressionType:        dataCompressionType,
+						volumeParamsNfsExports:                 nfsExports,
+						volumeParamsParentVolumeId:             parentVolumeId,
+						volumeParamsReadOnly:                   readOnly,
+						volumeParamsRecordSizeKiB:              recordSizeKiB,
+						volumeParamsUserAndGroupQuotas:         userAndGroupQuotas,
+						volumeParamsStorageCapacityReservation: storageCapacityReservation,
+						volumeParamsStorageCapacityQuota:       storageCapacityQuota,
+						volumeParamsTags:                       tags,
+						volumeParamsOptionsOnDeletion:          optionsOnDeletion,
 					},
 					VolumeContentSource: &csi.VolumeContentSource{
 						Type: &csi.VolumeContentSource_Snapshot{
@@ -420,11 +418,9 @@ func TestCreateVolume(t *testing.T) {
 					StorageCapacity: storageCapacity,
 				}
 				volume := &cloud.Volume{
-					FileSystemId:                  filesystemId,
-					StorageCapacityQuotaGiB:       storageCapacity,
-					StorageCapacityReservationGiB: storageCapacity,
-					VolumePath:                    "/",
-					VolumeId:                      volumeId,
+					FileSystemId: filesystemId,
+					VolumePath:   "/",
+					VolumeId:     volumeId,
 				}
 				snapshot := &cloud.Snapshot{
 					SnapshotID:     snapshotId,
@@ -448,8 +444,8 @@ func TestCreateVolume(t *testing.T) {
 					t.Fatal("resp.Volume is nil")
 				}
 
-				if resp.Volume.CapacityBytes != util.GiBToBytes(storageCapacity) {
-					t.Fatalf("CapacityBytes mismatches. actual: %v expected %v", resp.Volume.CapacityBytes, util.GiBToBytes(storageCapacity))
+				if resp.Volume.CapacityBytes != volumeDefaultRequiredBytes {
+					t.Fatalf("CapacityBytes mismatches. actual: %v expected %v", resp.Volume.CapacityBytes, volumeDefaultRequiredBytes)
 				}
 
 				if resp.Volume.VolumeId != volumeId {
@@ -486,7 +482,6 @@ func TestCreateVolume(t *testing.T) {
 				req := &csi.CreateVolumeRequest{
 					CapacityRange: &csi.CapacityRange{
 						RequiredBytes: util.GiBToBytes(storageCapacity),
-						LimitBytes:    util.GiBToBytes(storageCapacity),
 					},
 					VolumeCapabilities: []*csi.VolumeCapability{stdVolCap},
 					Parameters: map[string]string{
@@ -533,7 +528,6 @@ func TestCreateVolume(t *testing.T) {
 					Name: volumeId,
 					CapacityRange: &csi.CapacityRange{
 						RequiredBytes: util.GiBToBytes(storageCapacity),
-						LimitBytes:    util.GiBToBytes(storageCapacity),
 					},
 					VolumeCapabilities: []*csi.VolumeCapability{stdVolCap},
 					Parameters: map[string]string{
@@ -582,22 +576,23 @@ func TestCreateVolume(t *testing.T) {
 				req := &csi.CreateVolumeRequest{
 					Name: volumeId,
 					CapacityRange: &csi.CapacityRange{
-						RequiredBytes: util.GiBToBytes(storageCapacity),
-						LimitBytes:    util.GiBToBytes(storageCapacity),
+						RequiredBytes: volumeDefaultRequiredBytes,
 					},
 					VolumeCapabilities: []*csi.VolumeCapability{stdVolCap},
 					Parameters: map[string]string{
-						volumeParamsVolumeType:          "volume",
-						volumeParamsCopyTagsToSnapshots: copyTagsToSnapshots,
-						volumeParamsDataCompressionType: dataCompressionType,
-						volumeParamsNfsExports:          nfsExports,
-						volumeParamsParentVolumeId:      parentVolumeId,
-						volumeParamsReadOnly:            readOnly,
-						volumeParamsRecordSizeKiB:       recordSizeKiB,
-						volumeParamsUserAndGroupQuotas:  userAndGroupQuotas,
-						volumeParamsTags:                tags,
-						volumeParamsOptionsOnDeletion:   optionsOnDeletion,
-						"key":                           "value",
+						volumeParamsVolumeType:                 "volume",
+						volumeParamsCopyTagsToSnapshots:        copyTagsToSnapshots,
+						volumeParamsDataCompressionType:        dataCompressionType,
+						volumeParamsNfsExports:                 nfsExports,
+						volumeParamsParentVolumeId:             parentVolumeId,
+						volumeParamsReadOnly:                   readOnly,
+						volumeParamsRecordSizeKiB:              recordSizeKiB,
+						volumeParamsUserAndGroupQuotas:         userAndGroupQuotas,
+						volumeParamsStorageCapacityReservation: storageCapacityReservation,
+						volumeParamsStorageCapacityQuota:       storageCapacityQuota,
+						volumeParamsTags:                       tags,
+						volumeParamsOptionsOnDeletion:          optionsOnDeletion,
+						"key":                                  "value",
 					},
 				}
 
@@ -627,7 +622,6 @@ func TestCreateVolume(t *testing.T) {
 					Name: filesystemId,
 					CapacityRange: &csi.CapacityRange{
 						RequiredBytes: util.GiBToBytes(storageCapacity),
-						LimitBytes:    util.GiBToBytes(storageCapacity),
 					},
 					VolumeCapabilities: []*csi.VolumeCapability{stdVolCap},
 					Parameters: map[string]string{
@@ -677,7 +671,6 @@ func TestCreateVolume(t *testing.T) {
 					Name: filesystemId,
 					CapacityRange: &csi.CapacityRange{
 						RequiredBytes: util.GiBToBytes(storageCapacity),
-						LimitBytes:    util.GiBToBytes(storageCapacity),
 					},
 					VolumeCapabilities: []*csi.VolumeCapability{stdVolCap},
 					Parameters: map[string]string{
@@ -732,21 +725,22 @@ func TestCreateVolume(t *testing.T) {
 				req := &csi.CreateVolumeRequest{
 					Name: volumeId,
 					CapacityRange: &csi.CapacityRange{
-						RequiredBytes: util.GiBToBytes(storageCapacity),
-						LimitBytes:    util.GiBToBytes(storageCapacity),
+						RequiredBytes: volumeDefaultRequiredBytes,
 					},
 					VolumeCapabilities: []*csi.VolumeCapability{stdVolCap},
 					Parameters: map[string]string{
-						volumeParamsVolumeType:          "volume",
-						volumeParamsCopyTagsToSnapshots: copyTagsToSnapshots,
-						volumeParamsDataCompressionType: dataCompressionType,
-						volumeParamsNfsExports:          nfsExports,
-						volumeParamsParentVolumeId:      parentVolumeId,
-						volumeParamsReadOnly:            readOnly,
-						volumeParamsRecordSizeKiB:       recordSizeKiB,
-						volumeParamsUserAndGroupQuotas:  userAndGroupQuotas,
-						volumeParamsTags:                tags,
-						volumeParamsOptionsOnDeletion:   optionsOnDeletion,
+						volumeParamsVolumeType:                 "volume",
+						volumeParamsCopyTagsToSnapshots:        copyTagsToSnapshots,
+						volumeParamsDataCompressionType:        dataCompressionType,
+						volumeParamsNfsExports:                 nfsExports,
+						volumeParamsParentVolumeId:             parentVolumeId,
+						volumeParamsReadOnly:                   readOnly,
+						volumeParamsRecordSizeKiB:              recordSizeKiB,
+						volumeParamsUserAndGroupQuotas:         userAndGroupQuotas,
+						volumeParamsStorageCapacityReservation: storageCapacityReservation,
+						volumeParamsStorageCapacityQuota:       storageCapacityQuota,
+						volumeParamsTags:                       tags,
+						volumeParamsOptionsOnDeletion:          optionsOnDeletion,
 					},
 				}
 
@@ -776,8 +770,58 @@ func TestCreateVolume(t *testing.T) {
 				req := &csi.CreateVolumeRequest{
 					Name: volumeId,
 					CapacityRange: &csi.CapacityRange{
-						RequiredBytes: util.GiBToBytes(storageCapacity),
-						LimitBytes:    util.GiBToBytes(storageCapacity),
+						RequiredBytes: volumeDefaultRequiredBytes,
+					},
+					VolumeCapabilities: []*csi.VolumeCapability{stdVolCap},
+					Parameters: map[string]string{
+						volumeParamsVolumeType:                 "volume",
+						volumeParamsCopyTagsToSnapshots:        copyTagsToSnapshots,
+						volumeParamsDataCompressionType:        dataCompressionType,
+						volumeParamsNfsExports:                 nfsExports,
+						volumeParamsParentVolumeId:             parentVolumeId,
+						volumeParamsReadOnly:                   readOnly,
+						volumeParamsRecordSizeKiB:              recordSizeKiB,
+						volumeParamsUserAndGroupQuotas:         userAndGroupQuotas,
+						volumeParamsStorageCapacityReservation: storageCapacityReservation,
+						volumeParamsStorageCapacityQuota:       storageCapacityQuota,
+						volumeParamsTags:                       tags,
+						volumeParamsOptionsOnDeletion:          optionsOnDeletion,
+					},
+				}
+
+				ctx := context.Background()
+				volume := &cloud.Volume{
+					FileSystemId: filesystemId,
+					VolumePath:   "/",
+					VolumeId:     volumeId,
+				}
+				mockCloud.EXPECT().CreateVolume(gomock.Eq(ctx), gomock.Eq(volumeId), gomock.Any()).Return(volume, nil)
+				mockCloud.EXPECT().WaitForVolumeAvailable(gomock.Eq(ctx), gomock.Eq(volumeId)).Return(errors.New("error"))
+
+				_, err := driver.CreateVolume(ctx, req)
+				if err == nil {
+					t.Fatal("CreateVolume is not failed")
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: DescribeVolume return error",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockCloud := mocks.NewMockCloud(mockCtl)
+
+				driver := &Driver{
+					endpoint: endpoint,
+					inFlight: internal.NewInFlight(),
+					cloud:    mockCloud,
+				}
+
+				req := &csi.CreateVolumeRequest{
+					Name: volumeId,
+					CapacityRange: &csi.CapacityRange{
+						RequiredBytes: volumeDefaultRequiredBytes,
 					},
 					VolumeCapabilities: []*csi.VolumeCapability{stdVolCap},
 					Parameters: map[string]string{
@@ -793,17 +837,16 @@ func TestCreateVolume(t *testing.T) {
 						volumeParamsOptionsOnDeletion:   optionsOnDeletion,
 					},
 				}
+				volume := &cloud.Volume{
+					FileSystemId: filesystemId,
+					VolumePath:   volumePath,
+					VolumeId:     volumeId,
+				}
 
 				ctx := context.Background()
-				volume := &cloud.Volume{
-					FileSystemId:                  filesystemId,
-					StorageCapacityQuotaGiB:       storageCapacity,
-					StorageCapacityReservationGiB: storageCapacity,
-					VolumePath:                    "/",
-					VolumeId:                      volumeId,
-				}
 				mockCloud.EXPECT().CreateVolume(gomock.Eq(ctx), gomock.Eq(volumeId), gomock.Any()).Return(volume, nil)
-				mockCloud.EXPECT().WaitForVolumeAvailable(gomock.Eq(ctx), gomock.Eq(volumeId)).Return(errors.New("error"))
+				mockCloud.EXPECT().WaitForVolumeAvailable(gomock.Eq(ctx), gomock.Eq(volumeId)).Return(nil)
+				mockCloud.EXPECT().DescribeFileSystem(gomock.Eq(ctx), gomock.Eq(filesystemId)).Return(nil, errors.New(""))
 
 				_, err := driver.CreateVolume(ctx, req)
 				if err == nil {
@@ -814,7 +857,7 @@ func TestCreateVolume(t *testing.T) {
 			},
 		},
 		{
-			name: "fail: DescribeFileSystem return error",
+			name: "fail: volume invalid requiredBytes",
 			testFunc: func(t *testing.T) {
 				mockCtl := gomock.NewController(t)
 				mockCloud := mocks.NewMockCloud(mockCtl)
@@ -829,35 +872,25 @@ func TestCreateVolume(t *testing.T) {
 					Name: volumeId,
 					CapacityRange: &csi.CapacityRange{
 						RequiredBytes: util.GiBToBytes(storageCapacity),
-						LimitBytes:    util.GiBToBytes(storageCapacity),
 					},
 					VolumeCapabilities: []*csi.VolumeCapability{stdVolCap},
 					Parameters: map[string]string{
-						volumeParamsVolumeType:          "volume",
-						volumeParamsCopyTagsToSnapshots: copyTagsToSnapshots,
-						volumeParamsDataCompressionType: dataCompressionType,
-						volumeParamsNfsExports:          nfsExports,
-						volumeParamsParentVolumeId:      parentVolumeId,
-						volumeParamsReadOnly:            readOnly,
-						volumeParamsRecordSizeKiB:       recordSizeKiB,
-						volumeParamsUserAndGroupQuotas:  userAndGroupQuotas,
-						volumeParamsTags:                tags,
-						volumeParamsOptionsOnDeletion:   optionsOnDeletion,
+						volumeParamsVolumeType:                 "volume",
+						volumeParamsCopyTagsToSnapshots:        copyTagsToSnapshots,
+						volumeParamsDataCompressionType:        dataCompressionType,
+						volumeParamsNfsExports:                 nfsExports,
+						volumeParamsParentVolumeId:             parentVolumeId,
+						volumeParamsReadOnly:                   readOnly,
+						volumeParamsRecordSizeKiB:              recordSizeKiB,
+						volumeParamsUserAndGroupQuotas:         userAndGroupQuotas,
+						volumeParamsStorageCapacityReservation: storageCapacityReservation,
+						volumeParamsStorageCapacityQuota:       storageCapacityQuota,
+						volumeParamsTags:                       tags,
+						volumeParamsOptionsOnDeletion:          optionsOnDeletion,
 					},
-				}
-				volume := &cloud.Volume{
-					FileSystemId:                  filesystemId,
-					StorageCapacityQuotaGiB:       storageCapacity,
-					StorageCapacityReservationGiB: storageCapacity,
-					VolumePath:                    volumePath,
-					VolumeId:                      volumeId,
 				}
 
 				ctx := context.Background()
-				mockCloud.EXPECT().CreateVolume(gomock.Eq(ctx), gomock.Eq(volumeId), gomock.Any()).Return(volume, nil)
-				mockCloud.EXPECT().WaitForVolumeAvailable(gomock.Eq(ctx), gomock.Eq(volumeId)).Return(nil)
-				mockCloud.EXPECT().DescribeFileSystem(gomock.Eq(ctx), gomock.Eq(filesystemId)).Return(nil, errors.New(""))
-
 				_, err := driver.CreateVolume(ctx, req)
 				if err == nil {
 					t.Fatal("CreateVolume is not failed")
@@ -882,7 +915,6 @@ func TestCreateVolume(t *testing.T) {
 					Name: filesystemId,
 					CapacityRange: &csi.CapacityRange{
 						RequiredBytes: util.GiBToBytes(storageCapacity),
-						LimitBytes:    util.GiBToBytes(storageCapacity),
 					},
 					VolumeCapabilities: []*csi.VolumeCapability{stdVolCap},
 					Parameters: map[string]string{
@@ -938,7 +970,6 @@ func TestCreateVolume(t *testing.T) {
 					Name: filesystemId,
 					CapacityRange: &csi.CapacityRange{
 						RequiredBytes: util.GiBToBytes(storageCapacity),
-						LimitBytes:    util.GiBToBytes(storageCapacity),
 					},
 					VolumeCapabilities: []*csi.VolumeCapability{stdVolCap},
 					Parameters: map[string]string{
@@ -985,7 +1016,6 @@ func TestCreateVolume(t *testing.T) {
 					Name: filesystemId,
 					CapacityRange: &csi.CapacityRange{
 						RequiredBytes: util.GiBToBytes(storageCapacity),
-						LimitBytes:    util.GiBToBytes(storageCapacity),
 					},
 					VolumeCapabilities: []*csi.VolumeCapability{stdVolCap},
 					Parameters:         map[string]string{},
@@ -1693,16 +1723,15 @@ func TestDeleteSnapshot(t *testing.T) {
 
 func TestControllerExpandVolume(t *testing.T) {
 	var (
-		dnsName               = "dnsName"
-		endpoint              = "endpoint"
-		filesystemId          = "fs-1234"
-		volumeId              = "fsvol-1234"
-		storageCapacity int64 = 100
-		currentBytes          = util.GiBToBytes(storageCapacity)
-		newCapacity     int64 = 150
-		requiredBytes         = util.GiBToBytes(newCapacity)
-		limitBytes            = util.GiBToBytes(newCapacity)
-		volumePath            = "/"
+		dnsName                          = "dnsName"
+		endpoint                         = "endpoint"
+		filesystemId                     = "fs-1234"
+		volumeId                         = "fsvol-1234"
+		storageCapacity            int64 = 100
+		currentBytes                     = util.GiBToBytes(storageCapacity)
+		newCapacity                int64 = 150
+		requiredBytes                    = util.GiBToBytes(newCapacity)
+		volumeDefaultRequiredBytes       = util.GiBToBytes(util.DefaultVolumeStorageRequestGiB)
 	)
 	testCases := []struct {
 		name     string
@@ -1724,7 +1753,6 @@ func TestControllerExpandVolume(t *testing.T) {
 					VolumeId: filesystemId,
 					CapacityRange: &csi.CapacityRange{
 						RequiredBytes: requiredBytes,
-						LimitBytes:    limitBytes,
 					},
 				}
 				filesystem := &cloud.FileSystem{
@@ -1751,7 +1779,7 @@ func TestControllerExpandVolume(t *testing.T) {
 			},
 		},
 		{
-			name: "success: volume",
+			name: "success: volume (no-op)",
 			testFunc: func(t *testing.T) {
 				mockCtl := gomock.NewController(t)
 				mockCloud := mocks.NewMockCloud(mockCtl)
@@ -1766,29 +1794,18 @@ func TestControllerExpandVolume(t *testing.T) {
 					VolumeId: volumeId,
 					CapacityRange: &csi.CapacityRange{
 						RequiredBytes: requiredBytes,
-						LimitBytes:    limitBytes,
 					},
-				}
-				volume := &cloud.Volume{
-					FileSystemId:                  filesystemId,
-					VolumeId:                      volumeId,
-					StorageCapacityQuotaGiB:       storageCapacity,
-					StorageCapacityReservationGiB: storageCapacity,
-					VolumePath:                    volumePath,
 				}
 
 				ctx := context.Background()
-				mockCloud.EXPECT().DescribeVolume(gomock.Eq(ctx), gomock.Eq(volumeId)).Return(volume, nil)
-				mockCloud.EXPECT().ResizeVolume(gomock.Eq(ctx), gomock.Eq(volumeId), gomock.Any()).Return(&newCapacity, nil)
-				mockCloud.EXPECT().WaitForVolumeResize(gomock.Eq(ctx), gomock.Eq(volumeId), newCapacity).Return(nil)
 
 				resp, err := driver.ControllerExpandVolume(ctx, req)
 				if err != nil {
 					t.Fatalf("ControllerExpandVolume failed: %v", err)
 				}
 
-				if resp.CapacityBytes != requiredBytes {
-					t.Fatal("resp.CapacityBytes is not equal to requiredBytes")
+				if resp.CapacityBytes != volumeDefaultRequiredBytes {
+					t.Fatalf("resp.CapacityBytes is not equal to %v", volumeDefaultRequiredBytes)
 				}
 
 				mockCtl.Finish()
@@ -1811,7 +1828,6 @@ func TestControllerExpandVolume(t *testing.T) {
 					VolumeId: filesystemId,
 					CapacityRange: &csi.CapacityRange{
 						RequiredBytes: lowerBytes,
-						LimitBytes:    limitBytes,
 					},
 				}
 				filesystem := &cloud.FileSystem{
@@ -1836,36 +1852,6 @@ func TestControllerExpandVolume(t *testing.T) {
 			},
 		},
 		{
-			name: "fail: required capacity greater than limit",
-			testFunc: func(t *testing.T) {
-				mockCtl := gomock.NewController(t)
-				mockCloud := mocks.NewMockCloud(mockCtl)
-
-				driver := &Driver{
-					endpoint: endpoint,
-					inFlight: internal.NewInFlight(),
-					cloud:    mockCloud,
-				}
-
-				req := &csi.ControllerExpandVolumeRequest{
-					VolumeId: filesystemId,
-					CapacityRange: &csi.CapacityRange{
-						RequiredBytes: requiredBytes,
-						LimitBytes:    1,
-					},
-				}
-
-				ctx := context.Background()
-
-				_, err := driver.ControllerExpandVolume(ctx, req)
-				if err == nil {
-					t.Fatalf("ControllerExpandVolume success: %v", err)
-				}
-
-				mockCtl.Finish()
-			},
-		},
-		{
 			name: "fail: missing volumeId",
 			testFunc: func(t *testing.T) {
 				mockCtl := gomock.NewController(t)
@@ -1880,7 +1866,6 @@ func TestControllerExpandVolume(t *testing.T) {
 				req := &csi.ControllerExpandVolumeRequest{
 					CapacityRange: &csi.CapacityRange{
 						RequiredBytes: requiredBytes,
-						LimitBytes:    limitBytes,
 					},
 				}
 
@@ -1936,7 +1921,6 @@ func TestControllerExpandVolume(t *testing.T) {
 					VolumeId: filesystemId,
 					CapacityRange: &csi.CapacityRange{
 						RequiredBytes: requiredBytes,
-						LimitBytes:    limitBytes,
 					},
 				}
 
@@ -1967,7 +1951,6 @@ func TestControllerExpandVolume(t *testing.T) {
 					VolumeId: filesystemId,
 					CapacityRange: &csi.CapacityRange{
 						RequiredBytes: requiredBytes,
-						LimitBytes:    limitBytes,
 					},
 				}
 				filesystem := &cloud.FileSystem{
@@ -2004,7 +1987,6 @@ func TestControllerExpandVolume(t *testing.T) {
 					VolumeId: filesystemId,
 					CapacityRange: &csi.CapacityRange{
 						RequiredBytes: requiredBytes,
-						LimitBytes:    limitBytes,
 					},
 				}
 				filesystem := &cloud.FileSystem{

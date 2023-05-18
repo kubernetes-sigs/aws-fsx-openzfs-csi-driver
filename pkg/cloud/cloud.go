@@ -111,11 +111,9 @@ type FileSystemOptions struct {
 
 // Volume represents an OpenZFS volume
 type Volume struct {
-	FileSystemId                  string
-	VolumeId                      string
-	StorageCapacityQuotaGiB       int64
-	StorageCapacityReservationGiB int64
-	VolumePath                    string
+	FileSystemId string
+	VolumeId     string
+	VolumePath   string
 }
 
 // VolumeOptions represents parameters to create an OpenZFS volume
@@ -541,11 +539,9 @@ func (c *cloud) CreateVolume(ctx context.Context, volumeId string, volumeOptions
 	}
 
 	return &Volume{
-		FileSystemId:                  aws.StringValue(output.Volume.FileSystemId),
-		VolumeId:                      aws.StringValue(output.Volume.VolumeId),
-		StorageCapacityQuotaGiB:       aws.Int64Value(output.Volume.OpenZFSConfiguration.StorageCapacityQuotaGiB),
-		StorageCapacityReservationGiB: aws.Int64Value(output.Volume.OpenZFSConfiguration.StorageCapacityReservationGiB),
-		VolumePath:                    aws.StringValue(output.Volume.OpenZFSConfiguration.VolumePath),
+		FileSystemId: aws.StringValue(output.Volume.FileSystemId),
+		VolumeId:     aws.StringValue(output.Volume.VolumeId),
+		VolumePath:   aws.StringValue(output.Volume.OpenZFSConfiguration.VolumePath),
 	}, nil
 }
 
@@ -634,10 +630,8 @@ func (c *cloud) DescribeVolume(ctx context.Context, volumeId string) (*Volume, e
 	}
 
 	return &Volume{
-		VolumeId:                      aws.StringValue(v.VolumeId),
-		StorageCapacityQuotaGiB:       aws.Int64Value(v.OpenZFSConfiguration.StorageCapacityQuotaGiB),
-		StorageCapacityReservationGiB: aws.Int64Value(v.OpenZFSConfiguration.StorageCapacityReservationGiB),
-		VolumePath:                    aws.StringValue(v.OpenZFSConfiguration.VolumePath),
+		VolumeId:   aws.StringValue(v.VolumeId),
+		VolumePath: aws.StringValue(v.OpenZFSConfiguration.VolumePath),
 	}, nil
 }
 
