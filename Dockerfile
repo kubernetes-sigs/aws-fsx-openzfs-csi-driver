@@ -11,16 +11,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM --platform=$BUILDPLATFORM golang:1.20.2-bullseye as builder
+# See
+# https://docs.docker.com/engine/reference/builder/#automatic-platform-args-in-the-global-scope
+# for info on BUILDPLATFORM, TARGETOS, TARGETARCH, etc.
+FROM --platform=$BUILDPLATFORM golang:1.20.4-bullseye AS go-builder
 WORKDIR /go/src/github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver
-ADD . .
-RUN make
+COPY . .
+ARG TARGETOS
+ARG TARGETARCH
+RUN OS=$TARGETOS ARCH=$TARGETARCH make $TARGETOS/$TARGETARCH
 
-FROM amazonlinux:2 AS linux-amazon
-RUN yum update -y
-RUN yum install util-linux libyaml -y
-RUN yum install nfs-utils -y
+# https://github.com/aws/eks-distro-build-tooling/blob/main/eks-distro-base/Dockerfile.minimal-base-csi-ebs#L36
+FROM public.ecr.aws/eks-distro-build-tooling/eks-distro-minimal-base-csi-ebs-builder:latest-al2 as rpm-installer
 
-COPY --from=builder /go/src/github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/bin/aws-fsx-openzfs-csi-driver /bin/aws-fsx-openzfs-csi-driver
+RUN set -x && \
+      install_binary /sbin/mount.nfs /sbin/umount.nfs && \
+                     cleanup "fsx-openzfs-csi"
 
+FROM public.ecr.aws/eks-distro-build-tooling/eks-distro-minimal-base-csi-ebs:latest-al2 AS linux-amazon
+COPY --from=rpm-installer /newroot /
+COPY --from=go-builder /go/src/github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/bin/aws-fsx-openzfs-csi-driver /bin/aws-fsx-openzfs-csi-driver
 ENTRYPOINT ["/bin/aws-fsx-openzfs-csi-driver"]
