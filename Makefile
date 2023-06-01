@@ -11,13 +11,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-VERSION=0.1.0
+VERSION?=0.1.0
 
 PKG=github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver
 GIT_COMMIT?=$(shell git rev-parse HEAD)
 BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-LDFLAGS?="-X ${PKG}/pkg/driver.driverVersion=${VERSION} -X ${PKG}/pkg/driver.gitCommit=${GIT_COMMIT} -X ${PKG}/pkg/driver.buildDate=${BUILD_DATE}"
+LDFLAGS?="-X ${PKG}/pkg/driver.driverVersion=${VERSION} -X ${PKG}/pkg/driver.gitCommit=${GIT_COMMIT} -X ${PKG}/pkg/driver.buildDate=${BUILD_DATE} -s -w"
 
 GO111MODULE=on
 GOPROXY=direct
@@ -30,9 +30,9 @@ TAG?=$(GIT_COMMIT)
 
 OUTPUT_TYPE?=docker
 
-ARCH=amd64
-OS=linux
-OSVERSION=amazon
+ARCH?=amd64
+OS?=linux
+OSVERSION?=amazon
 
 ALL_OS?=linux
 ALL_ARCH_linux?=amd64 arm64
@@ -48,35 +48,55 @@ word-hyphen = $(word $2,$(subst -, ,$1))
 
 .EXPORT_ALL_VARIABLES:
 
-.PHONY: build-aws-openzfs-csi-driver
-build-aws-openzfs-csi-driver:
-	mkdir -p bin
-	CGO_ENABLED=0 GOOS=linux go build -ldflags ${LDFLAGS} -o bin/aws-fsx-openzfs-csi-driver ./cmd/
+.PHONY: linux/$(ARCH) bin/aws-fsx-openzfs-csi-driver
+linux/$(ARCH): bin/aws-fsx-openzfs-csi-driver
+bin/aws-fsx-openzfs-csi-driver: | bin
+	CGO_ENABLED=0 GOOS=linux GOARCH=$(ARCH) go build -mod=mod -ldflags ${LDFLAGS} -o bin/aws-fsx-openzfs-csi-driver ./cmd/
 
+# Builds all images
 .PHONY: all
 all: all-image-docker
 
+# Builds all images and pushes them
 .PHONY: all-push
-all-push:
-	docker buildx build \
-		--no-cache-filter=linux-amazon \
-		--platform=$(PLATFORM) \
-		--progress=plain \
-		--target=$(OS)-$(OSVERSION) \
-		--output=type=registry \
-		-t=$(IMAGE):$(TAG) \
-		.
-	touch $@
+all-push: create-manifest-and-images
+	docker manifest push --purge $(IMAGE):$(TAG)
+
+.PHONY: create-manifest-and-images
+create-manifest-and-images: all-image-registry
+# sed expression:
+# LHS: match 0 or more not space characters
+# RHS: replace with $(IMAGE):$(TAG)-& where & is what was matched on LHS
+	docker manifest create --amend $(IMAGE):$(TAG) $(shell echo $(ALL_OS_ARCH_OSVERSION) | sed -e "s~[^ ]*~$(IMAGE):$(TAG)\-&~g")
 
 .PHONY: all-image-docker
 all-image-docker: $(addprefix sub-image-docker-,$(ALL_OS_ARCH_OSVERSION_linux))
+.PHONY: all-image-registry
+all-image-registry: $(addprefix sub-image-registry-,$(ALL_OS_ARCH_OSVERSION))
 
 sub-image-%:
 	$(MAKE) OUTPUT_TYPE=$(call word-hyphen,$*,1) OS=$(call word-hyphen,$*,2) ARCH=$(call word-hyphen,$*,3) OSVERSION=$(call word-hyphen,$*,4) image
 
+.PHONY: image
+image: .image-$(TAG)-$(OS)-$(ARCH)-$(OSVERSION)
+.image-$(TAG)-$(OS)-$(ARCH)-$(OSVERSION):
+	docker buildx build \
+		--platform=$(OS)/$(ARCH) \
+		--progress=plain \
+		--target=$(OS)-$(OSVERSION) \
+		--output=type=$(OUTPUT_TYPE) \
+		-t=$(IMAGE):$(TAG)-$(OS)-$(ARCH)-$(OSVERSION) \
+		--build-arg=GOPROXY=$(GOPROXY) \
+		--build-arg=VERSION=$(VERSION) \
+		.
+	touch $@
+
 .PHONY: test
 test:
-	go test -v -race ./pkg/...
+	go test -v -race ./cmd/... ./pkg/...
+
+.PHONY: test-sanity
+test-sanity:
 	go test -v ./tests/sanity/...
 
 .PHONY: clean

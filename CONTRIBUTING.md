@@ -25,7 +25,8 @@ Please go through [CSI Spec](https://github.com/container-storage-interface/spec
 Dependencies are managed through go module. To build the project simply type: `make`
 
 ### Testing
-* To execute all unit tests and sanity tests, run: `make test`
+* To execute all unit tests, run: `make test`
+* To execute all sanity tests, run: `make test-sanity`
 
 ### Release Process
 Please see [Release Process](./docs/release.md).
