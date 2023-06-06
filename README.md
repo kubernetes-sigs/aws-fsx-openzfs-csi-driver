@@ -1,4 +1,4 @@
-**WARNING**: This driver is currently in a **PRE-ALPHA stage**. This means that there may be backwards compatible breaking changes moving forward. Do NOT use this driver in a production environment in its current state.
+**WARNING**: This driver is currently in a **Public BETA stage**. This means that there may be backwards compatible breaking changes moving forward. Do NOT use this driver in a production environment in its current state.
 
 **DISCLAIMER**: This is not an officially supported Amazon product.
 
@@ -19,6 +19,27 @@ The [Amazon FSx for OpenZFS](https://aws.amazon.com/fsx/openzfs/) Container Stor
 * Controller Service: ControllerGetCapabilities, CreateVolume, DeleteVolume, CreateSnapshot, DeleteSnapshot, ControllerExpandVolume
 * Node Service: NodePublishVolume, NodeUnpublishVolume, NodeGetCapabilities, NodeGetInfo, NodeGetId
 * Identity Service: GetPluginInfo, GetPluginCapabilities, Probe
+
+## Container Images
+
+| Driver Version | [ECR Public](https://gallery.ecr.aws/fsx-csi-driver/aws-fsx-openzfs-csi-driver) Image |
+|----------------|---------------------------------------------------------------------------------------|
+| v0.1.0         | public.ecr.aws/fsx-csi-driver/aws-fsx-openzfs-csi-driver:v0.1.0                       |   
+
+<details>
+<summary>Previous Images</summary>
+
+| Driver Version | [ECR Public](https://gallery.ecr.aws/fsx-csi-driver/aws-fsx-openzfs-csi-driver) Image |
+|----------------|---------------------------------------------------------------------------------------|
+</details>
+
+## Releases
+
+The FSx for OpenZFS CSI Driver follows [semantic versioning](https://semver.org/). The version will be bumped following the rules below:
+
+* Significant breaking changes will be released as a `MAJOR` update.
+* New features will be released as a `MINOR` update.
+* Bug or vulnerability fixes will be released as a `PATCH` update.
 
 ### Support
 

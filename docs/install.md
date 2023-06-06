@@ -78,15 +78,12 @@ If you don't want to deploy the driver node on all nodes, please set Helm `Value
 Add policies to `Value.node.tolerations` to configure customized toleration for nodes.
 
 ### Deploy driver
-<!--- TODO: Add that users may deploy the driver as an EKS add-on once it is true -->
 You may deploy the FSx for OpenZFS CSI driver via Kustomize or Helm
 
-<!--- TODO: Uncomment the following lines once we've released v0.1.0 of the driver
 #### Kustomize
 ```sh
 kubectl apply -k "github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/deploy/kubernetes/overlays/stable/?ref=release-0.1.0"
 ```
--->
 
 *Note: Using the master branch to deploy the driver is not supported as the master branch may contain upcoming features incompatible with the currently released stable version of the driver.*
 
