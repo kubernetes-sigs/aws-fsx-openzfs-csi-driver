@@ -25,7 +25,8 @@ GOPATH=$(shell go env GOPATH)
 GOOS=$(shell go env GOOS)
 GOBIN=$(shell pwd)/bin
 
-IMAGE?=633339324534.dkr.ecr.us-east-1.amazonaws.com/aws-fsx-openzfs-csi-driver
+REGISTRY?=public.ecr.aws
+IMAGE?=$(REGISTRY)/aws-fsx-openzfs-csi-driver
 TAG?=$(GIT_COMMIT)
 
 OUTPUT_TYPE?=docker
