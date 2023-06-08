@@ -19,7 +19,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -28,6 +27,7 @@ import (
 	"sigs.k8s.io/aws-fsx-openzfs-csi-driver/pkg/cloud"
 	"sigs.k8s.io/aws-fsx-openzfs-csi-driver/pkg/driver/internal"
 	"sigs.k8s.io/aws-fsx-openzfs-csi-driver/pkg/util"
+	"strconv"
 	"strings"
 )
 
@@ -41,47 +41,42 @@ var (
 )
 
 const (
-	volumeContextVolumeType                   = "volumeType"
-	volumeContextDnsName                      = "dnsName"
-	volumeContextVolumePath                   = "volumePath"
-	volumeParamsVolumeType                    = "volumeType"
-	volumeParamsKmsKeyId                      = "kmsKeyId"
-	volumeParamsAutomaticBackupRetentionDays  = "automaticBackupRetentionDays"
-	volumeParamsCopyTagsToBackups             = "copyTagsToBackups"
-	volumeParamsCopyTagsToVolumes             = "copyTagsToVolumes"
-	volumeParamsDailyAutomaticBackupStartTime = "dailyAutomaticBackupStartTime"
-	volumeParamsDeploymentType                = "deploymentType"
-	volumeParamsDiskIopsConfiguration         = "diskIopsConfiguration"
-	volumeParamsRootVolumeConfiguration       = "rootVolumeConfiguration"
-	volumeParamsThroughputCapacity            = "throughputCapacity"
-	volumeParamsWeeklyMaintenanceStartTime    = "weeklyMaintenanceStartTime"
-	volumeParamsSecurityGroupIds              = "securityGroupIds"
-	volumeParamsSubnetIds                     = "subnetIds"
-	volumeParamsTags                          = "tags"
-	volumeParamsOptionsOnDeletion             = "optionsOnDeletion"
-	volumeParamsSkipFinalBackupOnDeletion     = "skipFinalBackupOnDeletion"
-	volumeParamsCopyTagsToSnapshots           = "copyTagsToSnapshots"
-	volumeParamsDataCompressionType           = "dataCompressionType"
-	volumeParamsNfsExports                    = "nfsExports"
-	volumeParamsParentVolumeId                = "parentVolumeId"
-	volumeParamsReadOnly                      = "readOnly"
-	volumeParamsRecordSizeKiB                 = "recordSizeKiB"
-	volumeParamsUserAndGroupQuotas            = "userAndGroupQuotas"
-	snapshotParamsTags                        = "tags"
+	volumeContextDnsName             = "DNSName"
+	volumeContextResourceType        = "ResourceType"
+	volumeContextVolumePath          = "VolumePath"
+	volumeParamsClientRequestToken   = "ClientRequestToken"
+	volumeParamsFileSystemId         = "FileSystemId"
+	volumeParamsFileSystemType       = "FileSystemType"
+	volumeParamsName                 = "Name"
+	volumeParamsOpenZFSConfiguration = "OpenZFSConfiguration"
+	volumeParamsOriginSnapshot       = "OriginSnapshot"
+	volumeParamsResourceType         = "ResourceType"
+	volumeParamsSkipFinalBackup      = "SkipFinalBackup"
+	volumeParamsStorageCapacity      = "StorageCapacity"
+	volumeParamsTags                 = "Tags"
+	volumeParamsVolumeId             = "VolumeId"
+	volumeParamsVolumeType           = "VolumeType"
 )
 
-// The external-provisioner automatically configures reserved parameter keys on the CreateVolumeRequest:
-// https://kubernetes-csi.github.io/docs/external-provisioner.html#storageclass-parameters
-// Each of these parameter keys have the same prefix, "csi.storage.k8s.io".
-// We will store this prefix as a constant to avoid throwing an error when we encounter these parameters.
 const (
+	AwsFsxOpenZfsDriverTagKey  = "fsx.openzfs.csi.aws.com/cluster"
 	reservedVolumeParamsPrefix = "csi.storage.k8s.io"
+	deletionSuffix             = "OnDeletion"
 )
 
+// Resource Types
 const (
-	fsVolumeType   = "filesystem"
-	volVolumeType  = "volume"
-	rootVolumePath = "fsx"
+	fsType       = "filesystem"
+	volType      = "volume"
+	snapshotType = "snapshot"
+)
+
+// Errors
+const (
+	ErrContainsDriverProviderParameter = "Contains parameter that is defined by driver: %s"
+	ErrIncorrectlyFormatted            = "%s is incorrectly formatted: %s"
+	ErrResourceTypeNotProvided         = "ResourceType is not provided"
+	ErrResourceTypeNotSupported        = "ResourceType is not supported: %s"
 )
 
 func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
@@ -103,99 +98,62 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 	if len(volCaps) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume capabilities not provided")
 	}
-
 	if !d.isValidVolumeCapabilities(volCaps) {
 		return nil, status.Error(codes.InvalidArgument, "Volume capabilities not supported")
 	}
 
-	volumeParams := req.GetParameters()
-	volumeType := volumeParams[volumeParamsVolumeType]
-
-	var storageCapacity *int64
-
+	var storageCapacity int64
 	if req.GetCapacityRange() != nil {
-		convertedCapacity := util.BytesToGiB(req.GetCapacityRange().GetRequiredBytes())
-		storageCapacity = &convertedCapacity
+		storageCapacity = util.BytesToGiB(req.GetCapacityRange().GetRequiredBytes())
 	}
 
-	if volumeType == fsVolumeType {
+	volumeParams := req.GetParameters()
+
+	deleteReservedParameters(volumeParams)
+
+	resourceType := volumeParams[volumeParamsResourceType]
+	if resourceType != fsType && resourceType != volType {
+		if resourceType == "" {
+			return nil, status.Error(codes.InvalidArgument, ErrResourceTypeNotProvided)
+		}
+		return nil, status.Errorf(codes.InvalidArgument, ErrResourceTypeNotSupported, resourceType)
+	}
+	delete(volumeParams, volumeParamsResourceType)
+
+	err := containsDriverProvidedParameters(volumeParams)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	volumeParams[volumeParamsClientRequestToken] = strconv.Quote(volName)
+
+	err = appendDeleteTags(volumeParams, resourceType)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, ErrIncorrectlyFormatted, "Delete Parameters", err)
+	}
+
+	err = appendCustomTags(volumeParams, resourceType)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	if resourceType == fsType {
 		if req.GetVolumeContentSource() != nil {
-			return nil, status.Error(codes.InvalidArgument, "Snapshots are not available at the filesystem level. Set volumeType to volume.")
+			return nil, status.Error(codes.Unimplemented, "Cannot create new file system from a snapshot. To create a new volume from a snapshot, set ResourceType to volume.")
 		}
 
-		if _, ok := volumeParams[volumeParamsSkipFinalBackupOnDeletion]; !ok {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid parameter of %s: %s", volumeParamsSkipFinalBackupOnDeletion, "field required")
+		volumeParams[volumeParamsFileSystemType] = strconv.Quote("OPENZFS")
+		volumeParams[volumeParamsStorageCapacity] = strconv.FormatInt(storageCapacity, 10)
+		err = cloud.CollapseCreateFileSystemParameters(volumeParams)
+		if err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, ErrIncorrectlyFormatted, "OpenZFSConfiguration", err)
 		}
 
-		fsOptions := cloud.FileSystemOptions{
-			StorageCapacity: storageCapacity,
-		}
-
-		for key, value := range volumeParams {
-			switch {
-			case key == volumeParamsKmsKeyId:
-				fsOptions.KmsKeyId = aws.String(value)
-			case key == volumeParamsAutomaticBackupRetentionDays:
-				i, err := util.StringToIntPointer(value)
-				if err != nil {
-					return nil, status.Errorf(codes.InvalidArgument, "invalid parameter of %s: %s", volumeParamsAutomaticBackupRetentionDays, err)
-				}
-				fsOptions.AutomaticBackupRetentionDays = i
-			case key == volumeParamsCopyTagsToBackups:
-				boolVal, err := util.StringToBoolPointer(value)
-				if err != nil {
-					return nil, status.Errorf(codes.InvalidArgument, "invalid parameter of %s: %s", volumeParamsCopyTagsToBackups, err)
-				}
-				fsOptions.CopyTagsToBackups = boolVal
-			case key == volumeParamsCopyTagsToVolumes:
-				boolVal, err := util.StringToBoolPointer(value)
-				if err != nil {
-					return nil, status.Errorf(codes.InvalidArgument, "invalid parameter of %s: %s", volumeParamsCopyTagsToVolumes, err)
-				}
-				fsOptions.CopyTagsToVolumes = boolVal
-			case key == volumeParamsDailyAutomaticBackupStartTime:
-				fsOptions.DailyAutomaticBackupStartTime = aws.String(value)
-			case key == volumeParamsDeploymentType:
-				fsOptions.DeploymentType = aws.String(value)
-			case key == volumeParamsDiskIopsConfiguration:
-				fsOptions.DiskIopsConfiguration = aws.String(value)
-			case key == volumeParamsRootVolumeConfiguration:
-				fsOptions.RootVolumeConfiguration = aws.String(value)
-			case key == volumeParamsThroughputCapacity:
-				i, err := util.StringToIntPointer(value)
-				if err != nil {
-					return nil, status.Errorf(codes.InvalidArgument, "invalid parameter of %s: %s", volumeParamsThroughputCapacity, err)
-				}
-				fsOptions.ThroughputCapacity = i
-			case key == volumeParamsWeeklyMaintenanceStartTime:
-				fsOptions.WeeklyMaintenanceStartTime = aws.String(value)
-			case key == volumeParamsSecurityGroupIds:
-				fsOptions.SecurityGroupIds = util.SplitCommasAndRemoveOuterBrackets(value)
-			case key == volumeParamsSubnetIds:
-				fsOptions.SubnetIds = util.SplitCommasAndRemoveOuterBrackets(value)
-			case key == volumeParamsTags:
-				fsOptions.Tags = aws.String(value)
-			case key == volumeParamsOptionsOnDeletion:
-				fsOptions.OptionsOnDeletion = aws.String(value)
-			case key == volumeParamsSkipFinalBackupOnDeletion:
-				boolVal, err := util.StringToBoolPointer(value)
-				if err != nil {
-					return nil, status.Errorf(codes.InvalidArgument, "invalid parameter of %s: %s", volumeParamsSkipFinalBackupOnDeletion, err)
-				}
-				fsOptions.SkipFinalBackupOnDeletion = boolVal
-			case key == volumeParamsVolumeType:
-			case strings.HasPrefix(key, reservedVolumeParamsPrefix):
-				continue
-			default:
-				return nil, status.Errorf(codes.InvalidArgument, "invalid parameter of %s: %s", key, value)
-			}
-		}
-
-		fs, err := d.cloud.CreateFileSystem(ctx, volName, fsOptions)
+		fs, err := d.cloud.CreateFileSystem(ctx, volumeParams)
 		if err != nil {
 			klog.V(4).Infof("CreateFileSystem error: ", err.Error())
 			switch {
-			case errors.Is(err, cloud.ErrInvalidParameter):
+			case errors.Is(err, cloud.ErrInvalidInput):
 				return nil, status.Error(codes.InvalidArgument, err.Error())
 			case errors.Is(err, cloud.ErrAlreadyExists):
 				return nil, status.Error(codes.AlreadyExists, err.Error())
@@ -214,85 +172,57 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 				CapacityBytes: util.GiBToBytes(fs.StorageCapacity),
 				VolumeId:      fs.FileSystemId,
 				VolumeContext: map[string]string{
-					volumeContextDnsName:    fs.DnsName,
-					volumeContextVolumeType: volumeType,
+					volumeContextDnsName:      fs.DnsName,
+					volumeContextResourceType: resourceType,
 				},
 			},
 		}, nil
 	}
+	if resourceType == volType {
+		var volumeContentSource *csi.VolumeContentSource
 
-	if volumeType == volVolumeType {
-		var snapshotArn *string
+		if storageCapacity != 1 {
+			return nil, status.Error(codes.InvalidArgument, "resourceType Volume expects storage capacity to be 1Gi")
+		}
+
 		volumeSource := req.GetVolumeContentSource()
 		if volumeSource != nil {
 			if _, ok := volumeSource.GetType().(*csi.VolumeContentSource_Snapshot); !ok {
-				return nil, status.Error(codes.InvalidArgument, "Unsupported volumeContentSource type")
+				return nil, status.Error(codes.Unimplemented, "Unsupported volumeContentSource type")
 			}
+
 			sourceSnapshot := volumeSource.GetSnapshot()
 			if sourceSnapshot == nil {
 				return nil, status.Error(codes.InvalidArgument, "Error retrieving snapshot from the volumeContentSource")
 			}
+			snapshotId := sourceSnapshot.GetSnapshotId()
 
-			id := sourceSnapshot.GetSnapshotId()
-			snapshot, err := d.cloud.DescribeSnapshot(ctx, id)
+			err = d.appendSnapshotARN(ctx, volumeParams, snapshotId)
 			if err != nil {
 				return nil, err
 			}
-			snapshotArn = &snapshot.ResourceARN
-		}
 
-		volOptions := cloud.VolumeOptions{
-			Name:                          &volName,
-			StorageCapacityQuotaGiB:       storageCapacity,
-			StorageCapacityReservationGiB: storageCapacity,
-			SnapshotARN:                   snapshotArn,
-		}
-
-		for key, value := range volumeParams {
-			switch {
-			case key == volumeParamsCopyTagsToSnapshots:
-				boolVal, err := util.StringToBoolPointer(value)
-				if err != nil {
-					return nil, status.Errorf(codes.InvalidArgument, "invalid parameter of %s: %s", volumeParamsCopyTagsToSnapshots, err)
-				}
-				volOptions.CopyTagsToSnapshots = boolVal
-			case key == volumeParamsDataCompressionType:
-				volOptions.DataCompressionType = aws.String(value)
-			case key == volumeParamsNfsExports:
-				volOptions.NfsExports = aws.String(value)
-			case key == volumeParamsParentVolumeId:
-				volOptions.ParentVolumeId = aws.String(value)
-			case key == volumeParamsReadOnly:
-				boolVal, err := util.StringToBoolPointer(value)
-				if err != nil {
-					return nil, status.Errorf(codes.InvalidArgument, "invalid parameter of %s: %s", volumeParamsReadOnly, err)
-				}
-				volOptions.ReadOnly = boolVal
-			case key == volumeParamsRecordSizeKiB:
-				i, err := util.StringToIntPointer(value)
-				if err != nil {
-					return nil, status.Errorf(codes.InvalidArgument, "invalid parameter of %s: %s", volumeParamsRecordSizeKiB, err)
-				}
-				volOptions.RecordSizeKiB = i
-			case key == volumeParamsUserAndGroupQuotas:
-				volOptions.UserAndGroupQuotas = aws.String(value)
-			case key == volumeParamsTags:
-				volOptions.Tags = aws.String(value)
-			case key == volumeParamsOptionsOnDeletion:
-				volOptions.OptionsOnDeletion = aws.String(value)
-			case key == volumeParamsVolumeType:
-			case strings.HasPrefix(key, reservedVolumeParamsPrefix):
-				continue
-			default:
-				return nil, status.Errorf(codes.InvalidArgument, "invalid parameter of %s: %s", key, value)
+			volumeContentSource = &csi.VolumeContentSource{
+				Type: &csi.VolumeContentSource_Snapshot{
+					Snapshot: &csi.VolumeContentSource_SnapshotSource{
+						SnapshotId: snapshotId,
+					},
+				},
 			}
 		}
 
-		v, err := d.cloud.CreateVolume(ctx, volName, volOptions)
+		volumeParams[volumeParamsName] = strconv.Quote(volName)
+		volumeParams[volumeParamsVolumeType] = strconv.Quote("OPENZFS")
+		err = cloud.CollapseCreateVolumeParameters(volumeParams)
+		if err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, ErrIncorrectlyFormatted, "OpenZFSConfiguration", err)
+		}
+
+		v, err := d.cloud.CreateVolume(ctx, volumeParams)
 		if err != nil {
 			klog.V(4).Infof("CreateVolume error: ", err.Error())
 			switch {
-			case errors.Is(err, cloud.ErrInvalidParameter):
+			case errors.Is(err, cloud.ErrInvalidInput):
 				return nil, status.Error(codes.InvalidArgument, err.Error())
 			case errors.Is(err, cloud.ErrAlreadyExists):
 				return nil, status.Error(codes.AlreadyExists, err.Error())
@@ -313,21 +243,23 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 
 		return &csi.CreateVolumeResponse{
 			Volume: &csi.Volume{
-				CapacityBytes: util.GiBToBytes(v.StorageCapacityReservationGiB),
+				CapacityBytes: util.GiBToBytes(storageCapacity),
 				VolumeId:      v.VolumeId,
 				VolumeContext: map[string]string{
-					volumeContextDnsName:    fileSystem.DnsName,
-					volumeContextVolumeType: volumeType,
-					volumeContextVolumePath: v.VolumePath,
+					volumeContextDnsName:      fileSystem.DnsName,
+					volumeContextResourceType: resourceType,
+					volumeContextVolumePath:   v.VolumePath,
 				},
+				ContentSource: volumeContentSource,
 			},
 		}, nil
 	}
-	return nil, status.Error(codes.InvalidArgument, "Volume type not supported")
+	return nil, status.Errorf(codes.InvalidArgument, "Type %s not supported", volumeContextResourceType)
 }
 
 func (d *Driver) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
 	var err error
+
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "VolumeId is empty")
@@ -340,12 +272,27 @@ func (d *Driver) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest)
 	}
 	defer d.inFlight.Delete(volumeID)
 
+	deleteParams, err := d.cloud.GetDeleteParameters(ctx, volumeID)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
 	splitVolumeId := strings.SplitN(volumeID, "-", 2)
 	if splitVolumeId[0] == cloud.FilesystemPrefix {
-		err = d.cloud.DeleteFileSystem(ctx, volumeID)
+		deleteParams[volumeParamsFileSystemId] = strconv.Quote(volumeID)
+		err = cloud.CollapseDeleteFileSystemParameters(deleteParams)
+		if err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+		err = d.cloud.DeleteFileSystem(ctx, deleteParams)
 	}
 	if splitVolumeId[0] == cloud.VolumePrefix {
-		err = d.cloud.DeleteVolume(ctx, volumeID)
+		deleteParams[volumeParamsVolumeId] = strconv.Quote(volumeID)
+		err = cloud.CollapseDeleteVolumeParameters(deleteParams)
+		if err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+		err = d.cloud.DeleteVolume(ctx, deleteParams)
 	}
 
 	if err != nil {
@@ -448,46 +395,51 @@ func (d *Driver) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequ
 		return nil, status.Error(codes.InvalidArgument, "Snapshot volume source ID not provided")
 	}
 
-	snapshotParams := req.Parameters
-	snapshotName := req.GetName()
-	volumeID := req.GetSourceVolumeId()
-
 	// check if a request is already in-flight
-	if ok := d.inFlight.Insert(snapshotName); !ok {
-		msg := fmt.Sprintf("CreateSnapshot: "+internal.SnapshotOperationAlreadyExistsErrorMsg, snapshotName)
+	if ok := d.inFlight.Insert(req.GetName()); !ok {
+		msg := fmt.Sprintf("CreateSnapshot: "+internal.SnapshotOperationAlreadyExistsErrorMsg, req.GetName())
 		return nil, status.Error(codes.Aborted, msg)
 	}
-	defer d.inFlight.Delete(snapshotName)
+	defer d.inFlight.Delete(req.GetName())
 
-	opts := cloud.SnapshotOptions{
-		SnapshotName:   &snapshotName,
-		SourceVolumeId: &volumeID,
+	snapshotParams := req.Parameters
+
+	deleteReservedParameters(snapshotParams)
+
+	err := containsDriverProvidedParameters(snapshotParams)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	for key, value := range snapshotParams {
-		switch key {
-		case snapshotParamsTags:
-			opts.Tags = aws.String(value)
-		default:
-			return nil, status.Errorf(codes.InvalidArgument, "invalid parameter of %s: %s", key, value)
-		}
+	err = appendCustomTags(snapshotParams, snapshotType)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	snapshot, err := d.cloud.CreateSnapshot(ctx, opts)
+	volumeId, err := d.cloud.GetVolumeId(ctx, req.GetSourceVolumeId())
+	if err != nil {
+		return nil, status.Error(codes.Internal, "Custom tags incorrectly added")
+	}
+
+	snapshotParams[volumeParamsClientRequestToken] = strconv.Quote(req.GetName())
+	snapshotParams[volumeParamsVolumeId] = strconv.Quote(volumeId)
+	snapshotParams[volumeParamsName] = strconv.Quote(req.GetName())
+
+	snapshot, err := d.cloud.CreateSnapshot(ctx, snapshotParams)
 	if err != nil {
 		switch {
-		case errors.Is(err, cloud.ErrInvalidParameter):
+		case errors.Is(err, cloud.ErrInvalidInput):
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		case errors.Is(err, cloud.ErrAlreadyExists):
 			return nil, status.Error(codes.AlreadyExists, err.Error())
 		default:
-			return nil, status.Errorf(codes.Internal, "CreateSnapshot: Failed to create snapshot %q with error %v", snapshotName, err)
+			return nil, status.Errorf(codes.Internal, "CreateSnapshot: Failed to create snapshot %q with error %v", req.GetName(), err)
 		}
 	}
 
 	err = d.cloud.WaitForSnapshotAvailable(ctx, snapshot.SnapshotID)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Snapshot %s is not ready: %v", snapshotName, err)
+		return nil, status.Errorf(codes.Internal, "Snapshot %s is not ready: %v", req.GetName(), err)
 	}
 
 	return &csi.CreateSnapshotResponse{
@@ -502,12 +454,12 @@ func (d *Driver) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequ
 
 func (d *Driver) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
 	klog.V(4).Infof("DeleteSnapshot: called with args %#v", req)
+	deleteParams := make(map[string]string)
+	snapshotId := req.GetSnapshotId()
 
-	if len(req.GetSnapshotId()) == 0 {
+	if len(snapshotId) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Snapshot ID not provided")
 	}
-
-	snapshotId := req.GetSnapshotId()
 
 	// check if a request is already in-flight
 	if ok := d.inFlight.Insert(snapshotId); !ok {
@@ -516,7 +468,9 @@ func (d *Driver) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotRequ
 	}
 	defer d.inFlight.Delete(snapshotId)
 
-	if err := d.cloud.DeleteSnapshot(ctx, snapshotId); err != nil {
+	deleteParams["SnapshotId"] = strconv.Quote(snapshotId)
+
+	if err := d.cloud.DeleteSnapshot(ctx, deleteParams); err != nil {
 		if strings.Contains(err.Error(), "Unable to find snapshot") {
 			klog.V(4).Infof("DeleteSnapshot: Snapshot %s not found, returning with success", snapshotId)
 			return &csi.DeleteSnapshotResponse{}, nil
@@ -592,41 +546,167 @@ func (d *Driver) ControllerExpandVolume(ctx context.Context, req *csi.Controller
 	}
 
 	if splitVolumeId[0] == cloud.VolumePrefix {
-		v, err := d.cloud.DescribeVolume(ctx, volumeID)
-		if err != nil {
-			if err == cloud.ErrNotFound {
-				return nil, status.Errorf(codes.NotFound, "Volume not found with ID %q", volumeID)
-			}
-			return nil, status.Errorf(codes.Internal, "Could not get volume with ID %q: %v", volumeID, err)
-		}
-
-		if newCapacity <= v.StorageCapacityQuotaGiB {
-			// Current capacity is sufficient to satisfy the request
-			klog.V(4).Infof("ControllerExpandVolume: current volume capacity of %d GiB matches or exceeds requested storage capacity of %d GiB, returning with success", v.StorageCapacityQuotaGiB, newCapacity)
-			return &csi.ControllerExpandVolumeResponse{
-				CapacityBytes:         util.GiBToBytes(v.StorageCapacityQuotaGiB),
-				NodeExpansionRequired: false,
-			}, nil
-		}
-
-		finalCapacity, err := d.cloud.ResizeVolume(ctx, volumeID, newCapacity)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "resize failed: %v", err)
-		}
-
-		err = d.cloud.WaitForVolumeResize(ctx, volumeID, *finalCapacity)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "volume is not resized: %v", err)
-		}
-
-		return &csi.ControllerExpandVolumeResponse{
-			CapacityBytes:         util.GiBToBytes(*finalCapacity),
-			NodeExpansionRequired: false,
-		}, nil
+		return nil, status.Error(codes.Unimplemented, "Storage of volumeType Volume can not be scaled")
 	}
 	return nil, status.Errorf(codes.NotFound, "Volume not found with ID %q", volumeID)
 }
 
 func (d *Driver) ControllerGetVolume(ctx context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
+}
+
+// deleteReservedParameters removes reserved parameters that are populated in request parameters
+// Reserved parameters are deleted directly on the parameters map
+func deleteReservedParameters(parameters map[string]string) {
+	for key, _ := range parameters {
+		if strings.HasPrefix(key, reservedVolumeParamsPrefix) {
+			delete(parameters, key)
+		}
+	}
+}
+
+// containsDriverProvidedParameters checks if parameters contains a JSON field that will be provided by CSI driver.
+// Returns error if it is defined. Returns nil if it doesn't contain a field.
+func containsDriverProvidedParameters(parameters map[string]string) error {
+	driverDefinedParameters := []string{
+		volumeParamsClientRequestToken,
+		volumeParamsFileSystemType,
+		volumeParamsName,
+		volumeParamsOpenZFSConfiguration,
+		volumeParamsStorageCapacity,
+		volumeParamsVolumeId,
+		volumeParamsVolumeType,
+	}
+
+	for _, parameter := range driverDefinedParameters {
+		_, ok := parameters[parameter]
+		if ok {
+			return errors.New(fmt.Sprintf(ErrContainsDriverProviderParameter, parameter))
+		}
+	}
+
+	if strings.Contains(parameters[volumeParamsOriginSnapshot], "SnapshotARN") {
+		return errors.New(fmt.Sprintf(ErrContainsDriverProviderParameter, "SnapshotARN"))
+	}
+
+	return nil
+}
+
+// appendCustomTags appends custom CSI driver tags to resources created.
+// Added tags are directly combined to the Tags field in parameters
+// Errors if the provided parameters is not an expected json
+func appendCustomTags(parameters map[string]string, resourceType string) error {
+	//Create object containing existing tags
+	var existingTags []map[string]string
+	err := util.ConvertJsonStringToObject(parameters[volumeParamsTags], &existingTags)
+	if err != nil {
+		return err
+	}
+
+	existingTags = append(existingTags, map[string]string{"Key": AwsFsxOpenZfsDriverTagKey, "Value": "true"})
+
+	//Put the combined Tags json on parameters
+	combinedJsonString, err := util.ConvertObjectToJsonString(existingTags)
+	if err != nil {
+		return err
+	}
+	parameters[volumeParamsTags] = combinedJsonString
+
+	return nil
+}
+
+// appendDeleteTags converts all delete parameters provided to tag format and appends it to the Tags field.
+// Delete parameters should contain the suffix "OnDeletion"
+// Converted parameters are directly deleted off of parameters, and the combined Tags field is added
+// Validates delete parameters provided in accordance to the FSx API
+// Also validates the required SkipFinalBackup parameter is includes for ResourceType FileSystem
+// Errors if the provided parameters is not an expected json or is invalid
+func appendDeleteTags(parameters map[string]string, resourceType string) error {
+	//Store delete parameters for validation
+	deleteParameters := make(map[string]string)
+
+	//Create object containing existing tags
+	var existingTags []map[string]string
+	err := util.ConvertJsonStringToObject(parameters[volumeParamsTags], &existingTags)
+	if err != nil {
+		return err
+	}
+
+	//Convert deletion parameters to a tag, append it to the existingTags, and delete the deletion parameter
+	for key, value := range parameters {
+		if strings.HasSuffix(key, deletionSuffix) {
+			deleteKey := strings.TrimSuffix(key, deletionSuffix)
+			deleteParameters[deleteKey] = value
+
+			if strings.ContainsAny(value, "[],\"") {
+				value = util.EncodeDeletionTag(value)
+			}
+			existingTags = append(existingTags, map[string]string{"Key": key, "Value": value})
+
+			delete(parameters, key)
+		}
+	}
+
+	//Validate deleteParameters are compatible with their respective objects before creating the resource
+	if resourceType == fsType {
+		//Error if user doesn't provide CSI driver required SkipFinalBackup field
+		if _, ok := deleteParameters[volumeParamsSkipFinalBackup]; !ok {
+			return errors.New(fmt.Sprintf(ErrIncorrectlyFormatted, volumeParamsSkipFinalBackup, "field is required"))
+		}
+
+		deleteParameters[volumeParamsFileSystemId] = strconv.Quote("fs-1234567890abc")
+		err = cloud.CollapseDeleteFileSystemParameters(deleteParameters)
+		if err != nil {
+			return err
+		}
+		err = cloud.ValidateDeleteFileSystemParameters(deleteParameters)
+		if err != nil {
+			return err
+		}
+	}
+	if resourceType == volType {
+		deleteParameters[volumeParamsVolumeId] = strconv.Quote("fsvol-1234567890abcdefghijm")
+		err = cloud.CollapseDeleteVolumeParameters(deleteParameters)
+		if err != nil {
+			return err
+		}
+		err = cloud.ValidateDeleteVolumeParameters(deleteParameters)
+		if err != nil {
+			return err
+		}
+	}
+
+	//Put the combined Tags json on parameters
+	combinedJsonString, err := util.ConvertObjectToJsonString(existingTags)
+	if err != nil {
+		return err
+	}
+	parameters[volumeParamsTags] = combinedJsonString
+
+	return nil
+}
+
+// appendSnapshotARN appends the snapshot arn to the OriginSnapshot parameter provided
+// Directly replaces the parameters field with the new json string
+func (d *Driver) appendSnapshotARN(ctx context.Context, parameters map[string]string, snapshotId string) error {
+	existingOriginSnapshot := make(map[string]string)
+	err := util.ConvertJsonStringToObject(parameters[volumeParamsOriginSnapshot], &existingOriginSnapshot)
+	if err != nil {
+		return err
+	}
+
+	snapshot, err := d.cloud.DescribeSnapshot(ctx, snapshotId)
+	if err != nil {
+		return err
+	}
+
+	existingOriginSnapshot["SnapshotARN"] = snapshot.ResourceARN
+	originSnapshotJsonString, err := util.ConvertObjectToJsonString(existingOriginSnapshot)
+	if err != nil {
+		return err
+	}
+
+	parameters[volumeParamsOriginSnapshot] = originSnapshotJsonString
+
+	return nil
 }

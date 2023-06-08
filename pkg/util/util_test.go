@@ -16,119 +16,17 @@ limitations under the License.
 package util
 
 import (
+	"encoding/json"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
 	"reflect"
 	"testing"
 )
 
-func TestSplitCommasAndRemoveOuterBrackets(t *testing.T) {
-	testCases := []struct {
-		name     string
-		input    string
-		expected []string
-	}{
-		{
-			name:  "Split commas",
-			input: "Value1,Key2=Value2,Key3=[Value3],Key4={Value4},[Value5],{Value6}",
-			expected: []string{
-				"Value1",
-				"Key2=Value2",
-				"Key3=[Value3]",
-				"Key4={Value4}",
-				"[Value5]",
-				"Value6",
-			},
-		},
-		{
-			name:  "Split array",
-			input: "[Value1,Key2=Value2,Key3=[Value3],Key4={Value4},[Value5],{Value6}]",
-			expected: []string{
-				"Value1",
-				"Key2=Value2",
-				"Key3=[Value3]",
-				"Key4={Value4}",
-				"[Value5]",
-				"Value6",
-			},
-		},
-		{
-			name:  "Split object",
-			input: "{Value1,Key2=Value2,Key3=[Value3],Key4={Value4},[Value5],{Value6}}",
-			expected: []string{
-				"Value1",
-				"Key2=Value2",
-				"Key3=[Value3]",
-				"Key4={Value4}",
-				"[Value5]",
-				"Value6",
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			actual := SplitCommasAndRemoveOuterBrackets(tc.input)
-
-			if !reflect.DeepEqual(actual, tc.expected) {
-				t.Fatalf("SplitCommasAndRemoveOuterBrackets got wrong result. actual: %s, expected: %s", actual, tc.expected)
-			}
-		})
-	}
-}
-
-func TestMapValues(t *testing.T) {
-	testCases := []struct {
-		name     string
-		input    []string
-		expected map[string]*string
-		error    bool
-	}{
-		{
-			name: "Success",
-			input: []string{
-				"Key1=Value1",
-				"Key2=[Value2]",
-				"Key3={Value3}",
-				"Key4=",
-				"Key5=Value5=SubValue5",
-			},
-			expected: map[string]*string{
-				"Key1": aws.String("Value1"),
-				"Key2": aws.String("[Value2]"),
-				"Key3": aws.String("{Value3}"),
-				"Key4": nil,
-				"Key5": aws.String("Value5=SubValue5"),
-			},
-			error: false,
-		},
-		{
-			name: "Failure",
-			input: []string{
-				"Value1",
-			},
-			expected: map[string]*string{},
-			error:    true,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			mappedValues, err := MapValues(tc.input)
-
-			if err != nil && tc.error == false || err == nil && tc.error == true {
-				t.Fatalf("MapValues got wrong result. Error mismatch.")
-			}
-
-			actual := aws.StringValueMap(mappedValues)
-			expected := aws.StringValueMap(tc.expected)
-
-			if fmt.Sprint(actual) != fmt.Sprint(expected) {
-				t.Fatalf("MapValues got wrong result. actual: %s, expected: %s", fmt.Sprint(actual), fmt.Sprint(tc.expected))
-			}
-		})
-	}
-}
+const (
+	FailureExpectedError        = "%s didn't throw an error when one was expected"
+	FailureThrewUnexpectedError = "%s threw the following error when one wasn't expected: %s"
+	FailureWrongResult          = "%s got wrong result. actual: %s, expected: %s"
+)
 
 func TestContains(t *testing.T) {
 	testCases := []struct {
@@ -171,6 +69,180 @@ func TestContains(t *testing.T) {
 
 			if actual != tc.expected {
 				t.Fatalf("Contains got wrong result. actual: %v, expected: %v", actual, tc.expected)
+			}
+		})
+	}
+}
+
+func TestEncodeAndDecodeDeletionTag(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Success: Array of Objects",
+			input:    "[{\"Key1\":\"Test\",\"Key2\":2},{\"Key1\",4,true}]",
+			expected: " -  +  @ Key1 @ : @ Test @  .  @ Key2 @ :2 =  .  +  @ Key1 @  . 4 . true =  _ ",
+		},
+		{
+			name:     "Success: Characters Used in Translation ",
+			input:    "[{Test_Case-.},{5+5=10}]",
+			expected: " -  + Test_Case-. =  .  + 5+5=10 =  _ ",
+		},
+		{
+			name:     "Success: Empty",
+			input:    "",
+			expected: "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			encodedInput := EncodeDeletionTag(tc.input)
+			decodedInput := DecodeDeletionTag(encodedInput)
+
+			if encodedInput != tc.expected {
+				t.Fatalf("EncodeDeletionTag got wrong result. actual: %s, expected: %s", encodedInput, tc.expected)
+			}
+
+			if decodedInput != tc.input {
+				t.Fatalf("DecodeDeletionTag got wrong result. actual: %s, expected: %s", decodedInput, tc.input)
+			}
+		})
+	}
+}
+
+func TestConvertStringMapToAny(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    map[string]string
+		expected any
+	}{
+		{
+			name: "Success: Multiple Types as Strings",
+			input: map[string]string{
+				"stringValue": "\"value\"",
+				"intValue":    "1",
+				"boolValue":   "true",
+				"sliceValue":  "[val1, val2]",
+				"objectValue": "{\"Key1\": \"Val1\"}",
+				"nilValue":    "",
+			},
+			expected: map[string]any{
+				"stringValue": json.RawMessage("\"value\""),
+				"intValue":    int64(1),
+				"boolValue":   true,
+				"sliceValue":  json.RawMessage("[val1, val2]"),
+				"objectValue": json.RawMessage("{\"Key1\": \"Val1\"}"),
+				"nilValue":    json.RawMessage(""),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			output := ConvertStringMapToAny(tc.input)
+
+			if !reflect.DeepEqual(output, tc.expected) {
+				t.Fatalf(FailureWrongResult, "ConvertObjectToJsonString", output, tc.expected)
+			}
+		})
+	}
+}
+
+func TestConvertObjectToJsonString(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    any
+		expected string
+		error    bool
+	}{
+		{
+			name: "Success: Array of Maps",
+			input: []map[string]any{
+				{
+					"Key0": int64(1),
+					"Key1": json.RawMessage("\"val1\""),
+				},
+				{
+					"Key2": true,
+				},
+			},
+			expected: "[{\"Key0\":1,\"Key1\":\"val1\"},{\"Key2\":true}]",
+		},
+		{
+			name: "Failure: Invalid Json String",
+			input: map[string]any{
+				"Key1": json.RawMessage("{"),
+			},
+			error: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual, err := ConvertObjectToJsonString(tc.input)
+
+			if err != nil && tc.error == false {
+				t.Fatalf(FailureThrewUnexpectedError, "ConvertObjectToJsonString", err)
+			}
+
+			if err == nil && tc.error == true {
+				t.Fatalf(FailureExpectedError, "ConvertObjectToJsonString")
+			}
+
+			if err == nil && actual != tc.expected {
+				t.Fatalf(FailureWrongResult, "ConvertObjectToJsonString", actual, tc.expected)
+			}
+		})
+	}
+}
+
+func TestConvertJsonStringToObject(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    string
+		object   any
+		expected any
+		error    bool
+	}{
+		{
+			name:   "Success: Array of Maps",
+			input:  "[{\"Key0\":1,\"Key1\":\"val1\"},{\"Key2\":true}]",
+			object: []map[string]any{},
+			expected: []map[string]any{
+				{
+					"Key0": float64(1),
+					"Key1": "val1",
+				},
+				{
+					"Key2": true,
+				},
+			},
+		},
+		{
+			name:   "Failure: Invalid json",
+			input:  "{",
+			object: map[string]string{},
+			error:  true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ConvertJsonStringToObject(tc.input, &tc.object)
+
+			if err != nil && tc.error == false {
+				t.Fatalf(FailureThrewUnexpectedError, "ConvertObjectToJsonString", err)
+			}
+
+			if err == nil && tc.error == true {
+				t.Fatalf(FailureExpectedError, "ConvertObjectToJsonString")
+			}
+
+			if err == nil && fmt.Sprint(tc.object) != fmt.Sprint(tc.expected) {
+				t.Fatalf(FailureWrongResult, "ConvertObjectToJsonString", tc.object, tc.expected)
 			}
 		})
 	}

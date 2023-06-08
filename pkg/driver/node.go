@@ -27,6 +27,10 @@ import (
 	"k8s.io/klog/v2"
 )
 
+const (
+	rootVolumePath = "fsx"
+)
+
 var (
 	nodeCaps = []csi.NodeServiceCapability_RPC_Type{}
 )
@@ -59,13 +63,13 @@ func (d *Driver) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolu
 	context := req.GetVolumeContext()
 	dnsName := context[volumeContextDnsName]
 	volumePath := context[volumeContextVolumePath]
-	volumeType := context[volumeContextVolumeType]
+	volumeType := context[volumeContextResourceType]
 
 	if len(dnsName) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume: dnsName is not provided")
 	}
 
-	if volumeType != fsVolumeType && volumeType != volVolumeType {
+	if volumeType != fsType && volumeType != volType {
 		return nil, status.Errorf(codes.InvalidArgument, "NodePublishVolume: volumeType %q is invalid", volumeType)
 	}
 
@@ -73,7 +77,7 @@ func (d *Driver) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolu
 	// root volume of the file system. On the other hand, if the volumePath is not provided and we are attempting
 	// to mount an OpenZFS volume, throw an error.
 	if len(volumePath) == 0 {
-		if volumeType == fsVolumeType {
+		if volumeType == fsType {
 			volumePath = rootVolumePath
 		} else {
 			return nil, status.Error(codes.InvalidArgument, "NodePublishVolume: volumePath must be provided when mounting an OpenZFS volume")
@@ -81,7 +85,7 @@ func (d *Driver) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolu
 	}
 
 	// If we are attempting to "mount" a file system, the mount path must be equal to the root volume path.
-	if volumeType == fsVolumeType && volumePath != rootVolumePath {
+	if volumeType == fsType && volumePath != rootVolumePath {
 		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume: volumePath must match the root volume path when mounting an OpenZFS file system")
 	}
 
