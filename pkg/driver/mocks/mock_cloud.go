@@ -167,7 +167,7 @@ func (mr *MockCloudMockRecorder) DescribeVolume(arg0, arg1 interface{}) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeVolume", reflect.TypeOf((*MockCloud)(nil).DescribeVolume), arg0, arg1)
 }
 
-// FetchDeletionParameters mocks base method.
+// GetDeleteParameters mocks base method.
 func (m *MockCloud) GetDeleteParameters(arg0 context.Context, arg1 string) (map[string]string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetDeleteParameters", arg0, arg1)
@@ -176,8 +176,8 @@ func (m *MockCloud) GetDeleteParameters(arg0 context.Context, arg1 string) (map[
 	return ret0, ret1
 }
 
-// FetchDeletionParameters indicates an expected call of FetchDeletionParameters.
-func (mr *MockCloudMockRecorder) FetchDeletionParameters(arg0, arg1 interface{}) *gomock.Call {
+// GetDeleteParameters indicates an expected call of GetDeleteParameters.
+func (mr *MockCloudMockRecorder) GetDeleteParameters(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDeleteParameters", reflect.TypeOf((*MockCloud)(nil).GetDeleteParameters), arg0, arg1)
 }

@@ -1,67 +1,49 @@
 # Tagging
-To help manage FSx resources in your AWS accounts, the FSx for OpenZFS CSI driver will automatically add tags to the resources it manages.
+Alongside tags a user defines, the CSI driver adds additional tags.
+The types of tags the CSI driver adds includes driver and deletion tags.
 
-| TagKey                          | TagValue                    | Example                                                                  | Description                                                                                                                                                                                                                                                                                                   |
-|---------------------------------|-----------------------------|--------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| CSIVolumeName                   | <pvcName>                   | CSIVolumeName = pvc-a3ab0567-3a48-4608-8cb6-4e3b1485c808                 | Added to all FSx for OpenZFS file systems and volumes created via the CSI Driver.                                                                                                                                                                                                                             |
-| CSIVolumeSnapshotName           | <volumeSnapshotContentName> | CSIVolumeSnapshotName = snapcontent-69477690-803b-4d3e-a61a-03c7b2592a76 | Added to all FSx for OpenZFS snapshots created via the CSI Driver.                                                                                                                                                                                                                                            |
-| CSISkipFinalBackupOnDeletion    | boolean                     | CSISkipFinalBackupOnDeletion = True                                      | Added to all FSx for OpenZFS file systems created via the CSI Driver.                                                                                                                                                                                                                                         |
-| CSIOptionsOnDeletion            | string                      | CSIOptionsOnDeletion = DELETE_CHILD_VOLUMES_AND_SNAPSHOTS                | Added to FSx for OpenZFS file systems and volumes created via the CSI Driver with the OptionsOnDeletion parameter configured.                                                                                                                                                                                 |
-| fsx.openzfs.csi.aws.com/cluster | true                        | fsx.openzfs.csi.aws.com/cluster = true                                   | Added to all FSx for OpenZFS file systems, volumes, snapshots, and final backups created via the CSI Driver. This allows users to track which resources were created via the FSx for OpenZFS CSI driver. Users may also use an IAM policy to limit the driver's permissions to just the resources it manages. |                                                                                      |
+## Driver Tags
 
-## Storage Class Tagging
+The FSx for OpenZFS CSI driver will automatically add unique tag(s) to denote the resources it manages.
+These tags are not used by the driver, and is only for aiding the user in resource management.
 
-The AWS FSx for OpenZFS CSI Driver supports tagging through `StorageClass.parameters`
+The CSI driver attaches the following tag(s) to resources created:
 
-**Example**
+| Key                             | Value                       | Description                                     |
+|---------------------------------|-----------------------------|-------------------------------------------------|
+| fsx.openzfs.csi.aws.com/cluster | true                        | Attached to all FSx OpenZFS resources created.  |                                                                                      |
+
+## Deletion Tags
+
+The CSI driver also adds deletion parameters that were provided by the user.
+Due to CSI limitations, parameters can't be defined when deleting resources.
+To get around this, any parameter specified with the `OnDeletion` suffix is saved as a Key-Value pair.
+
+Due to restriction in tags, special characters used in JSON such as `",[]{}` must be encoded.
+The following chart contains the translation between JSON characters and their respective tag representation.
+To prevent mistranslation when decoding parameters that contain translate characters, a space is added before and after the tag representation.
+
+| JSON Character | Tag Character |
+|----------------|---------------|
+| `"`            | ` @ `         |
+| `,`            | ` . `         |
+| `[`            | ` - `         |
+| `]`            | ` _ `         |
+| `{`            | ` + `         |
+| `}`            | ` = `         |
+**Note: Tag Characters are proceeded and succeeded by a space**
+
+#### Example:
+
+JSON Representation:
+```json
+[{"Key": "OPENZFS", "Value": "OPENZFS"}]
 ```
-kind: StorageClass
-apiVersion: storage.k8s.io/v1
-metadata:
-  name: fsx-openzfs-sc
-provisioner: fsx.openzfs.csi.aws.com
-parameters:
-  ...
-  ...
-  tags: "key1=value1,key2=hello world,key3="
+Tag Representation:
 ```
-
-Provisioning a volume using the above StorageClass will apply the following tags:
-
-```
-key1=value1
-key2=hello world
-key3=<empty string>
-```
-
-## Snapshot Tagging
-The AWS FSx for OpenZFS CSI Driver supports tagging snapshots through `VolumeSnapshotClass.parameters`, similar to StorageClass tagging.
-
-**Example**
-```
-apiVersion: snapshot.storage.k8s.io/v1
-kind: VolumeSnapshotClass
-metadata:
-  name: csi-aws-vsc
-driver: fsx.openzfs.csi.aws.com
-deletionPolicy: Delete
-parameters:
-  tags: "key1=value1,key2=hello world,key3="
+ -  +  @ Key @ :  @ OPENZFS @  .  @ Value @ :  @ OPENZFS @  =  _ 
 ```
 
-Provisioning a snapshot using the above VolumeSnapshotClass will apply the following tags to the snapshot:
-
-```
-key1=value1
-key2=hello world
-key3=<empty string>
-```
-____
-
-## Failure Modes
-
-There can be multiple failure modes:
-* The key/interpolated value do not meet the [AWS Tag Requirements](https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html)
-* The tags parameter is incorrectly formatted and not of the form "key=value".
-* The key is not allowed (such as keys used internally by the CSI driver e.g., 'CSIVolumeName').
-In these cases, the FSx for OpenZFS CSI driver will not provision a volume, but instead return an error.
+Deletion tags may be manually modified or added to change the delete behavior for a specific resource.
+If tags are incorrect during delete they are ignored and the default behavior occurs.
+The `OnDeletion` suffix remains on the tag key for parsing purposes.
