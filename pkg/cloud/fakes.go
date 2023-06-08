@@ -19,6 +19,8 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"reflect"
+	"strconv"
 	"time"
 )
 
@@ -29,18 +31,30 @@ func init() {
 }
 
 type FakeCloudProvider struct {
-	m           *metadata
-	fileSystems map[string]*FileSystem
-	volumes     map[string]*Volume
-	snapshots   map[string]*Snapshot
+	m                     *metadata
+	filesystemId          string
+	fileSystems           map[string]*FileSystem
+	fileSystemsParameters map[string]map[string]string
+	volumes               map[string]*Volume
+	volumesParameters     map[string]map[string]string
+	snapshots             map[string]*Snapshot
+	snapshotsParameters   map[string]map[string]string
 }
 
 func NewFakeCloudProvider() *FakeCloudProvider {
+	filesystemId := "fs-1234"
+	filesystem := FileSystem{
+		DnsName:         "test.us-east-1.fsx.amazonaws.com",
+		FileSystemId:    filesystemId,
+		StorageCapacity: 100,
+	}
+
 	return &FakeCloudProvider{
-		m:           &metadata{"instanceID", "region", "az"},
-		fileSystems: make(map[string]*FileSystem),
-		volumes:     make(map[string]*Volume),
-		snapshots:   make(map[string]*Snapshot),
+		m:            &metadata{"instanceID", "region", "az"},
+		filesystemId: filesystemId,
+		fileSystems:  map[string]*FileSystem{filesystemId: &filesystem},
+		volumes:      make(map[string]*Volume),
+		snapshots:    make(map[string]*Snapshot),
 	}
 }
 
@@ -48,29 +62,38 @@ func (c *FakeCloudProvider) GetMetadata() MetadataService {
 	return c.m
 }
 
-func (c *FakeCloudProvider) CreateFileSystem(ctx context.Context, volumeName string, fileSystemOptions FileSystemOptions) (*FileSystem, error) {
-	fs, exists := c.fileSystems[volumeName]
+func (c *FakeCloudProvider) CreateFileSystem(ctx context.Context, parameters map[string]string) (*FileSystem, error) {
+	exists := false
+	var existingParams map[string]string
+	var existingId string
+	for id, params := range c.fileSystemsParameters {
+		if params["ClientRequestToken"] == parameters["ClientRequestToken"] {
+			exists = true
+			existingParams = params
+			existingId = id
+			break
+		}
+	}
+
 	if exists {
-		if fs.StorageCapacity == *fileSystemOptions.StorageCapacity {
-			return fs, nil
+		if reflect.DeepEqual(existingParams, parameters) {
+			return c.fileSystems[existingId], nil
 		} else {
 			return nil, ErrAlreadyExists
 		}
 	}
 
-	var storageCapacity int64
-	if fileSystemOptions.StorageCapacity == nil {
-		storageCapacity = 10
-	} else {
-		storageCapacity = *fileSystemOptions.StorageCapacity
+	storageCapacity, err := strconv.ParseInt(parameters["StorageCapacity"], 10, 64)
+	if err != nil {
+		return nil, err
 	}
-
-	fs = &FileSystem{
+	fs := &FileSystem{
 		DnsName:         "test.us-east-1.fsx.amazonaws.com",
 		FileSystemId:    fmt.Sprintf("fs-%d", random.Uint64()),
 		StorageCapacity: storageCapacity,
 	}
-	c.fileSystems[volumeName] = fs
+	c.fileSystems[fs.FileSystemId] = fs
+	c.fileSystemsParameters[fs.FileSystemId] = parameters
 	return fs, nil
 }
 
@@ -84,13 +107,9 @@ func (c *FakeCloudProvider) ResizeFileSystem(ctx context.Context, fileSystemId s
 	return nil, ErrNotFound
 }
 
-func (c *FakeCloudProvider) DeleteFileSystem(ctx context.Context, filesystemId string) error {
-	delete(c.fileSystems, filesystemId)
-	for name, fs := range c.fileSystems {
-		if fs.FileSystemId == filesystemId {
-			delete(c.fileSystems, name)
-		}
-	}
+func (c *FakeCloudProvider) DeleteFileSystem(ctx context.Context, parameters map[string]string) error {
+	delete(c.fileSystems, parameters["FileSystemId"])
+	delete(c.fileSystemsParameters, parameters["FileSystemId"])
 	return nil
 }
 
@@ -111,52 +130,40 @@ func (c *FakeCloudProvider) WaitForFileSystemResize(ctx context.Context, fileSys
 	return nil
 }
 
-func (c *FakeCloudProvider) CreateVolume(ctx context.Context, volumeName string, volumeOptions VolumeOptions) (*Volume, error) {
-	v, exists := c.volumes[volumeName]
+func (c *FakeCloudProvider) CreateVolume(ctx context.Context, parameters map[string]string) (*Volume, error) {
+	exists := false
+	var existingParams map[string]string
+	var existingId string
+	for id, params := range c.volumesParameters {
+		if params["ClientRequestToken"] == parameters["ClientRequestToken"] {
+			exists = true
+			existingParams = params
+			existingId = id
+			break
+		}
+	}
+
 	if exists {
-		if v.StorageCapacityReservationGiB == *volumeOptions.StorageCapacityReservationGiB {
-			return v, nil
+		if reflect.DeepEqual(existingParams, parameters) {
+			return c.volumes[existingId], nil
 		} else {
 			return nil, ErrAlreadyExists
 		}
 	}
 
-	var storageCapacity int64
-	if volumeOptions.StorageCapacityQuotaGiB == nil {
-		storageCapacity = 10
-	} else {
-		storageCapacity = *volumeOptions.StorageCapacityQuotaGiB
+	v := &Volume{
+		FileSystemId: c.filesystemId,
+		VolumePath:   "/",
+		VolumeId:     fmt.Sprintf("fsvol-%d", random.Uint64()),
 	}
-
-	v = &Volume{
-		FileSystemId:                  "fs-1234",
-		StorageCapacityQuotaGiB:       storageCapacity,
-		StorageCapacityReservationGiB: storageCapacity,
-		VolumePath:                    "/",
-		VolumeId:                      fmt.Sprintf("fsvol-%d", random.Uint64()),
-	}
-	c.volumes[volumeName] = v
+	c.volumes[v.VolumeId] = v
+	c.volumesParameters[v.VolumeId] = parameters
 	return v, nil
 }
 
-func (c *FakeCloudProvider) ResizeVolume(ctx context.Context, volumeId string, newSizeGiB int64) (*int64, error) {
-	for _, v := range c.volumes {
-		if v.VolumeId == volumeId {
-			v.StorageCapacityQuotaGiB = newSizeGiB
-			v.StorageCapacityReservationGiB = newSizeGiB
-			return &newSizeGiB, nil
-		}
-	}
-	return nil, ErrNotFound
-}
-
-func (c *FakeCloudProvider) DeleteVolume(ctx context.Context, volumeId string) (err error) {
-	delete(c.volumes, volumeId)
-	for name, v := range c.volumes {
-		if v.VolumeId == volumeId {
-			delete(c.volumes, name)
-		}
-	}
+func (c *FakeCloudProvider) DeleteVolume(ctx context.Context, parameters map[string]string) (err error) {
+	delete(c.volumes, parameters["VolumeId"])
+	delete(c.volumesParameters, parameters["VolumeId"])
 	return nil
 }
 
@@ -177,13 +184,22 @@ func (c *FakeCloudProvider) WaitForVolumeResize(ctx context.Context, volumeId st
 	return nil
 }
 
-func (c *FakeCloudProvider) CreateSnapshot(ctx context.Context, snapshotOptions SnapshotOptions) (snapshot *Snapshot, err error) {
-	snapshotName := *snapshotOptions.SnapshotName
-	sourceVolumeId := *snapshotOptions.SourceVolumeId
-	snapshot, exists := c.snapshots[snapshotName]
+func (c *FakeCloudProvider) CreateSnapshot(ctx context.Context, parameters map[string]string) (snapshot *Snapshot, err error) {
+	exists := false
+	var existingParams map[string]string
+	var existingId string
+	for id, params := range c.snapshotsParameters {
+		if params["ClientRequestToken"] == parameters["ClientRequestToken"] {
+			exists = true
+			existingParams = params
+			existingId = id
+			break
+		}
+	}
+
 	if exists {
-		if snapshot.SourceVolumeID == sourceVolumeId {
-			return snapshot, nil
+		if reflect.DeepEqual(existingParams, parameters) {
+			return c.snapshots[existingId], nil
 		} else {
 			return nil, ErrAlreadyExists
 		}
@@ -191,21 +207,18 @@ func (c *FakeCloudProvider) CreateSnapshot(ctx context.Context, snapshotOptions 
 
 	snapshot = &Snapshot{
 		SnapshotID:     fmt.Sprintf("fsvolsnap-%d", random.Uint64()),
-		SourceVolumeID: sourceVolumeId,
+		SourceVolumeID: parameters["VolumeId"],
 		CreationTime:   time.Now(),
 	}
 
-	c.snapshots[snapshotName] = snapshot
+	c.snapshots[snapshot.SnapshotID] = snapshot
+	c.snapshotsParameters[snapshot.SnapshotID] = parameters
 	return snapshot, nil
 }
 
-func (c *FakeCloudProvider) DeleteSnapshot(ctx context.Context, snapshotId string) (err error) {
-	delete(c.snapshots, snapshotId)
-	for name, snapshot := range c.snapshots {
-		if snapshot.SnapshotID == snapshotId {
-			delete(c.snapshots, name)
-		}
-	}
+func (c *FakeCloudProvider) DeleteSnapshot(ctx context.Context, parameters map[string]string) (err error) {
+	delete(c.snapshots, parameters["SnapshotID"])
+	delete(c.snapshotsParameters, parameters["SnapshotID"])
 	return nil
 }
 
@@ -220,4 +233,12 @@ func (c *FakeCloudProvider) DescribeSnapshot(ctx context.Context, snapshotId str
 
 func (c *FakeCloudProvider) WaitForSnapshotAvailable(ctx context.Context, snapshotId string) error {
 	return nil
+}
+
+func (c *FakeCloudProvider) GetDeleteParameters(ctx context.Context, id string) (map[string]string, error) {
+	return nil, nil
+}
+
+func (c *FakeCloudProvider) GetVolumeId(ctx context.Context, volumeId string) (string, error) {
+	return "fsvol-123456", nil
 }

@@ -27,13 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/aws-fsx-openzfs-csi-driver/pkg/util"
-	"strconv"
 	"strings"
 	"time"
-)
-
-const (
-	DefaultFileSystemType = "OPENZFS"
 )
 
 // Polling
@@ -45,35 +40,12 @@ const (
 	PollCheckTimeout = 15 * time.Minute
 )
 
-// Tags
-const (
-	// VolumeNameTagKey is the key value that refers to the volume's name.
-	VolumeNameTagKey = "CSIVolumeName"
-	// SkipFinalBackupOnDeletionTagKey is the key value that stores whether a user wants to SkipFinalBackup during delete
-	SkipFinalBackupOnDeletionTagKey = "CSISkipFinalBackupOnDeletion"
-	// OptionsOnDeletionTagKey is the key value that stores the Options the user wishes to configure when the file system or volume is deleted.
-	OptionsOnDeletionTagKey = "CSIOptionsOnDeletion"
-	// SnapshotNameTagKey is the key value that refers to the snapshot's name.
-	SnapshotNameTagKey = "CSIVolumeSnapshotName"
-	// AwsFsxOpenZfsDriverTagKey is the tag to identify if a volume/snapshot is managed by the openzfs csi driver
-	AwsFsxOpenZfsDriverTagKey = "fsx.openzfs.csi.aws.com/cluster"
-)
-
 // Errors
 var (
-	ErrInvalidParameter             = errors.New("invalid input")
-	ErrAlreadyExists                = errors.New("resource already exists with the given name and different parameters")
-	ErrNotFound                     = errors.New("resource could not be found using the respective ID")
-	ErrMultipleFound                = errors.New("multiple resource found with the given ID")
-	errParseDiskIopsConfiguration   = errors.New("error when parsing DiskIopsConfiguration")
-	errParseRootVolumeConfiguration = errors.New("error when parsing RootVolumeConfiguration")
-	errParseUserAndGroupQuotas      = errors.New("error when parsing UserAndGroupQuotas")
-	errParseNfsExports              = errors.New("error when parsing NfsExports")
-	errParseTags                    = errors.New("error when parsing Tags")
-	errInvalidMap                   = errors.New("object is incorrectly formatted")
-	errKeyDoesNotExist              = errors.New("inputted key does not exist")
-	errValueNotAnInt                = errors.New("inputted value is not an int")
-	errValueNotABool                = errors.New("inputted value is not an bool")
+	ErrAlreadyExists = errors.New("resource already exists with the given name and different parameters")
+	ErrInvalidInput  = errors.New("invalid input")
+	ErrMultipleFound = errors.New("multiple resource found with the given ID")
+	ErrNotFound      = errors.New("resource could not be found using the respective ID")
 )
 
 // Prefixes used to parse the volume id.
@@ -89,50 +61,11 @@ type FileSystem struct {
 	StorageCapacity int64
 }
 
-// FileSystemOptions represents parameters to create an OpenZFS filesystem
-type FileSystemOptions struct {
-	KmsKeyId                      *string
-	AutomaticBackupRetentionDays  *int64
-	CopyTagsToBackups             *bool
-	CopyTagsToVolumes             *bool
-	DailyAutomaticBackupStartTime *string
-	DeploymentType                *string
-	DiskIopsConfiguration         *string
-	RootVolumeConfiguration       *string
-	ThroughputCapacity            *int64
-	WeeklyMaintenanceStartTime    *string
-	SecurityGroupIds              []string
-	StorageCapacity               *int64
-	SubnetIds                     []string
-	Tags                          *string
-	OptionsOnDeletion             *string
-	SkipFinalBackupOnDeletion     *bool
-}
-
 // Volume represents an OpenZFS volume
 type Volume struct {
-	FileSystemId                  string
-	VolumeId                      string
-	StorageCapacityQuotaGiB       int64
-	StorageCapacityReservationGiB int64
-	VolumePath                    string
-}
-
-// VolumeOptions represents parameters to create an OpenZFS volume
-type VolumeOptions struct {
-	Name                          *string
-	CopyTagsToSnapshots           *bool
-	DataCompressionType           *string
-	NfsExports                    *string
-	ParentVolumeId                *string
-	ReadOnly                      *bool
-	RecordSizeKiB                 *int64
-	StorageCapacityQuotaGiB       *int64
-	StorageCapacityReservationGiB *int64
-	UserAndGroupQuotas            *string
-	Tags                          *string
-	SnapshotARN                   *string
-	OptionsOnDeletion             *string
+	FileSystemId string
+	VolumeId     string
+	VolumePath   string
 }
 
 // Snapshot represents an OpenZFS volume snapshot
@@ -143,13 +76,6 @@ type Snapshot struct {
 	CreationTime   time.Time
 }
 
-// SnapshotOptions represents parameters to create an OpenZFS snapshot
-type SnapshotOptions struct {
-	SnapshotName   *string
-	SourceVolumeId *string
-	Tags           *string
-}
-
 // FSx abstracts FSx client to facilitate its mocking.
 // See https://docs.aws.amazon.com/sdk-for-go/api/service/fsx/ for details
 type FSx interface {
@@ -158,7 +84,6 @@ type FSx interface {
 	DeleteFileSystemWithContext(aws.Context, *fsx.DeleteFileSystemInput, ...request.Option) (*fsx.DeleteFileSystemOutput, error)
 	DescribeFileSystemsWithContext(aws.Context, *fsx.DescribeFileSystemsInput, ...request.Option) (*fsx.DescribeFileSystemsOutput, error)
 	CreateVolumeWithContext(aws.Context, *fsx.CreateVolumeInput, ...request.Option) (*fsx.CreateVolumeOutput, error)
-	UpdateVolumeWithContext(aws.Context, *fsx.UpdateVolumeInput, ...request.Option) (*fsx.UpdateVolumeOutput, error)
 	DeleteVolumeWithContext(aws.Context, *fsx.DeleteVolumeInput, ...request.Option) (*fsx.DeleteVolumeOutput, error)
 	DescribeVolumesWithContext(aws.Context, *fsx.DescribeVolumesInput, ...request.Option) (*fsx.DescribeVolumesOutput, error)
 	CreateSnapshotWithContext(aws.Context, *fsx.CreateSnapshotInput, ...request.Option) (*fsx.CreateSnapshotOutput, error)
@@ -168,22 +93,23 @@ type FSx interface {
 }
 
 type Cloud interface {
-	CreateFileSystem(ctx context.Context, fileSystemId string, fileSystemOptions FileSystemOptions) (*FileSystem, error)
+	CreateFileSystem(ctx context.Context, parameters map[string]string) (*FileSystem, error)
 	ResizeFileSystem(ctx context.Context, fileSystemId string, newSizeGiB int64) (*int64, error)
-	DeleteFileSystem(ctx context.Context, fileSystemId string) error
+	DeleteFileSystem(ctx context.Context, parameters map[string]string) error
 	DescribeFileSystem(ctx context.Context, fileSystemId string) (*FileSystem, error)
 	WaitForFileSystemAvailable(ctx context.Context, fileSystemId string) error
 	WaitForFileSystemResize(ctx context.Context, fileSystemId string, resizeGiB int64) error
-	CreateVolume(ctx context.Context, volumeId string, volumeOptions VolumeOptions) (*Volume, error)
-	ResizeVolume(ctx context.Context, volumeId string, newSizeGiB int64) (*int64, error)
-	DeleteVolume(ctx context.Context, volumeId string) error
+	CreateVolume(ctx context.Context, parameters map[string]string) (*Volume, error)
+	DeleteVolume(ctx context.Context, parameters map[string]string) error
 	DescribeVolume(ctx context.Context, volumeId string) (*Volume, error)
 	WaitForVolumeAvailable(ctx context.Context, volumeId string) error
 	WaitForVolumeResize(ctx context.Context, volumeId string, resizeGiB int64) error
-	CreateSnapshot(ctx context.Context, snapshotOptions SnapshotOptions) (snapshot *Snapshot, err error)
-	DeleteSnapshot(ctx context.Context, snapshotId string) error
+	CreateSnapshot(ctx context.Context, options map[string]string) (*Snapshot, error)
+	DeleteSnapshot(ctx context.Context, parameters map[string]string) error
 	DescribeSnapshot(ctx context.Context, snapshotId string) (*Snapshot, error)
 	WaitForSnapshotAvailable(ctx context.Context, snapshotId string) error
+	GetDeleteParameters(ctx context.Context, id string) (map[string]string, error)
+	GetVolumeId(ctx context.Context, volumeId string) (string, error)
 }
 
 type cloud struct {
@@ -203,92 +129,11 @@ func NewCloud(region string) Cloud {
 	}
 }
 
-func (c *cloud) CreateFileSystem(ctx context.Context, fileSystemId string, fileSystemOptions FileSystemOptions) (*FileSystem, error) {
-	var err error
-
-	var diskIopsConfiguration *fsx.DiskIopsConfiguration
-	if fileSystemOptions.DiskIopsConfiguration != nil {
-		diskIopsConfiguration, err = c.parseDiskIopsConfiguration(*fileSystemOptions.DiskIopsConfiguration)
-		if err != nil {
-			return nil, fmt.Errorf("%w. %s. %s", ErrInvalidParameter, errParseDiskIopsConfiguration, err)
-		}
-	}
-
-	var rootVolumeConfig *fsx.OpenZFSCreateRootVolumeConfiguration
-	if fileSystemOptions.RootVolumeConfiguration != nil {
-		rootVolumeConfig, err = c.parseRootVolumeConfiguration(*fileSystemOptions.RootVolumeConfiguration)
-		if err != nil {
-			return nil, fmt.Errorf("%w. %s. %s", ErrInvalidParameter, errParseRootVolumeConfiguration, err)
-		}
-	}
-
-	openZFSConfiguration := &fsx.CreateFileSystemOpenZFSConfiguration{
-		AutomaticBackupRetentionDays:  fileSystemOptions.AutomaticBackupRetentionDays,
-		CopyTagsToBackups:             fileSystemOptions.CopyTagsToBackups,
-		CopyTagsToVolumes:             fileSystemOptions.CopyTagsToVolumes,
-		DailyAutomaticBackupStartTime: fileSystemOptions.DailyAutomaticBackupStartTime,
-		DeploymentType:                fileSystemOptions.DeploymentType,
-		DiskIopsConfiguration:         diskIopsConfiguration,
-		RootVolumeConfiguration:       rootVolumeConfig,
-		ThroughputCapacity:            fileSystemOptions.ThroughputCapacity,
-		WeeklyMaintenanceStartTime:    fileSystemOptions.WeeklyMaintenanceStartTime,
-	}
-
-	tags := []*fsx.Tag{
-		{
-			Key:   aws.String(AwsFsxOpenZfsDriverTagKey),
-			Value: aws.String("true"),
-		},
-		{
-			Key:   aws.String(VolumeNameTagKey),
-			Value: aws.String(fileSystemId),
-		},
-	}
-	if fileSystemOptions.Tags != nil {
-		userTags, err := c.parseTags(*fileSystemOptions.Tags)
-		if err != nil {
-			return nil, fmt.Errorf("%w. %s. %s", ErrInvalidParameter, errParseTags, err)
-		}
-		tags = append(tags, userTags...)
-	}
-
-	// Store OptionsOnDeletion and SkipFinalBackupOnDeletion
-	// as tags on the file system so we can retrieve them at deletion time.
-	if fileSystemOptions.OptionsOnDeletion != nil {
-		// Values in FSx tags cannot contain bracket characters or commas,
-		// so we must trim the brackets from the user provided string and use spaces to delimit different options
-		optionsOnDeletion := strings.Trim(*fileSystemOptions.OptionsOnDeletion, "[]")
-		optionsOnDeletion = strings.ReplaceAll(optionsOnDeletion, ",", " ")
-
-		// Validate the user provided options
-		for _, option := range strings.Split(optionsOnDeletion, " ") {
-			if !util.Contains(fsx.DeleteFileSystemOpenZFSOption_Values(), option) {
-				return nil, fmt.Errorf("%s is not a valid deletion option", option)
-			}
-		}
-
-		tags = append(tags, &fsx.Tag{
-			Key:   aws.String(OptionsOnDeletionTagKey),
-			Value: aws.String(optionsOnDeletion),
-		})
-	}
-
-	if fileSystemOptions.SkipFinalBackupOnDeletion != nil {
-		tags = append(tags, &fsx.Tag{
-			Key:   aws.String(SkipFinalBackupOnDeletionTagKey),
-			Value: util.BoolToStringPointer(*fileSystemOptions.SkipFinalBackupOnDeletion),
-		})
-	}
-
-	input := fsx.CreateFileSystemInput{
-		ClientRequestToken:   aws.String(fileSystemId),
-		FileSystemType:       aws.String(DefaultFileSystemType),
-		KmsKeyId:             fileSystemOptions.KmsKeyId,
-		OpenZFSConfiguration: openZFSConfiguration,
-		SecurityGroupIds:     aws.StringSlice(fileSystemOptions.SecurityGroupIds),
-		StorageCapacity:      fileSystemOptions.StorageCapacity,
-		SubnetIds:            aws.StringSlice(fileSystemOptions.SubnetIds),
-		Tags:                 tags,
+func (c *cloud) CreateFileSystem(ctx context.Context, parameters map[string]string) (*FileSystem, error) {
+	input := fsx.CreateFileSystemInput{}
+	err := util.StrictRemoveParametersAndPopulateObject(parameters, &input)
+	if err != nil {
+		return nil, err
 	}
 
 	output, err := c.fsx.CreateFileSystemWithContext(ctx, &input)
@@ -325,56 +170,18 @@ func (c *cloud) ResizeFileSystem(ctx context.Context, fileSystemId string, newSi
 					return nil, err
 				}
 			}
-		} else {
-			return nil, fmt.Errorf("UpdateFileSystem failed: %v", err)
 		}
+		return nil, fmt.Errorf("UpdateFileSystem failed: %v", err)
 	}
 
 	return &newSizeGiB, nil
 }
 
-func (c *cloud) DeleteFileSystem(ctx context.Context, fileSystemId string) error {
-	fs, err := c.getFileSystem(ctx, fileSystemId)
+func (c *cloud) DeleteFileSystem(ctx context.Context, parameters map[string]string) error {
+	input := fsx.DeleteFileSystemInput{}
+	err := util.RemoveParametersAndPopulateObject(parameters, &input)
 	if err != nil {
 		return err
-	}
-
-	var skipFinalBackup *bool
-	var options []*string
-	for _, tag := range fs.Tags {
-		if *tag.Key == OptionsOnDeletionTagKey && tag.Value != nil {
-			// Only add valid deletion options to prevent errors if the user altered the tag value
-			for _, option := range strings.Split(*tag.Value, " ") {
-				if util.Contains(fsx.DeleteFileSystemOpenZFSOption_Values(), option) {
-					options = append(options, aws.String(option))
-				} else {
-					klog.V(2).InfoS("Ignoring invalid deletion option", "option", option)
-				}
-			}
-		} else if *tag.Key == SkipFinalBackupOnDeletionTagKey && tag.Value != nil {
-			skipFinalBackup, _ = util.StringToBoolPointer(*tag.Value)
-		}
-	}
-
-	var finalBackupTags []*fsx.Tag
-	if skipFinalBackup == nil || *skipFinalBackup == false {
-		finalBackupTags = []*fsx.Tag{
-			{
-				Key:   aws.String(AwsFsxOpenZfsDriverTagKey),
-				Value: aws.String("true"),
-			},
-		}
-	}
-
-	openZFSConfiguration := &fsx.DeleteFileSystemOpenZFSConfiguration{
-		FinalBackupTags: finalBackupTags,
-		Options:         options,
-		SkipFinalBackup: skipFinalBackup,
-	}
-
-	input := fsx.DeleteFileSystemInput{
-		FileSystemId:         aws.String(fileSystemId),
-		OpenZFSConfiguration: openZFSConfiguration,
 	}
 
 	_, err = c.fsx.DeleteFileSystemWithContext(ctx, &input)
@@ -443,91 +250,15 @@ func (c *cloud) WaitForFileSystemResize(ctx context.Context, fileSystemId string
 	return err
 }
 
-func (c *cloud) CreateVolume(ctx context.Context, volumeId string, volumeOptions VolumeOptions) (*Volume, error) {
-	var err error
-
-	var nfsExports []*fsx.OpenZFSNfsExport
-	if volumeOptions.NfsExports != nil {
-		nfsExports, err = c.parseNfsExports(*volumeOptions.NfsExports)
-		if err != nil {
-			return nil, fmt.Errorf("%w. %s. %s", ErrInvalidParameter, errParseNfsExports, err)
-		}
+func (c *cloud) CreateVolume(ctx context.Context, parameters map[string]string) (*Volume, error) {
+	input := fsx.CreateVolumeInput{}
+	err := util.StrictRemoveParametersAndPopulateObject(parameters, &input)
+	if err != nil {
+		return nil, err
 	}
 
-	var originSnapshotConfiguration *fsx.CreateOpenZFSOriginSnapshotConfiguration
-	if volumeOptions.SnapshotARN != nil {
-		originSnapshotConfiguration = &fsx.CreateOpenZFSOriginSnapshotConfiguration{
-			//CLONE strategy must be used since FULL_COPY creates a new snapshot.
-			//It is possible to delete a snapshot but not the child volumes, therefore users must sequentially delete
-			CopyStrategy: aws.String(fsx.OpenZFSCopyStrategyClone),
-			SnapshotARN:  volumeOptions.SnapshotARN,
-		}
-	}
-
-	var userAndGroupQuotas []*fsx.OpenZFSUserOrGroupQuota
-	if volumeOptions.UserAndGroupQuotas != nil {
-		userAndGroupQuotas, err = c.parseUserAndGroupQuotas(*volumeOptions.UserAndGroupQuotas)
-		if err != nil {
-			return nil, fmt.Errorf("%w. %s. %s", ErrInvalidParameter, errParseUserAndGroupQuotas, err)
-		}
-	}
-
-	openZFSConfiguration := &fsx.CreateOpenZFSVolumeConfiguration{
-		CopyTagsToSnapshots:           volumeOptions.CopyTagsToSnapshots,
-		DataCompressionType:           volumeOptions.DataCompressionType,
-		NfsExports:                    nfsExports,
-		OriginSnapshot:                originSnapshotConfiguration,
-		ParentVolumeId:                volumeOptions.ParentVolumeId,
-		ReadOnly:                      volumeOptions.ReadOnly,
-		RecordSizeKiB:                 volumeOptions.RecordSizeKiB,
-		StorageCapacityQuotaGiB:       volumeOptions.StorageCapacityQuotaGiB,
-		StorageCapacityReservationGiB: volumeOptions.StorageCapacityReservationGiB,
-		UserAndGroupQuotas:            userAndGroupQuotas,
-	}
-
-	tags := []*fsx.Tag{
-		{
-			Key:   aws.String(AwsFsxOpenZfsDriverTagKey),
-			Value: aws.String("true"),
-		},
-		{
-			Key:   aws.String(VolumeNameTagKey),
-			Value: aws.String(volumeId),
-		},
-	}
-	if volumeOptions.Tags != nil {
-		userTags, err := c.parseTags(*volumeOptions.Tags)
-		if err != nil {
-			return nil, fmt.Errorf("%w. %s. %s", ErrInvalidParameter, errParseTags, err)
-		}
-		tags = append(tags, userTags...)
-	}
-
-	// Store OptionsOnDeletion as a tag on the volume so we can retrieve it at deletion time.
-	if volumeOptions.OptionsOnDeletion != nil {
-		// Values in FSx tags cannot contain bracket characters or commas,
-		// so we must trim the brackets from the user provided string and use spaces to delimit different options
-		optionsOnDeletion := strings.Trim(*volumeOptions.OptionsOnDeletion, "[]")
-		optionsOnDeletion = strings.ReplaceAll(optionsOnDeletion, ",", " ")
-		// Validate the user provided options
-		for _, option := range strings.Split(optionsOnDeletion, " ") {
-			if !util.Contains(fsx.DeleteOpenZFSVolumeOption_Values(), option) {
-				return nil, fmt.Errorf("%s is not a valid volume deletion option", option)
-			}
-		}
-
-		tags = append(tags, &fsx.Tag{
-			Key:   aws.String(OptionsOnDeletionTagKey),
-			Value: aws.String(optionsOnDeletion),
-		})
-	}
-
-	input := fsx.CreateVolumeInput{
-		ClientRequestToken:   aws.String(volumeId),
-		Name:                 volumeOptions.Name,
-		OpenZFSConfiguration: openZFSConfiguration,
-		Tags:                 tags,
-		VolumeType:           aws.String(DefaultFileSystemType),
+	if len(parameters) != 0 {
+		return nil, ErrInvalidInput
 	}
 
 	output, err := c.fsx.CreateVolumeWithContext(ctx, &input)
@@ -541,77 +272,17 @@ func (c *cloud) CreateVolume(ctx context.Context, volumeId string, volumeOptions
 	}
 
 	return &Volume{
-		FileSystemId:                  aws.StringValue(output.Volume.FileSystemId),
-		VolumeId:                      aws.StringValue(output.Volume.VolumeId),
-		StorageCapacityQuotaGiB:       aws.Int64Value(output.Volume.OpenZFSConfiguration.StorageCapacityQuotaGiB),
-		StorageCapacityReservationGiB: aws.Int64Value(output.Volume.OpenZFSConfiguration.StorageCapacityReservationGiB),
-		VolumePath:                    aws.StringValue(output.Volume.OpenZFSConfiguration.VolumePath),
+		FileSystemId: aws.StringValue(output.Volume.FileSystemId),
+		VolumeId:     aws.StringValue(output.Volume.VolumeId),
+		VolumePath:   aws.StringValue(output.Volume.OpenZFSConfiguration.VolumePath),
 	}, nil
 }
 
-func (c *cloud) ResizeVolume(ctx context.Context, volumeId string, newSizeGiB int64) (*int64, error) {
-	input := &fsx.UpdateVolumeInput{
-		VolumeId: aws.String(volumeId),
-		OpenZFSConfiguration: &fsx.UpdateOpenZFSVolumeConfiguration{
-			StorageCapacityQuotaGiB:       aws.Int64(newSizeGiB),
-			StorageCapacityReservationGiB: aws.Int64(newSizeGiB),
-		},
-	}
-
-	_, err := c.fsx.UpdateVolumeWithContext(ctx, input)
-	if err != nil {
-		if awsErr, ok := err.(awserr.Error); ok {
-			if awsErr.Code() == fsx.ErrCodeBadRequest &&
-				awsErr.Message() == "Unable to update the volume because there are existing pending actions for the volume" {
-				// If a previous request timed out and was successful, don't error
-				_, err = c.getUpdateResizeVolumeAdministrativeAction(ctx, volumeId, newSizeGiB)
-				if err != nil {
-					return nil, err
-				}
-			}
-		} else {
-			return nil, fmt.Errorf("UpdateFileSystem failed: %v", err)
-		}
-	}
-
-	return &newSizeGiB, nil
-}
-
-func (c *cloud) DeleteVolume(ctx context.Context, volumeId string) error {
-	v, err := c.getVolume(ctx, volumeId)
+func (c *cloud) DeleteVolume(ctx context.Context, parameters map[string]string) error {
+	input := fsx.DeleteVolumeInput{}
+	err := util.RemoveParametersAndPopulateObject(parameters, &input)
 	if err != nil {
 		return err
-	}
-
-	tags, err := c.getTagsForResource(*v.ResourceARN)
-	if err != nil {
-		return err
-	}
-
-	var options []*string
-	for _, tag := range tags {
-		if *tag.Key == OptionsOnDeletionTagKey {
-			if tag.Value != nil {
-				// Only add valid deletion options to prevent errors if the user altered the tag value
-				for _, option := range strings.Split(*tag.Value, " ") {
-					if util.Contains(fsx.DeleteOpenZFSVolumeOption_Values(), option) {
-						options = append(options, aws.String(option))
-					} else {
-						klog.V(2).InfoS("Ignoring invalid deletion option", "option", option)
-					}
-				}
-			}
-			break
-		}
-	}
-
-	openZFSConfiguration := &fsx.DeleteVolumeOpenZFSConfiguration{
-		Options: options,
-	}
-
-	input := fsx.DeleteVolumeInput{
-		VolumeId:             aws.String(volumeId),
-		OpenZFSConfiguration: openZFSConfiguration,
 	}
 
 	_, err = c.fsx.DeleteVolumeWithContext(ctx, &input)
@@ -634,10 +305,8 @@ func (c *cloud) DescribeVolume(ctx context.Context, volumeId string) (*Volume, e
 	}
 
 	return &Volume{
-		VolumeId:                      aws.StringValue(v.VolumeId),
-		StorageCapacityQuotaGiB:       aws.Int64Value(v.OpenZFSConfiguration.StorageCapacityQuotaGiB),
-		StorageCapacityReservationGiB: aws.Int64Value(v.OpenZFSConfiguration.StorageCapacityReservationGiB),
-		VolumePath:                    aws.StringValue(v.OpenZFSConfiguration.VolumePath),
+		VolumeId:   aws.StringValue(v.VolumeId),
+		VolumePath: aws.StringValue(v.OpenZFSConfiguration.VolumePath),
 	}, nil
 }
 
@@ -681,59 +350,21 @@ func (c *cloud) WaitForVolumeResize(ctx context.Context, volumeId string, resize
 	return err
 }
 
-func (c *cloud) CreateSnapshot(ctx context.Context, snapshotOptions SnapshotOptions) (snapshot *Snapshot, err error) {
-	snapshotName := snapshotOptions.SnapshotName
-	volumeId := snapshotOptions.SourceVolumeId
-	tags := snapshotOptions.Tags
-	if snapshotName == nil {
-		return nil, fmt.Errorf("snapshot name not provided")
-	}
-	if volumeId == nil {
-		return nil, fmt.Errorf("volume id not provided")
-	}
-
-	// The volume id associated with the persistent volume could refer to the file system id. In that case,
-	// we need to retrieve the id of the root volume associated with the file system
-	volumeId, err = c.getVolumeId(ctx, *volumeId)
+func (c *cloud) CreateSnapshot(ctx context.Context, parameters map[string]string) (*Snapshot, error) {
+	input := fsx.CreateSnapshotInput{}
+	err := util.StrictRemoveParametersAndPopulateObject(parameters, &input)
 	if err != nil {
 		return nil, err
 	}
 
-	snapshotTags := []*fsx.Tag{
-		{
-			Key:   aws.String(SnapshotNameTagKey),
-			Value: snapshotName,
-		},
-		{
-			Key:   aws.String(AwsFsxOpenZfsDriverTagKey),
-			Value: aws.String("true"),
-		},
-	}
-
-	if tags != nil {
-		userTags, err := c.parseTags(*tags)
-		if err != nil {
-			return nil, fmt.Errorf("%w. %s. %s", ErrInvalidParameter, errParseTags, err)
-		}
-		snapshotTags = append(snapshotTags, userTags...)
-	}
-
-	input := &fsx.CreateSnapshotInput{
-		ClientRequestToken: snapshotName,
-		Name:               snapshotName,
-		Tags:               snapshotTags,
-		VolumeId:           volumeId,
-	}
-	klog.V(4).Infof("CreateSnapshotInput: ", input.GoString())
-	output, err := c.fsx.CreateSnapshotWithContext(ctx, input)
-
+	output, err := c.fsx.CreateSnapshotWithContext(ctx, &input)
 	if err != nil {
 		if awsErr, ok := err.(awserr.Error); ok {
 			if awsErr.Code() == fsx.ErrCodeIncompatibleParameterError {
 				return nil, ErrAlreadyExists
 			}
 		}
-		return nil, fmt.Errorf("error creating snapshot of volume %s: %w", *volumeId, err)
+		return nil, fmt.Errorf("error creating snapshot of volume %s: %w", *input.VolumeId, err)
 	}
 	if output == nil {
 		return nil, fmt.Errorf("nil CreateSnapshotResponse")
@@ -741,28 +372,26 @@ func (c *cloud) CreateSnapshot(ctx context.Context, snapshotOptions SnapshotOpti
 	klog.V(4).Infof("CreateSnapshotResponse: ", output.GoString())
 	return &Snapshot{
 		SnapshotID:     aws.StringValue(output.Snapshot.SnapshotId),
-		SourceVolumeID: aws.StringValue(volumeId),
+		SourceVolumeID: aws.StringValue(output.Snapshot.VolumeId),
 		ResourceARN:    aws.StringValue(output.Snapshot.ResourceARN),
 		CreationTime:   aws.TimeValue(output.Snapshot.CreationTime),
 	}, nil
 }
 
-func (c *cloud) DeleteSnapshot(ctx context.Context, snapshotId string) (err error) {
-	if len(snapshotId) == 0 {
-		return fmt.Errorf("snapshot id not provided")
+func (c *cloud) DeleteSnapshot(ctx context.Context, parameters map[string]string) error {
+	input := fsx.DeleteSnapshotInput{}
+	err := util.RemoveParametersAndPopulateObject(parameters, &input)
+	if err != nil {
+		return err
 	}
 
-	input := &fsx.DeleteSnapshotInput{
-		ClientRequestToken: aws.String(snapshotId),
-		SnapshotId:         aws.String(snapshotId),
-	}
-	if _, err = c.fsx.DeleteSnapshotWithContext(ctx, input); err != nil {
+	if _, err = c.fsx.DeleteSnapshotWithContext(ctx, &input); err != nil {
 		if awsErr, ok := err.(awserr.Error); ok {
 			if awsErr.Code() == fsx.ErrCodeSnapshotNotFound {
-				return fmt.Errorf("DeleteSnapshot: Unable to find snapshot %s", snapshotId)
+				return fmt.Errorf("DeleteSnapshot: Unable to find snapshot %s", *input.SnapshotId)
 			}
 		}
-		return fmt.Errorf("DeleteSnapshot: Failed to delete snapshot %s, received error %v", snapshotId, err)
+		return fmt.Errorf("DeleteSnapshot: Failed to delete snapshot %s, received error %v", *input.SnapshotId, err)
 	}
 	return nil
 }
@@ -803,6 +432,57 @@ func (c *cloud) WaitForSnapshotAvailable(ctx context.Context, snapshotId string)
 	})
 
 	return err
+}
+
+func (c *cloud) GetDeleteParameters(ctx context.Context, id string) (map[string]string, error) {
+	parameters := make(map[string]string)
+	resourceArn := ""
+
+	splitVolumeId := strings.SplitN(id, "-", 2)
+	if splitVolumeId[0] == FilesystemPrefix {
+		f, err := c.getFileSystem(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		resourceArn = *f.ResourceARN
+	}
+	if splitVolumeId[0] == VolumePrefix {
+		v, err := c.getVolume(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		resourceArn = *v.ResourceARN
+	}
+
+	tags, err := c.getTagsForResource(resourceArn)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, tag := range tags {
+		if tag.Key == nil || tag.Value == nil {
+			continue
+		}
+		if strings.HasSuffix(*tag.Key, "OnDeletion") {
+			deleteKey := strings.TrimSuffix(*tag.Key, "OnDeletion")
+			deleteValue := util.DecodeDeletionTag(*tag.Value)
+			deleteMap := map[string]string{
+				deleteKey: deleteValue,
+			}
+			if splitVolumeId[0] == FilesystemPrefix {
+				err = util.StrictRemoveParametersAndPopulateObject(deleteMap, &fsx.DeleteFileSystemOpenZFSConfiguration{})
+			}
+			if splitVolumeId[0] == VolumePrefix {
+				err = util.StrictRemoveParametersAndPopulateObject(deleteMap, &fsx.DeleteVolumeOpenZFSConfiguration{})
+			}
+
+			if err != nil {
+				continue
+			}
+			parameters[deleteKey] = deleteValue
+		}
+	}
+	return parameters, nil
 }
 
 func (c *cloud) getFileSystem(ctx context.Context, fileSystemId string) (*fsx.FileSystem, error) {
@@ -881,28 +561,28 @@ func (c *cloud) getTagsForResource(resourceARN string) ([]*fsx.Tag, error) {
 	return output.Tags, nil
 }
 
-// getVolumeId Parses the volumeId to determine if it is the id of a file system or an OpenZFS volume.
+// GetVolumeId getVolumeId Parses the volumeId to determine if it is the id of a file system or an OpenZFS volume.
 // If the volumeId references a file system, this function retrieves the file system's root volume id.
 // If the volumeId references an OpenZFS volume, this function returns a pointer to the volumeId.
-func (c *cloud) getVolumeId(ctx context.Context, volumeId string) (*string, error) {
+func (c *cloud) GetVolumeId(ctx context.Context, volumeId string) (string, error) {
 	splitVolumeId := strings.Split(volumeId, "-")
 	if len(splitVolumeId) != 2 {
-		return nil, fmt.Errorf("volume id %s is improperly formatted", volumeId)
+		return "", fmt.Errorf("volume id %s is improperly formatted", volumeId)
 	}
 	idPrefix := splitVolumeId[0]
 	if idPrefix == FilesystemPrefix {
 		filesystem, err := c.getFileSystem(ctx, volumeId)
 		if err != nil {
-			return nil, err
+			return "", err
 		}
 		if filesystem.OpenZFSConfiguration != nil && len(*filesystem.OpenZFSConfiguration.RootVolumeId) > 0 {
-			return filesystem.OpenZFSConfiguration.RootVolumeId, nil
+			return *filesystem.OpenZFSConfiguration.RootVolumeId, nil
 		}
-		return nil, fmt.Errorf("failed to retrieve root volume id for file system %s", volumeId)
+		return "", fmt.Errorf("failed to retrieve root volume id for file system %s", volumeId)
 	} else if idPrefix == VolumePrefix {
-		return aws.String(volumeId), nil
+		return volumeId, nil
 	} else {
-		return nil, fmt.Errorf("volume id %s is improperly formatted", volumeId)
+		return "", fmt.Errorf("volume id %s is improperly formatted", volumeId)
 	}
 }
 
@@ -957,218 +637,50 @@ func (c *cloud) getUpdateResizeVolumeAdministrativeAction(ctx context.Context, v
 	return nil, fmt.Errorf("there is no update with storage capacity of %d GiB on volume %s", resizeGiB, volumeId)
 }
 
-func (c *cloud) parseDiskIopsConfiguration(input string) (*fsx.DiskIopsConfiguration, error) {
-	splitConfig := util.SplitCommasAndRemoveOuterBrackets(input)
-	mappedConfig, err := util.MapValues(splitConfig)
+func CollapseCreateFileSystemParameters(parameters map[string]string) error {
+	config := fsx.CreateFileSystemOpenZFSConfiguration{}
+	return util.ReplaceParametersAndPopulateObject("OpenZFSConfiguration", parameters, &config)
+}
+
+func CollapseDeleteFileSystemParameters(parameters map[string]string) error {
+	config := fsx.DeleteFileSystemOpenZFSConfiguration{}
+	return util.ReplaceParametersAndPopulateObject("OpenZFSConfiguration", parameters, &config)
+}
+
+func CollapseCreateVolumeParameters(parameters map[string]string) error {
+	config := fsx.CreateOpenZFSVolumeConfiguration{}
+	return util.ReplaceParametersAndPopulateObject("OpenZFSConfiguration", parameters, &config)
+}
+
+func CollapseDeleteVolumeParameters(parameters map[string]string) error {
+	config := fsx.DeleteVolumeOpenZFSConfiguration{}
+	return util.ReplaceParametersAndPopulateObject("OpenZFSConfiguration", parameters, &config)
+}
+
+// ValidateDeleteFileSystemParameters is used in CreateVolume to remove all delete parameters from the parameters map, and ensure they are valid.
+// Parameters should be unique map containing only delete parameters without the OnDeletion suffix
+// This method expects there to be no remaining delete parameters and errors if there are any
+// Verifies parameters are valid in accordance to the API to prevent unknown errors from occurring during DeleteVolume
+func ValidateDeleteFileSystemParameters(parameters map[string]string) error {
+	config := fsx.DeleteFileSystemInput{}
+	err := util.StrictRemoveParametersAndPopulateObject(parameters, &config)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %s", errInvalidMap, input)
+		return err
 	}
 
-	diskIopsConfiguration := fsx.DiskIopsConfiguration{}
-
-	for key, value := range mappedConfig {
-		if value == nil {
-			continue
-		}
-
-		switch key {
-		case "Iops":
-			iops, err := strconv.ParseInt(*value, 10, 64)
-			if err != nil {
-				return nil, fmt.Errorf("%w: %s=%s", errValueNotAnInt, key, *value)
-			}
-			diskIopsConfiguration.SetIops(iops)
-		case "Mode":
-			diskIopsConfiguration.SetMode(*value)
-		default:
-			return nil, fmt.Errorf("%w: %s", errKeyDoesNotExist, key)
-		}
-	}
-
-	return &diskIopsConfiguration, nil
+	return config.Validate()
 }
 
-func (c *cloud) parseRootVolumeConfiguration(input string) (*fsx.OpenZFSCreateRootVolumeConfiguration, error) {
-	splitConfig := util.SplitCommasAndRemoveOuterBrackets(input)
-	mappedConfig, err := util.MapValues(splitConfig)
+// ValidateDeleteVolumeParameters is used in CreateVolume to remove all delete parameters from the parameters map, and ensure they are valid.
+// Parameters should be unique map containing only delete parameters without the OnDeletion suffix
+// This method expects there to be no remaining delete parameters and errors if there are any
+// Verifies parameters are valid in accordance to the API to prevent unknown errors from occurring during DeleteVolume
+func ValidateDeleteVolumeParameters(parameters map[string]string) error {
+	config := fsx.DeleteVolumeInput{}
+	err := util.StrictRemoveParametersAndPopulateObject(parameters, &config)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %s", errInvalidMap, input)
+		return err
 	}
 
-	rootVolumeConfiguration := fsx.OpenZFSCreateRootVolumeConfiguration{}
-
-	for key, value := range mappedConfig {
-		if value == nil {
-			continue
-		}
-
-		switch key {
-		case "CopyTagsToSnapshots":
-			copyTagsToSnapshots, err := strconv.ParseBool(*value)
-			if err != nil {
-				return nil, fmt.Errorf("%w: %s=%s", errValueNotABool, key, *value)
-			}
-			rootVolumeConfiguration.SetCopyTagsToSnapshots(copyTagsToSnapshots)
-		case "DataCompressionType":
-			rootVolumeConfiguration.SetDataCompressionType(*value)
-		case "NfsExports":
-			nfsExports, err := c.parseNfsExports(*value)
-			if err != nil {
-				return nil, fmt.Errorf("%w. %s", errParseNfsExports, err)
-			}
-			rootVolumeConfiguration.SetNfsExports(nfsExports)
-		case "ReadOnly":
-			readOnly, err := strconv.ParseBool(*value)
-			if err != nil {
-				return nil, fmt.Errorf("%w: %s=%s", errValueNotABool, key, *value)
-			}
-			rootVolumeConfiguration.SetReadOnly(readOnly)
-		case "RecordSizeKiB":
-			recordSize, err := strconv.ParseInt(*value, 10, 64)
-			if err != nil {
-				return nil, fmt.Errorf("%w: %s=%s", errValueNotAnInt, key, *value)
-			}
-			rootVolumeConfiguration.SetRecordSizeKiB(recordSize)
-		case "UserAndGroupQuotas":
-			userAndGroupQuotas, err := c.parseUserAndGroupQuotas(*value)
-			if err != nil {
-				return nil, fmt.Errorf("%w. %s", errParseUserAndGroupQuotas, err)
-			}
-			rootVolumeConfiguration.SetUserAndGroupQuotas(userAndGroupQuotas)
-		default:
-			return nil, fmt.Errorf("%w: %s", errKeyDoesNotExist, key)
-		}
-	}
-
-	return &rootVolumeConfiguration, nil
-}
-
-func (c *cloud) parseNfsExports(input string) ([]*fsx.OpenZFSNfsExport, error) {
-	splitElements := util.SplitCommasAndRemoveOuterBrackets(input)
-
-	var nfsExports []*fsx.OpenZFSNfsExport
-
-	for _, clientConfig := range splitElements {
-		mappedClientConfiguration, err := util.MapValues([]string{clientConfig})
-		if err != nil {
-			return nil, fmt.Errorf("%w: %s", errInvalidMap, []string{clientConfig})
-		}
-
-		openZFSNfsExport := fsx.OpenZFSNfsExport{}
-
-		for clientKey, clientValue := range mappedClientConfiguration {
-			if clientValue == nil {
-				continue
-			}
-
-			switch clientKey {
-			case "ClientConfigurations":
-				splitClientConfiguration := util.SplitCommasAndRemoveOuterBrackets(*clientValue)
-
-				var clientConfigurations []*fsx.OpenZFSClientConfiguration
-
-				for _, clientConfiguration := range splitClientConfiguration {
-					splitConfig := util.SplitCommasAndRemoveOuterBrackets(clientConfiguration)
-					mappedConfig, err := util.MapValues(splitConfig)
-					if err != nil {
-						return nil, fmt.Errorf("%w: %s", errInvalidMap, clientConfiguration)
-					}
-
-					openZFSClientConfiguration := fsx.OpenZFSClientConfiguration{}
-
-					for key, value := range mappedConfig {
-						if value == nil {
-							continue
-						}
-
-						switch key {
-						case "Clients":
-							openZFSClientConfiguration.SetClients(*value)
-						case "Options":
-							options := aws.StringSlice(util.SplitCommasAndRemoveOuterBrackets(*value))
-							openZFSClientConfiguration.SetOptions(options)
-						default:
-							return nil, fmt.Errorf("%w: %s", errKeyDoesNotExist, key)
-						}
-					}
-
-					clientConfigurations = append(clientConfigurations, &openZFSClientConfiguration)
-				}
-
-				openZFSNfsExport.SetClientConfigurations(clientConfigurations)
-			default:
-				return nil, fmt.Errorf("%w: %s", errKeyDoesNotExist, clientKey)
-			}
-		}
-
-		nfsExports = append(nfsExports, &openZFSNfsExport)
-	}
-
-	return nfsExports, nil
-}
-
-func (c *cloud) parseUserAndGroupQuotas(input string) ([]*fsx.OpenZFSUserOrGroupQuota, error) {
-	splitElements := util.SplitCommasAndRemoveOuterBrackets(input)
-
-	var userAndGroupQuotas []*fsx.OpenZFSUserOrGroupQuota
-
-	for _, element := range splitElements {
-		splitConfig := util.SplitCommasAndRemoveOuterBrackets(element)
-		mappedConfig, err := util.MapValues(splitConfig)
-		if err != nil {
-			return nil, fmt.Errorf("%w: %s", errInvalidMap, input)
-		}
-
-		openZFSUserOrGroupQuota := fsx.OpenZFSUserOrGroupQuota{}
-
-		for key, value := range mappedConfig {
-			if value == nil {
-				continue
-			}
-
-			switch key {
-			case "Id":
-				id, err := strconv.ParseInt(*value, 10, 64)
-				if err != nil {
-					return nil, fmt.Errorf("%w: %s=%s", errValueNotAnInt, key, *value)
-				}
-				openZFSUserOrGroupQuota.SetId(id)
-			case "StorageCapacityQuotaGiB":
-				storageCapacityQuotaGiB, err := strconv.ParseInt(*value, 10, 64)
-				if err != nil {
-					return nil, fmt.Errorf("%w: %s=%s", errValueNotAnInt, key, *value)
-				}
-				openZFSUserOrGroupQuota.SetStorageCapacityQuotaGiB(storageCapacityQuotaGiB)
-			case "Type":
-				openZFSUserOrGroupQuota.SetType(*value)
-			default:
-				return nil, fmt.Errorf("%w: %s", errKeyDoesNotExist, key)
-			}
-		}
-
-		userAndGroupQuotas = append(userAndGroupQuotas, &openZFSUserOrGroupQuota)
-	}
-
-	return userAndGroupQuotas, nil
-}
-
-func (c *cloud) parseTags(input string) ([]*fsx.Tag, error) {
-	splitConfig := util.SplitCommasAndRemoveOuterBrackets(input)
-	mappedConfig, err := util.MapValues(splitConfig)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %s", errInvalidMap, input)
-	}
-
-	var tags []*fsx.Tag
-
-	for key, value := range mappedConfig {
-		var tag = fsx.Tag{
-			Key:   aws.String(key),
-			Value: value,
-		}
-
-		tags = append(tags, &tag)
-	}
-
-	return tags, nil
+	return config.Validate()
 }
