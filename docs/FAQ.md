@@ -40,7 +40,7 @@ If you wish to revise the deletion behavior of the volume after creation, you wi
 This will need to be done outside the context of the CSI driver.
 If the these tags are missing from the underlying FSx for OpenZFS resource or the tag does not have a valid value, 
 the driver will use the default behavior specified in the [FSx API](https://docs.aws.amazon.com/cli/latest/reference/fsx/index.html#cli-aws-fsx).
-Deletion parameters with JSON special characters "[]{} are encoded due to [AWS tagging limitations](https://docs.aws.amazon.com/tag-editor/latest/userguide/tagging.html#tag-conventions).
+Deletion parameters with JSON special characters `"[]{},` are encoded due to [AWS tagging limitations](https://docs.aws.amazon.com/tag-editor/latest/userguide/tagging.html#tag-conventions).
 See [tagging](tagging.md) for more details.
 
 ### Is there a way to tag FSx resources created via the CSI driver?
