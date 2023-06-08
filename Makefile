@@ -25,7 +25,7 @@ GOPATH=$(shell go env GOPATH)
 GOOS=$(shell go env GOOS)
 GOBIN=$(shell pwd)/bin
 
-IMAGE?=633339324534.dkr.ecr.us-east-1.amazonaws.com/aws-fsx-openzfs-csi-driver
+IMAGE?=public.ecr.aws/fsx-csi-driver/aws-fsx-openzfs-csi-driver
 TAG?=$(GIT_COMMIT)
 
 OUTPUT_TYPE?=docker
@@ -88,6 +88,7 @@ image: .image-$(TAG)-$(OS)-$(ARCH)-$(OSVERSION)
 		-t=$(IMAGE):$(TAG)-$(OS)-$(ARCH)-$(OSVERSION) \
 		--build-arg=GOPROXY=$(GOPROXY) \
 		--build-arg=VERSION=$(VERSION) \
+		`./hack/provenance` \
 		.
 	touch $@
 
