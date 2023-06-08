@@ -945,7 +945,7 @@ func TestDeleteVolume(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockCloud.EXPECT().FetchDeletionParameters(gomock.Eq(ctx), gomock.Any()).Return(filesystemParameters, nil)
+				mockCloud.EXPECT().GetDeleteParameters(gomock.Eq(ctx), gomock.Any()).Return(filesystemParameters, nil)
 				mockCloud.EXPECT().DeleteFileSystem(gomock.Eq(ctx), gomock.Any()).Return(nil)
 
 				_, err := driver.DeleteVolume(ctx, req)
@@ -973,7 +973,7 @@ func TestDeleteVolume(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockCloud.EXPECT().FetchDeletionParameters(gomock.Eq(ctx), gomock.Any()).Return(map[string]string{}, nil)
+				mockCloud.EXPECT().GetDeleteParameters(gomock.Eq(ctx), gomock.Any()).Return(map[string]string{}, nil)
 				mockCloud.EXPECT().DeleteFileSystem(gomock.Eq(ctx), gomock.Any()).Return(nil)
 
 				_, err := driver.DeleteVolume(ctx, req)
@@ -1001,7 +1001,7 @@ func TestDeleteVolume(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockCloud.EXPECT().FetchDeletionParameters(gomock.Eq(ctx), gomock.Any()).Return(volumeParameters, nil)
+				mockCloud.EXPECT().GetDeleteParameters(gomock.Eq(ctx), gomock.Any()).Return(volumeParameters, nil)
 				mockCloud.EXPECT().DeleteVolume(gomock.Eq(ctx), gomock.Any()).Return(nil)
 
 				_, err := driver.DeleteVolume(ctx, req)
@@ -1029,7 +1029,7 @@ func TestDeleteVolume(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockCloud.EXPECT().FetchDeletionParameters(gomock.Eq(ctx), gomock.Any()).Return(map[string]string{}, nil)
+				mockCloud.EXPECT().GetDeleteParameters(gomock.Eq(ctx), gomock.Any()).Return(map[string]string{}, nil)
 				mockCloud.EXPECT().DeleteVolume(gomock.Eq(ctx), gomock.Any()).Return(nil)
 
 				_, err := driver.DeleteVolume(ctx, req)
@@ -1057,7 +1057,7 @@ func TestDeleteVolume(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockCloud.EXPECT().FetchDeletionParameters(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New(""))
+				mockCloud.EXPECT().GetDeleteParameters(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New(""))
 
 				_, err := driver.DeleteVolume(ctx, req)
 				if err == nil {
@@ -1084,7 +1084,7 @@ func TestDeleteVolume(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockCloud.EXPECT().FetchDeletionParameters(gomock.Eq(ctx), gomock.Any()).Return(volumeParameters, nil)
+				mockCloud.EXPECT().GetDeleteParameters(gomock.Eq(ctx), gomock.Any()).Return(volumeParameters, nil)
 				mockCloud.EXPECT().DeleteFileSystem(gomock.Eq(ctx), gomock.Any()).Return(cloud.ErrNotFound)
 
 				_, err := driver.DeleteVolume(ctx, req)
@@ -1112,7 +1112,7 @@ func TestDeleteVolume(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockCloud.EXPECT().FetchDeletionParameters(gomock.Eq(ctx), gomock.Any()).Return(volumeParameters, nil)
+				mockCloud.EXPECT().GetDeleteParameters(gomock.Eq(ctx), gomock.Any()).Return(volumeParameters, nil)
 				mockCloud.EXPECT().DeleteFileSystem(gomock.Eq(ctx), gomock.Any()).Return(errors.New(""))
 
 				_, err := driver.DeleteVolume(ctx, req)
@@ -1140,7 +1140,7 @@ func TestDeleteVolume(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockCloud.EXPECT().FetchDeletionParameters(gomock.Eq(ctx), gomock.Any()).Return(volumeParameters, nil)
+				mockCloud.EXPECT().GetDeleteParameters(gomock.Eq(ctx), gomock.Any()).Return(volumeParameters, nil)
 				mockCloud.EXPECT().DeleteVolume(gomock.Eq(ctx), gomock.Any()).Return(cloud.ErrNotFound)
 
 				_, err := driver.DeleteVolume(ctx, req)
@@ -1168,7 +1168,7 @@ func TestDeleteVolume(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockCloud.EXPECT().FetchDeletionParameters(gomock.Eq(ctx), gomock.Any()).Return(volumeParameters, nil)
+				mockCloud.EXPECT().GetDeleteParameters(gomock.Eq(ctx), gomock.Any()).Return(volumeParameters, nil)
 				mockCloud.EXPECT().DeleteVolume(gomock.Eq(ctx), gomock.Any()).Return(errors.New(""))
 
 				_, err := driver.DeleteVolume(ctx, req)
