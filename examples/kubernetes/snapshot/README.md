@@ -6,10 +6,10 @@ Volume snapshots allow users to quickly store the state of a volume at a given t
 Snapshots can be taken either manually or by utilizing the CSI driver.
 Any snapshot taken can be utilized to create new volumes.
 
-Currently only FSxZ volume level snapshots are supported.
-Snapshots taken of an FSxZ filesystem will create a snapshot of its root volume.
-FSxZ filesystem level backups are NOT supported.
-Snapshots can only be restored to volumes that exist under the same filesystem.
+Currently only FSx for OpenZFS volume level snapshots are supported.
+Snapshots taken of an FSx for OpenZFS file system will create a snapshot of its root volume.
+FSx for OpenZFS file system level backups are NOT supported.
+Snapshots can only be restored to volumes that exist under the same file system.
 
 ## Prerequisites
 
@@ -24,10 +24,10 @@ This example shows you how to create snapshots and restore them.
 
 Values in the example files may be modified or removed based on preferences.
 
-### Create VolumeSnapshot From Existing FSxZ Volume Snapshot
+### Create VolumeSnapshot From Existing FSx for OpenZFS Volume Snapshot
 
-It is assumed that the necessary FSxZ snapshot has already been created.
-For information on creating an FSxZ snapshot see this [guide](https://docs.aws.amazon.com/fsx/latest/OpenZFSGuide/snapshots-openzfs.html).
+It is assumed that the necessary FSx for OpenZFS snapshot has already been created.
+For information on creating an FSx for OpenZFS snapshot see this [guide](https://docs.aws.amazon.com/fsx/latest/OpenZFSGuide/snapshots-openzfs.html).
 
 1. Apply necessary manifests:
     ```sh
@@ -43,15 +43,15 @@ For information on creating an FSxZ snapshot see this [guide](https://docs.aws.a
     ```
 
 ### Create VolumeSnapshot From PersistentVolume
-1. Run **one of the following** to apply the manifests needed to create either an FSxZ filesystem or an FSxZ volume.
+1. Run **one of the following** to apply the manifests needed to create either an FSx for OpenZFS file system or an FSx for OpenZFS volume.
    See this [example](../dynamic-provisioning/README.md) for more information on dynamic provisioning.
-   1. FSxZ filesystem:
+   1. FSx for OpenZFS file system:
     ```sh
-   kubectl apply -f ../dynamic-provisioning/filesystem/,../dynamic-provisioning/manifests/
+   kubectl apply -f ../dynamic-provisioning/filesystem/
     ```
-   2. FSxZ volume:
+   2. FSx for OpenZFS volume:
    ```sh
-   kubectl apply -f ../dynamic-provisioning/volume/,../dynamic-provisioning/manifests/
+   kubectl apply -f ../dynamic-provisioning/volume/
     ```
 2. Verify the PersistentVolumeClaim enters a `Bound` state.
     ```sh
@@ -66,13 +66,13 @@ For information on creating an FSxZ snapshot see this [guide](https://docs.aws.a
     kubectl describe volumesnapshot.snapshot.storage.k8s.io fsx-vs
     ```
 5. Delete all the created resources:
-   1. FSxZ filesystem:
+   1. FSx for OpenZFS file system:
    ```sh
-    kubectl delete -f snapshot/,../dynamic-provisioning/manifests/,../dynamic-provisioning/filesystem/
+    kubectl delete -f snapshot/,../dynamic-provisioning/filesystem/
    ```
-   2. FSxZ volume:
+   2. FSx for OpenZFS volume:
    ```sh
-   kubectl delete -f snapshot/,../dynamic-provisioning/manifests/,../dynamic-provisioning/volume/
+   kubectl delete -f snapshot/,../dynamic-provisioning/volume/
    ```
 
 ### Create PersistentVolume From VolumeSnapshot
@@ -91,11 +91,11 @@ For information on creating an FSxZ snapshot see this [guide](https://docs.aws.a
     kubectl exec -ti fsx-restored-app -- tail -f /data/out.txt
     ```
 5. Delete all the created resources:
-   1. FSxZ filesystem:
+   1. FSx for OpenZFS file system:
    ```sh
-    kubectl delete -f restore-snapshot/,snapshot/,../dynamic-provisioning/manifests/,../dynamic-provisioning/filesystem/
+    kubectl delete -f restore-snapshot/,snapshot/,../dynamic-provisioning/filesystem/
    ```
-   2. FSxZ volume:
+   2. FSx for OpenZFS volume:
    ```sh
-   kubectl delete -f restore-snapshot/,snapshot/,../dynamic-provisioning/manifests/,../dynamic-provisioning/volume/
+   kubectl delete -f restore-snapshot/,snapshot/,../dynamic-provisioning/volume/
    ```

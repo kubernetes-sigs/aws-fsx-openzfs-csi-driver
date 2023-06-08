@@ -2,12 +2,13 @@
 
 ## Context
 
-Users are able to change the capacity of their volumes. 
+Users are able to use the driver to change the storage capacity of their FSx for OpenZFS file systems. 
 Currently, the capacity can ONLY be increased, and NOT decreased.
-Only storage capacity can be adjusted. Throughput can NOT be modified.
-When scaling an FSxZ Volume, both StorageCapacityQuota and StorageCapacityReservation are increased to the same value.
+Only the storage capacity of a file system can be adjusted; throughput capacity can NOT be modified.
+Additionally, the StorageCapacityReservation and StorageCapacityQuota of an FSx for OpenZFS volume cannot be changed via the CSI driver.
 
-When expanding the storage capacity of an FSxZ filesystem it must be increased by at least 10% of the current capacity, up to a max size of 512 TiB.
+
+When expanding the storage capacity of an FSx for OpenZFS file system, it must be increased by at least 10% of the current capacity, up to a max size of 512 TiB.
 For more information see this [document](https://docs.aws.amazon.com/fsx/latest/OpenZFSGuide/managing-storage-capacity.html).
 
 ## Prerequisites
@@ -21,19 +22,14 @@ This example shows you how to expand the capacity of a volume.
 
 Values in the example files may be modified or removed based on preferences.
 
-### Expand an FSxZ Resource Capacity
+### Expand an FSx for OpenZFS File System
 
-1. Run **one of the following** to apply manifests needed to create either an FSxZ filesystem or an FSxZ volume.
+1. Run the following to apply manifests needed to create an FSx for OpenZFS file system.
 See this [example](../dynamic-provisioning/README.md) for more information on dynamic provisioning.
-   1. FSxZ filesystem:
     ```sh
-   kubectl apply -f ../dynamic-provisioning/filesystem/,../dynamic-provisioning/manifests/
+   kubectl apply -f ../dynamic-provisioning/filesystem/
     ```
-   2. FSxZ volume:
-   ```sh
-   kubectl apply -f ../dynamic-provisioning/volume/,../dynamic-provisioning/manifests/
-    ```
-2. Update the storage capacity of respective claim:
+2. Update the requested storage capacity of respective claim:
     ```sh
    export KUBE_EDITOR="nano" && kubectl edit pvc fsx-pvc
     ```
@@ -41,12 +37,7 @@ See this [example](../dynamic-provisioning/README.md) for more information on dy
    ```sh
    kubectl get pv && kubectl get pvc
     ```
-4. Run **one of the following** to delete the associated resources that were created.
-   1. FSxZ filesystem:
+4. Run the following to delete the associated resources that were created.
    ```sh
-   kubectl delete -f ../dynamic-provisioning/manifests/,../dynamic-provisioning/filesystem/
-   ```
-   2. FSxZ volume:
-   ```sh
-   kubectl delete -f ../dynamic-provisioning/manifests/,../dynamic-provisioning/volume/
+   kubectl delete -f ../dynamic-provisioning/filesystem/
    ```
