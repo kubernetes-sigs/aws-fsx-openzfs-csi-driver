@@ -4,9 +4,9 @@
 
 image:
   # TODO: replace this temporary private ECR and regenerate the manifests when we are ready to release
-  repository: 633339324534.dkr.ecr.us-east-1.amazonaws.com/aws-fsx-openzfs-csi-driver
+  repository: public.ecr.aws/fsx-csi-driver/aws-fsx-openzfs-csi-driver
   # Overrides the image tag whose default is v{{ .Chart.AppVersion }}
-  tag: v0.0.24
+  tag: v0.1.0
   pullPolicy: IfNotPresent
 
 csidriver:

@@ -22,6 +22,6 @@ jobs:
           body: |
             AWS FSx for OpenZFS CSI Driver
             ## CHANGELOG
-            See [CHANGELOG](https://github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/blob/master/CHANGELOG-0.x.md) for full list of changes
+            See [CHANGELOG](https://github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/blob/master/CHANGELOG.md) for full list of changes
           draft: false
           prerelease: false
