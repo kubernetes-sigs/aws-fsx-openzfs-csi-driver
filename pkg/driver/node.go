@@ -19,6 +19,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sigs.k8s.io/aws-fsx-openzfs-csi-driver/pkg/cloud"
+	"sigs.k8s.io/aws-fsx-openzfs-csi-driver/pkg/driver/internal"
 	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -35,16 +37,44 @@ var (
 	nodeCaps = []csi.NodeServiceCapability_RPC_Type{}
 )
 
-func (d *Driver) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
+type nodeService struct {
+	metadata      cloud.MetadataService
+	mounter       Mounter
+	inFlight      *internal.InFlight
+	driverOptions *DriverOptions
+}
+
+func newNodeService(driverOptions *DriverOptions) nodeService {
+	klog.V(5).InfoS("[Debug] Retrieving node info from metadata service")
+
+	metadata, err := cloud.NewMetadata()
+	if err != nil {
+		panic(err)
+	}
+
+	nodeMounter, err := newNodeMounter()
+	if err != nil {
+		panic(err)
+	}
+
+	return nodeService{
+		metadata:      metadata,
+		mounter:       nodeMounter,
+		inFlight:      internal.NewInFlight(),
+		driverOptions: driverOptions,
+	}
+}
+
+func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func (d *Driver) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
+func (d *nodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
 // NodePublishVolume Mounts the PV at the target path.
-func (d *Driver) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
+func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
 	klog.V(4).Infof("NodePublishVolume: Called with args %+v", req)
 
 	volumeID := req.GetVolumeId()
@@ -56,7 +86,7 @@ func (d *Driver) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolu
 	if volCap == nil {
 		return nil, status.Error(codes.InvalidArgument, "Volume capability missing in NodePublishVolumeRequest")
 	}
-	if !d.isValidVolumeCapabilities([]*csi.VolumeCapability{volCap}) {
+	if !isValidVolumeCapabilities([]*csi.VolumeCapability{volCap}) {
 		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume: Volume capability not supported")
 	}
 
@@ -147,7 +177,7 @@ func (d *Driver) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolu
 }
 
 // NodeUnpublishVolume Unmounts the volume from the target path
-func (d *Driver) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
+func (d *nodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
 	klog.V(4).Infof("NodeUnpublishVolume: Called with args %+v", req)
 
 	volumeID := req.GetVolumeId()
@@ -181,16 +211,16 @@ func (d *Driver) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublish
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 
-func (d *Driver) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
+func (d *nodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func (d *Driver) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
+func (d *nodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
 // NodeGetCapabilities Returns the capabilities of the Node plugin
-func (d *Driver) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
+func (d *nodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
 	klog.V(4).Infof("NodeGetCapabilities: Called with args %+v", req)
 	var caps []*csi.NodeServiceCapability
 	for _, cap := range nodeCaps {
@@ -207,35 +237,15 @@ func (d *Driver) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabi
 }
 
 // NodeGetInfo Returns the id of the node on which the plugin is running
-func (d *Driver) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
+func (d *nodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	klog.V(4).Infof("NodeGetInfo: called with args %+v", req)
 	return &csi.NodeGetInfoResponse{
-		NodeId: d.nodeID,
+		NodeId: d.metadata.GetInstanceID(),
 	}, nil
 }
 
-// isValidVolumeCapabilities Validates the accessMode support for the volume capabilities
-func (d *Driver) isValidVolumeCapabilities(volCaps []*csi.VolumeCapability) bool {
-	hasSupport := func(cap *csi.VolumeCapability) bool {
-		for _, c := range volumeCaps {
-			if c.GetMode() == cap.AccessMode.GetMode() {
-				return true
-			}
-		}
-		return false
-	}
-
-	foundAll := true
-	for _, c := range volCaps {
-		if !hasSupport(c) {
-			foundAll = false
-		}
-	}
-	return foundAll
-}
-
 // isMounted Checks if volume is mounted. It does NOT return an error if the targetPath does not exist.
-func (d *Driver) isMounted(source string, targetPath string) (bool, error) {
+func (d *nodeService) isMounted(source string, targetPath string) (bool, error) {
 	/*
 		Checks if the targetPath a mount point using IsLikelyNotMountPoint.
 		This function has three different return values:

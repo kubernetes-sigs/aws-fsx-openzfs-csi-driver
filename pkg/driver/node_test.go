@@ -18,18 +18,19 @@ package driver
 import (
 	"context"
 	"fmt"
+	"sigs.k8s.io/aws-fsx-openzfs-csi-driver/pkg/driver/internal"
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/golang/mock/gomock"
-	"sigs.k8s.io/aws-fsx-openzfs-csi-driver/pkg/driver/mocks"
+
+	cloudMock "sigs.k8s.io/aws-fsx-openzfs-csi-driver/pkg/cloud/mocks"
+	driverMocks "sigs.k8s.io/aws-fsx-openzfs-csi-driver/pkg/driver/mocks"
 )
 
 func TestNodePublishVolume(t *testing.T) {
 
 	var (
-		endpoint   = "endpoint"
-		nodeID     = "nodeID"
 		fsVolumeId = "fs-0a2d0632b5ff567e9"
 		volumeId   = "fsvol-0efb292807cc770ff"
 		dnsName    = "fs-0a2d0632b5ff567e9.fsx.us-west-2.amazonaws.com"
@@ -52,12 +53,16 @@ func TestNodePublishVolume(t *testing.T) {
 		{
 			name: "success: normal filesystem nfs mount",
 			testFunc: func(t *testing.T) {
-				mockCtrl := gomock.NewController(t)
-				mockMounter := mocks.NewMockMounter(mockCtrl)
-				driver := &Driver{
-					endpoint: endpoint,
-					nodeID:   nodeID,
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+
+				mockMetadata := cloudMock.NewMockMetadataService(mockCtl)
+				mockMounter := driverMocks.NewMockMounter(mockCtl)
+
+				driver := &nodeService{
+					metadata: mockMetadata,
 					mounter:  mockMounter,
+					inFlight: internal.NewInFlight(),
 				}
 				source := fmt.Sprintf("%s:%s", dnsName, rootVolumePath)
 
@@ -81,18 +86,22 @@ func TestNodePublishVolume(t *testing.T) {
 					t.Fatalf("NodePublishVolume is failed: %v", err)
 				}
 
-				mockCtrl.Finish()
+				mockCtl.Finish()
 			},
 		},
 		{
 			name: "success: normal volume nfs mount",
 			testFunc: func(t *testing.T) {
-				mockCtrl := gomock.NewController(t)
-				mockMounter := mocks.NewMockMounter(mockCtrl)
-				driver := &Driver{
-					endpoint: endpoint,
-					nodeID:   nodeID,
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+
+				mockMetadata := cloudMock.NewMockMetadataService(mockCtl)
+				mockMounter := driverMocks.NewMockMounter(mockCtl)
+
+				driver := &nodeService{
+					metadata: mockMetadata,
 					mounter:  mockMounter,
+					inFlight: internal.NewInFlight(),
 				}
 				source := fmt.Sprintf("%s:%s", dnsName, volumePath)
 
@@ -116,18 +125,22 @@ func TestNodePublishVolume(t *testing.T) {
 					t.Fatalf("NodePublishVolume is failed: %v", err)
 				}
 
-				mockCtrl.Finish()
+				mockCtl.Finish()
 			},
 		},
 		{
 			name: "success: missing volumePath for file system mount in static provisioning, default 'fsx' used",
 			testFunc: func(t *testing.T) {
-				mockCtrl := gomock.NewController(t)
-				mockMounter := mocks.NewMockMounter(mockCtrl)
-				driver := &Driver{
-					endpoint: endpoint,
-					nodeID:   nodeID,
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+
+				mockMetadata := cloudMock.NewMockMetadataService(mockCtl)
+				mockMounter := driverMocks.NewMockMounter(mockCtl)
+
+				driver := &nodeService{
+					metadata: mockMetadata,
 					mounter:  mockMounter,
+					inFlight: internal.NewInFlight(),
 				}
 				source := fmt.Sprintf("%s:%s", dnsName, rootVolumePath)
 
@@ -150,18 +163,22 @@ func TestNodePublishVolume(t *testing.T) {
 					t.Fatalf("NodePublishVolume is failed: %v", err)
 				}
 
-				mockCtrl.Finish()
+				mockCtl.Finish()
 			},
 		},
 		{
 			name: "success: normal nfs mount with read only mount",
 			testFunc: func(t *testing.T) {
-				mockCtrl := gomock.NewController(t)
-				mockMounter := mocks.NewMockMounter(mockCtrl)
-				driver := &Driver{
-					endpoint: endpoint,
-					nodeID:   nodeID,
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+
+				mockMetadata := cloudMock.NewMockMetadataService(mockCtl)
+				mockMounter := driverMocks.NewMockMounter(mockCtl)
+
+				driver := &nodeService{
+					metadata: mockMetadata,
 					mounter:  mockMounter,
+					inFlight: internal.NewInFlight(),
 				}
 
 				source := fmt.Sprintf("%s:%s", dnsName, rootVolumePath)
@@ -187,18 +204,22 @@ func TestNodePublishVolume(t *testing.T) {
 					t.Fatalf("NodePublishVolume is failed: %v", err)
 				}
 
-				mockCtrl.Finish()
+				mockCtl.Finish()
 			},
 		},
 		{
 			name: "success: normal nfs mount with mount options",
 			testFunc: func(t *testing.T) {
-				mockCtrl := gomock.NewController(t)
-				mockMounter := mocks.NewMockMounter(mockCtrl)
-				driver := &Driver{
-					endpoint: endpoint,
-					nodeID:   nodeID,
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+
+				mockMetadata := cloudMock.NewMockMetadataService(mockCtl)
+				mockMounter := driverMocks.NewMockMounter(mockCtl)
+
+				driver := &nodeService{
+					metadata: mockMetadata,
 					mounter:  mockMounter,
+					inFlight: internal.NewInFlight(),
 				}
 
 				source := fmt.Sprintf("%s:%s", dnsName, rootVolumePath)
@@ -232,18 +253,22 @@ func TestNodePublishVolume(t *testing.T) {
 					t.Fatalf("NodePublishVolume is failed: %v", err)
 				}
 
-				mockCtrl.Finish()
+				mockCtl.Finish()
 			},
 		},
 		{
 			name: "fail: missing volume id",
 			testFunc: func(t *testing.T) {
-				mockCtrl := gomock.NewController(t)
-				mockMounter := mocks.NewMockMounter(mockCtrl)
-				driver := &Driver{
-					endpoint: endpoint,
-					nodeID:   nodeID,
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+
+				mockMetadata := cloudMock.NewMockMetadataService(mockCtl)
+				mockMounter := driverMocks.NewMockMounter(mockCtl)
+
+				driver := &nodeService{
+					metadata: mockMetadata,
 					mounter:  mockMounter,
+					inFlight: internal.NewInFlight(),
 				}
 
 				ctx := context.Background()
@@ -262,18 +287,22 @@ func TestNodePublishVolume(t *testing.T) {
 					t.Fatalf("NodePublishVolume is not failed: %v", err)
 				}
 
-				mockCtrl.Finish()
+				mockCtl.Finish()
 			},
 		},
 		{
 			name: "fail: missing volume capability",
 			testFunc: func(t *testing.T) {
-				mockCtrl := gomock.NewController(t)
-				mockMounter := mocks.NewMockMounter(mockCtrl)
-				driver := &Driver{
-					endpoint: endpoint,
-					nodeID:   nodeID,
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+
+				mockMetadata := cloudMock.NewMockMetadataService(mockCtl)
+				mockMounter := driverMocks.NewMockMounter(mockCtl)
+
+				driver := &nodeService{
+					metadata: mockMetadata,
 					mounter:  mockMounter,
+					inFlight: internal.NewInFlight(),
 				}
 
 				ctx := context.Background()
@@ -292,18 +321,22 @@ func TestNodePublishVolume(t *testing.T) {
 					t.Fatalf("NodePublishVolume is not failed: %v", err)
 				}
 
-				mockCtrl.Finish()
+				mockCtl.Finish()
 			},
 		},
 		{
 			name: "fail: unsupported volume capability",
 			testFunc: func(t *testing.T) {
-				mockCtrl := gomock.NewController(t)
-				mockMounter := mocks.NewMockMounter(mockCtrl)
-				driver := &Driver{
-					endpoint: endpoint,
-					nodeID:   nodeID,
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+
+				mockMetadata := cloudMock.NewMockMetadataService(mockCtl)
+				mockMounter := driverMocks.NewMockMounter(mockCtl)
+
+				driver := &nodeService{
+					metadata: mockMetadata,
 					mounter:  mockMounter,
+					inFlight: internal.NewInFlight(),
 				}
 
 				ctx := context.Background()
@@ -330,18 +363,22 @@ func TestNodePublishVolume(t *testing.T) {
 					t.Fatalf("NodePublishVolume is not failed: %v", err)
 				}
 
-				mockCtrl.Finish()
+				mockCtl.Finish()
 			},
 		},
 		{
 			name: "fail: missing dns name",
 			testFunc: func(t *testing.T) {
-				mockCtrl := gomock.NewController(t)
-				mockMounter := mocks.NewMockMounter(mockCtrl)
-				driver := &Driver{
-					endpoint: endpoint,
-					nodeID:   nodeID,
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+
+				mockMetadata := cloudMock.NewMockMetadataService(mockCtl)
+				mockMounter := driverMocks.NewMockMounter(mockCtl)
+
+				driver := &nodeService{
+					metadata: mockMetadata,
 					mounter:  mockMounter,
+					inFlight: internal.NewInFlight(),
 				}
 
 				ctx := context.Background()
@@ -360,18 +397,22 @@ func TestNodePublishVolume(t *testing.T) {
 					t.Fatalf("NodePublishVolume is not failed: %v", err)
 				}
 
-				mockCtrl.Finish()
+				mockCtl.Finish()
 			},
 		},
 		{
 			name: "fail: invalid volume type",
 			testFunc: func(t *testing.T) {
-				mockCtrl := gomock.NewController(t)
-				mockMounter := mocks.NewMockMounter(mockCtrl)
-				driver := &Driver{
-					endpoint: endpoint,
-					nodeID:   nodeID,
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+
+				mockMetadata := cloudMock.NewMockMetadataService(mockCtl)
+				mockMounter := driverMocks.NewMockMounter(mockCtl)
+
+				driver := &nodeService{
+					metadata: mockMetadata,
 					mounter:  mockMounter,
+					inFlight: internal.NewInFlight(),
 				}
 
 				ctx := context.Background()
@@ -391,18 +432,22 @@ func TestNodePublishVolume(t *testing.T) {
 					t.Fatalf("NodePublishVolume is not failed: %v", err)
 				}
 
-				mockCtrl.Finish()
+				mockCtl.Finish()
 			},
 		},
 		{
 			name: "fail: missing volumePath when mounting volume",
 			testFunc: func(t *testing.T) {
-				mockCtrl := gomock.NewController(t)
-				mockMounter := mocks.NewMockMounter(mockCtrl)
-				driver := &Driver{
-					endpoint: endpoint,
-					nodeID:   nodeID,
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+
+				mockMetadata := cloudMock.NewMockMetadataService(mockCtl)
+				mockMounter := driverMocks.NewMockMounter(mockCtl)
+
+				driver := &nodeService{
+					metadata: mockMetadata,
 					mounter:  mockMounter,
+					inFlight: internal.NewInFlight(),
 				}
 
 				ctx := context.Background()
@@ -421,18 +466,22 @@ func TestNodePublishVolume(t *testing.T) {
 					t.Fatalf("NodePublishVolume is not failed: %v", err)
 				}
 
-				mockCtrl.Finish()
+				mockCtl.Finish()
 			},
 		},
 		{
 			name: "fail: invalid volumePath when mounting a file system",
 			testFunc: func(t *testing.T) {
-				mockCtrl := gomock.NewController(t)
-				mockMounter := mocks.NewMockMounter(mockCtrl)
-				driver := &Driver{
-					endpoint: endpoint,
-					nodeID:   nodeID,
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+
+				mockMetadata := cloudMock.NewMockMetadataService(mockCtl)
+				mockMounter := driverMocks.NewMockMounter(mockCtl)
+
+				driver := &nodeService{
+					metadata: mockMetadata,
 					mounter:  mockMounter,
+					inFlight: internal.NewInFlight(),
 				}
 
 				ctx := context.Background()
@@ -452,18 +501,22 @@ func TestNodePublishVolume(t *testing.T) {
 					t.Fatalf("NodePublishVolume is not failed: %v", err)
 				}
 
-				mockCtrl.Finish()
+				mockCtl.Finish()
 			},
 		},
 		{
 			name: "fail: missing target path",
 			testFunc: func(t *testing.T) {
-				mockCtrl := gomock.NewController(t)
-				mockMounter := mocks.NewMockMounter(mockCtrl)
-				driver := &Driver{
-					endpoint: endpoint,
-					nodeID:   nodeID,
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+
+				mockMetadata := cloudMock.NewMockMetadataService(mockCtl)
+				mockMounter := driverMocks.NewMockMounter(mockCtl)
+
+				driver := &nodeService{
+					metadata: mockMetadata,
 					mounter:  mockMounter,
+					inFlight: internal.NewInFlight(),
 				}
 
 				ctx := context.Background()
@@ -482,18 +535,22 @@ func TestNodePublishVolume(t *testing.T) {
 					t.Fatalf("NodePublishVolume is not failed: %v", err)
 				}
 
-				mockCtrl.Finish()
+				mockCtl.Finish()
 			},
 		},
 		{
 			name: "fail: mounter failed to MakeDir",
 			testFunc: func(t *testing.T) {
-				mockCtrl := gomock.NewController(t)
-				mockMounter := mocks.NewMockMounter(mockCtrl)
-				driver := &Driver{
-					endpoint: endpoint,
-					nodeID:   nodeID,
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+
+				mockMetadata := cloudMock.NewMockMetadataService(mockCtl)
+				mockMounter := driverMocks.NewMockMounter(mockCtl)
+
+				driver := &nodeService{
+					metadata: mockMetadata,
 					mounter:  mockMounter,
+					inFlight: internal.NewInFlight(),
 				}
 
 				ctx := context.Background()
@@ -516,18 +573,22 @@ func TestNodePublishVolume(t *testing.T) {
 					t.Fatalf("NodePublishVolume is not failed: %v", err)
 				}
 
-				mockCtrl.Finish()
+				mockCtl.Finish()
 			},
 		},
 		{
 			name: "fail: mounter failed to Mount",
 			testFunc: func(t *testing.T) {
-				mockCtrl := gomock.NewController(t)
-				mockMounter := mocks.NewMockMounter(mockCtrl)
-				driver := &Driver{
-					endpoint: endpoint,
-					nodeID:   nodeID,
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+
+				mockMetadata := cloudMock.NewMockMetadataService(mockCtl)
+				mockMounter := driverMocks.NewMockMounter(mockCtl)
+
+				driver := &nodeService{
+					metadata: mockMetadata,
 					mounter:  mockMounter,
+					inFlight: internal.NewInFlight(),
 				}
 
 				ctx := context.Background()
@@ -553,7 +614,7 @@ func TestNodePublishVolume(t *testing.T) {
 					t.Fatalf("NodePublishVolume is not failed: %v", err)
 				}
 
-				mockCtrl.Finish()
+				mockCtl.Finish()
 			},
 		},
 	}
@@ -566,8 +627,6 @@ func TestNodePublishVolume(t *testing.T) {
 func TestNodeUnpublishVolume(t *testing.T) {
 
 	var (
-		endpoint   = "endpoint"
-		nodeID     = "nodeID"
 		targetPath = "/target/path"
 		volumeId   = "fsvol-0efb292807cc770ff"
 	)
@@ -579,12 +638,16 @@ func TestNodeUnpublishVolume(t *testing.T) {
 		{
 			name: "success: normal",
 			testFunc: func(t *testing.T) {
-				mockCtrl := gomock.NewController(t)
-				mockMounter := mocks.NewMockMounter(mockCtrl)
-				driver := &Driver{
-					endpoint: endpoint,
-					nodeID:   nodeID,
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+
+				mockMetadata := cloudMock.NewMockMetadataService(mockCtl)
+				mockMounter := driverMocks.NewMockMounter(mockCtl)
+
+				driver := &nodeService{
+					metadata: mockMetadata,
 					mounter:  mockMounter,
+					inFlight: internal.NewInFlight(),
 				}
 
 				ctx := context.Background()
@@ -605,12 +668,16 @@ func TestNodeUnpublishVolume(t *testing.T) {
 		{
 			name: "success: target already unmounted",
 			testFunc: func(t *testing.T) {
-				mockCtrl := gomock.NewController(t)
-				mockMounter := mocks.NewMockMounter(mockCtrl)
-				driver := &Driver{
-					endpoint: endpoint,
-					nodeID:   nodeID,
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+
+				mockMetadata := cloudMock.NewMockMetadataService(mockCtl)
+				mockMounter := driverMocks.NewMockMounter(mockCtl)
+
+				driver := &nodeService{
+					metadata: mockMetadata,
 					mounter:  mockMounter,
+					inFlight: internal.NewInFlight(),
 				}
 
 				ctx := context.Background()
@@ -630,12 +697,16 @@ func TestNodeUnpublishVolume(t *testing.T) {
 		{
 			name: "fail: targetPath is missing",
 			testFunc: func(t *testing.T) {
-				mockCtrl := gomock.NewController(t)
-				mockMounter := mocks.NewMockMounter(mockCtrl)
-				driver := &Driver{
-					endpoint: endpoint,
-					nodeID:   nodeID,
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+
+				mockMetadata := cloudMock.NewMockMetadataService(mockCtl)
+				mockMounter := driverMocks.NewMockMounter(mockCtl)
+
+				driver := &nodeService{
+					metadata: mockMetadata,
 					mounter:  mockMounter,
+					inFlight: internal.NewInFlight(),
 				}
 
 				ctx := context.Background()
@@ -652,12 +723,16 @@ func TestNodeUnpublishVolume(t *testing.T) {
 		{
 			name: "fail: mounter failed to umount",
 			testFunc: func(t *testing.T) {
-				mockCtrl := gomock.NewController(t)
-				mockMounter := mocks.NewMockMounter(mockCtrl)
-				driver := &Driver{
-					endpoint: endpoint,
-					nodeID:   nodeID,
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+
+				mockMetadata := cloudMock.NewMockMetadataService(mockCtl)
+				mockMounter := driverMocks.NewMockMounter(mockCtl)
+
+				driver := &nodeService{
+					metadata: mockMetadata,
 					mounter:  mockMounter,
+					inFlight: internal.NewInFlight(),
 				}
 
 				ctx := context.Background()
@@ -667,7 +742,7 @@ func TestNodeUnpublishVolume(t *testing.T) {
 				}
 
 				mockMounter.EXPECT().IsLikelyNotMountPoint(gomock.Eq(targetPath)).Return(false, nil)
-				mountErr := fmt.Errorf("Unmount failed")
+				mountErr := fmt.Errorf("unmount failed")
 				mockMounter.EXPECT().Unmount(gomock.Eq(targetPath)).Return(mountErr)
 
 				_, err := driver.NodeUnpublishVolume(ctx, req)

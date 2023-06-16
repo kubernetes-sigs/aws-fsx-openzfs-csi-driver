@@ -54,7 +54,7 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
             - --endpoint=$(CSI_ENDPOINT)
-            - --logtostderr
+            - --logging-format=text
             - --v={{ .Values.node.logLevel }}
           env:
             - name: CSI_ENDPOINT
