@@ -108,6 +108,9 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 	}
 
 	volumeParams := req.GetParameters()
+	if volumeParams == nil {
+		volumeParams = make(map[string]string)
+	}
 
 	deleteReservedParameters(volumeParams)
 
@@ -402,7 +405,10 @@ func (d *Driver) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequ
 	}
 	defer d.inFlight.Delete(req.GetName())
 
-	snapshotParams := req.Parameters
+	snapshotParams := req.GetParameters()
+	if snapshotParams == nil {
+		snapshotParams = make(map[string]string)
+	}
 
 	deleteReservedParameters(snapshotParams)
 
