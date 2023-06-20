@@ -538,12 +538,12 @@ func (c *cloud) getSnapshot(ctx context.Context, snapshotId string) (*fsx.Snapsh
 		return nil, err
 	}
 
-	if len(output.Snapshots) > 1 {
-		return nil, fmt.Errorf("getSnapshot: snapshot id %s returned multiple snapshots", snapshotId)
+	if len(output.Snapshots) == 0 {
+		return nil, ErrNotFound
 	}
 
-	if len(output.Snapshots) == 0 {
-		return nil, fmt.Errorf("getSnapshot: could not find snapshot with snapshot id %s", snapshotId)
+	if len(output.Snapshots) > 1 {
+		return nil, ErrMultipleFound
 	}
 
 	return output.Snapshots[0], nil

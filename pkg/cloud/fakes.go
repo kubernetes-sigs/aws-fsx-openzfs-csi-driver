@@ -21,6 +21,7 @@ import (
 	"math/rand"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -39,6 +40,7 @@ type FakeCloudProvider struct {
 	volumesParameters     map[string]map[string]string
 	snapshots             map[string]*Snapshot
 	snapshotsParameters   map[string]map[string]string
+	volumeIds             map[string]string
 }
 
 func NewFakeCloudProvider() *FakeCloudProvider {
@@ -50,11 +52,15 @@ func NewFakeCloudProvider() *FakeCloudProvider {
 	}
 
 	return &FakeCloudProvider{
-		m:            &metadata{"instanceID", "region", "az"},
-		filesystemId: filesystemId,
-		fileSystems:  map[string]*FileSystem{filesystemId: &filesystem},
-		volumes:      make(map[string]*Volume),
-		snapshots:    make(map[string]*Snapshot),
+		m:                     &metadata{"instanceID", "region", "az"},
+		filesystemId:          filesystemId,
+		fileSystems:           map[string]*FileSystem{filesystemId: &filesystem},
+		fileSystemsParameters: make(map[string]map[string]string),
+		volumes:               make(map[string]*Volume),
+		volumesParameters:     make(map[string]map[string]string),
+		snapshots:             make(map[string]*Snapshot),
+		snapshotsParameters:   make(map[string]map[string]string),
+		volumeIds:             make(map[string]string),
 	}
 }
 
@@ -236,9 +242,24 @@ func (c *FakeCloudProvider) WaitForSnapshotAvailable(ctx context.Context, snapsh
 }
 
 func (c *FakeCloudProvider) GetDeleteParameters(ctx context.Context, id string) (map[string]string, error) {
-	return nil, nil
+	return make(map[string]string), nil
 }
 
 func (c *FakeCloudProvider) GetVolumeId(ctx context.Context, volumeId string) (string, error) {
-	return "fsvol-123456", nil
+	val, ok := c.volumeIds[volumeId]
+	if ok {
+		return val, nil
+	}
+
+	splitVolumeId := strings.SplitN(volumeId, "-", 2)
+	if splitVolumeId[0] == FilesystemPrefix {
+		volId := fmt.Sprintf("fsvol-%d", random.Uint64())
+		c.volumeIds[volumeId] = volId
+		return volId, nil
+	} else if splitVolumeId[0] == VolumePrefix {
+		c.volumeIds[volumeId] = volumeId
+		return volumeId, nil
+	}
+
+	return "", ErrNotFound
 }

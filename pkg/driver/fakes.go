@@ -31,12 +31,16 @@ func NewFakeMounter() Mounter {
 
 // NewFakeDriver creates a new mock driver used for testing
 func NewFakeDriver(endpoint string) *Driver {
-	cloud := cloud.NewFakeCloudProvider()
+	c := cloud.NewFakeCloudProvider()
 	return &Driver{
 		endpoint: endpoint,
-		nodeID:   cloud.GetMetadata().GetInstanceID(),
-		cloud:    cloud,
+		nodeID:   c.GetMetadata().GetInstanceID(),
+		cloud:    c,
 		inFlight: internal.NewInFlight(),
 		mounter:  NewFakeMounter(),
 	}
+}
+
+func (d *Driver) ResetCloud() {
+	d.cloud = cloud.NewFakeCloudProvider()
 }

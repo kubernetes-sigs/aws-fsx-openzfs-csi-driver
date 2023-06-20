@@ -17,22 +17,21 @@ package sanity
 
 import (
 	"os"
+	"sigs.k8s.io/aws-fsx-openzfs-csi-driver/pkg/util"
+	"strings"
 	"testing"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	sanity "github.com/kubernetes-csi/csi-test/pkg/sanity"
+	"github.com/kubernetes-csi/csi-test/v5/pkg/sanity"
 
 	"sigs.k8s.io/aws-fsx-openzfs-csi-driver/pkg/driver"
-	"sigs.k8s.io/aws-fsx-openzfs-csi-driver/pkg/util"
 )
 
-const (
-	mountPath = "/tmp/csi/mount"
-	stagePath = "/tmp/csi/stage"
-	socket    = "/tmp/csi.sock"
-	endpoint  = "unix://" + socket
+var (
+	socket   = os.TempDir() + "/csi-socket"
+	endpoint = "unix://" + socket
 )
 
 var fsxOpenZfsDriver *driver.Driver
@@ -55,16 +54,51 @@ var _ = AfterSuite(func() {
 })
 
 var _ = Describe("AWS FSx for OpenZFS CSI Driver", func() {
-	_ = os.MkdirAll("/tmp/csi", os.ModePerm)
-	config := &sanity.Config{
-		Address:        endpoint,
-		TargetPath:     mountPath,
-		StagingPath:    stagePath,
-		TestVolumeSize: 2000 * util.GiB,
-		TestVolumeParameters: map[string]string{
+	Context("Filesystem", Ordered, func() {
+		config := sanity.NewTestConfig()
+		config.Address = endpoint
+		config.TestVolumeParameters = map[string]string{
 			"ResourceType":              "filesystem",
-			"SkipFinalBackupOnDeletion": `true`,
-		},
-	}
-	sanity.GinkgoTest(config)
+			"SkipFinalBackupOnDeletion": "true",
+		}
+
+		BeforeAll(func() {
+			fsxOpenZfsDriver.ResetCloud()
+		})
+
+		Describe("CSI sanity", func() {
+			BeforeEach(func() {
+				switch {
+				case strings.Contains(CurrentSpecReport().FullText(), "should create volume from an existing source snapshot"), //FileSystems don't support CreateVolume from snapshot
+					strings.Contains(CurrentSpecReport().FullText(), "should fail when the volume source snapshot is not found"): //FileSystems don't support CreateVolume from snapshot
+					Skip("This test produces a false negative")
+				}
+			})
+			sanity.GinkgoTest(&config)
+		})
+	})
+
+	Context("Volume", Ordered, func() {
+		config := sanity.NewTestConfig()
+		config.Address = endpoint
+		config.TestVolumeParameters = map[string]string{
+			"ResourceType": "volume",
+		}
+		config.TestVolumeSize = util.GiBToBytes(1)
+
+		BeforeAll(func() {
+			fsxOpenZfsDriver.ResetCloud()
+		})
+
+		Describe("CSI sanity", func() {
+			BeforeEach(func() {
+				switch {
+				case strings.Contains(CurrentSpecReport().FullText(), "ExpandVolume"), //Volumes don't support ExpandVolume
+					strings.Contains(CurrentSpecReport().FullText(), "should fail when requesting to create a volume with already existing name and different capacity"): //Volumes don't support ExpandVolume
+					Skip("This test produces a false negative")
+				}
+			})
+			sanity.GinkgoTest(&config)
+		})
+	})
 })

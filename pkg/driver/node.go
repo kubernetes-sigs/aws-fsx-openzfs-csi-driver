@@ -63,21 +63,21 @@ func (d *Driver) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolu
 	context := req.GetVolumeContext()
 	dnsName := context[volumeContextDnsName]
 	volumePath := context[volumeContextVolumePath]
-	volumeType := context[volumeContextResourceType]
+	resourceType := context[volumeContextResourceType]
 
 	if len(dnsName) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume: dnsName is not provided")
 	}
 
-	if volumeType != fsType && volumeType != volType {
-		return nil, status.Errorf(codes.InvalidArgument, "NodePublishVolume: volumeType %q is invalid", volumeType)
+	if resourceType != fsType && resourceType != volType {
+		return nil, status.Errorf(codes.InvalidArgument, "NodePublishVolume: resourceType %q is invalid", resourceType)
 	}
 
 	// If the volumePath is not provided and we are attempting to "mount" a file system, then we should mount the
 	// root volume of the file system. On the other hand, if the volumePath is not provided and we are attempting
 	// to mount an OpenZFS volume, throw an error.
 	if len(volumePath) == 0 {
-		if volumeType == fsType {
+		if resourceType == fsType {
 			volumePath = rootVolumePath
 		} else {
 			return nil, status.Error(codes.InvalidArgument, "NodePublishVolume: volumePath must be provided when mounting an OpenZFS volume")
@@ -85,7 +85,7 @@ func (d *Driver) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolu
 	}
 
 	// If we are attempting to "mount" a file system, the mount path must be equal to the root volume path.
-	if volumeType == fsType && volumePath != rootVolumePath {
+	if resourceType == fsType && volumePath != rootVolumePath {
 		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume: volumePath must match the root volume path when mounting an OpenZFS file system")
 	}
 
@@ -171,6 +171,11 @@ func (d *Driver) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublish
 	err := d.mounter.Unmount(targetPath)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "NodeUnpublishVolume: Could not unmount %q: %v", targetPath, err)
+	}
+
+	err = os.RemoveAll(targetPath)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "NodeUnpublishVolume: Could not delete %q: %v", targetPath, err)
 	}
 
 	return &csi.NodeUnpublishVolumeResponse{}, nil

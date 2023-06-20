@@ -202,7 +202,10 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 
 			err = d.appendSnapshotARN(ctx, volumeParams, snapshotId)
 			if err != nil {
-				return nil, err
+				if err == cloud.ErrNotFound {
+					return nil, status.Errorf(codes.NotFound, "Snapshot not found with ID %q", snapshotId)
+				}
+				return nil, status.Errorf(codes.Internal, "Could not get snapshot with ID %q: %v", snapshotId, err)
 			}
 
 			volumeContentSource = &csi.VolumeContentSource{
@@ -552,7 +555,7 @@ func (d *Driver) ControllerExpandVolume(ctx context.Context, req *csi.Controller
 	}
 
 	if splitVolumeId[0] == cloud.VolumePrefix {
-		return nil, status.Error(codes.Unimplemented, "Storage of volumeType Volume can not be scaled")
+		return nil, status.Error(codes.Unimplemented, "Storage of ResourceType Volume can not be scaled")
 	}
 	return nil, status.Errorf(codes.NotFound, "Volume not found with ID %q", volumeID)
 }
