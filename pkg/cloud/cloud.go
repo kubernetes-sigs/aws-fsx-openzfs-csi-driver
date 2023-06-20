@@ -169,6 +169,7 @@ func (c *cloud) ResizeFileSystem(ctx context.Context, fileSystemId string, newSi
 				if err != nil {
 					return nil, err
 				}
+				return &newSizeGiB, nil
 			}
 		}
 		return nil, fmt.Errorf("UpdateFileSystem failed: %v", err)
