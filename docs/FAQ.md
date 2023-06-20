@@ -2,7 +2,7 @@
 The purpose of this document is to answer questions surrounding the unique design decisions and limitations of the FSx for OpenZFS CSI Driver.
 
 ### What does it mean to provision an FSx for OpenZFS file system as a persistent volume in my cluster? What is actually mounted?
-In general, Persistent Volumes created with the "filesystem" `volumeType` point at the file system's root volume.
+In general, Persistent Volumes created with the "filesystem" `ResourceType` point at the file system's root volume.
 Dynamically provisioning a new FSx for OpenZFS file system as a Persistent Volume (PV) will create the FSx for OpenZFS file system resource,
 but attempting to mount the PV on a pod in your cluster will mount the file system's root volume. Likewise, attempting to take a Volume Snapshot
 of the PV will create an FSx for OpenZFS snapshot of the file system's root volume. The only exception occurs when attempting to expand the PV;
