@@ -21,7 +21,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/golang/mock/gomock"
-	"sigs.k8s.io/aws-fsx-openzfs-csi-driver/pkg/cloud/mocks"
+	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/cloud/mocks"
 )
 
 var (

@@ -16,9 +16,8 @@ limitations under the License.
 package driver
 
 import (
+	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/cloud"
 	"k8s.io/mount-utils"
-	"sigs.k8s.io/aws-fsx-openzfs-csi-driver/pkg/cloud"
-	"sigs.k8s.io/aws-fsx-openzfs-csi-driver/pkg/driver/internal"
 )
 
 func NewFakeMounter() Mounter {
@@ -31,16 +30,22 @@ func NewFakeMounter() Mounter {
 
 // NewFakeDriver creates a new mock driver used for testing
 func NewFakeDriver(endpoint string) *Driver {
-	c := cloud.NewFakeCloudProvider()
-	return &Driver{
+	driverOptions := DriverOptions{
 		endpoint: endpoint,
-		nodeID:   c.GetMetadata().GetInstanceID(),
-		cloud:    c,
-		inFlight: internal.NewInFlight(),
-		mounter:  NewFakeMounter(),
 	}
+
+	nodeService := newNodeService(&driverOptions)
+	nodeService.mounter = NewFakeMounter()
+
+	driver := Driver{
+		options:           &driverOptions,
+		controllerService: newControllerService(&driverOptions),
+		nodeService:       nodeService,
+	}
+
+	return &driver
 }
 
 func (d *Driver) ResetCloud() {
-	d.cloud = cloud.NewFakeCloudProvider()
+	d.controllerService.cloud = cloud.NewFakeCloudProvider()
 }

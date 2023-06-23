@@ -16,8 +16,8 @@ limitations under the License.
 package sanity
 
 import (
+	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/util"
 	"os"
-	"sigs.k8s.io/aws-fsx-openzfs-csi-driver/pkg/util"
 	"strings"
 	"testing"
 
@@ -26,7 +26,7 @@ import (
 
 	"github.com/kubernetes-csi/csi-test/v5/pkg/sanity"
 
-	"sigs.k8s.io/aws-fsx-openzfs-csi-driver/pkg/driver"
+	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/driver"
 )
 
 var (
