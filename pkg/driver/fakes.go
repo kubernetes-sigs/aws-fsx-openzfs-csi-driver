@@ -16,8 +16,8 @@ limitations under the License.
 package driver
 
 import (
+	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/cloud"
 	"k8s.io/mount-utils"
-	"sigs.k8s.io/aws-fsx-openzfs-csi-driver/pkg/cloud"
 )
 
 func NewFakeMounter() Mounter {

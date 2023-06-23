@@ -21,8 +21,8 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	json "k8s.io/component-base/logs/json"
 
+	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/driver"
 	"k8s.io/klog/v2"
-	"sigs.k8s.io/aws-fsx-openzfs-csi-driver/pkg/driver"
 )
 
 func main() {

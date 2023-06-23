@@ -18,14 +18,14 @@ package driver
 import (
 	"context"
 	"fmt"
-	"sigs.k8s.io/aws-fsx-openzfs-csi-driver/pkg/driver/internal"
+	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/driver/internal"
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/golang/mock/gomock"
 
-	cloudMock "sigs.k8s.io/aws-fsx-openzfs-csi-driver/pkg/cloud/mocks"
-	driverMocks "sigs.k8s.io/aws-fsx-openzfs-csi-driver/pkg/driver/mocks"
+	cloudMock "github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/cloud/mocks"
+	driverMocks "github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/driver/mocks"
 )
 
 func TestNodePublishVolume(t *testing.T) {

@@ -18,11 +18,11 @@ package main
 
 import (
 	"fmt"
+	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/cmd/options"
+	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/driver"
 	flag "github.com/spf13/pflag"
 	"k8s.io/klog/v2"
 	"os"
-	"sigs.k8s.io/aws-fsx-openzfs-csi-driver/cmd/options"
-	"sigs.k8s.io/aws-fsx-openzfs-csi-driver/pkg/driver"
 
 	"k8s.io/component-base/featuregate"
 	logsapi "k8s.io/component-base/logs/api/v1"

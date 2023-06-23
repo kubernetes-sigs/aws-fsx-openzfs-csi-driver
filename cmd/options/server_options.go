@@ -19,7 +19,7 @@ package options
 import (
 	flag "github.com/spf13/pflag"
 
-	"sigs.k8s.io/aws-fsx-openzfs-csi-driver/pkg/driver"
+	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/driver"
 )
 
 // ServerOptions contains options and configuration settings for the driver server.

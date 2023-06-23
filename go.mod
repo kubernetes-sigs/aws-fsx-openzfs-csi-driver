@@ -1,4 +1,4 @@
-module sigs.k8s.io/aws-fsx-openzfs-csi-driver
+module github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver
 
 go 1.20
 

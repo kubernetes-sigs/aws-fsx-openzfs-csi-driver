@@ -18,9 +18,9 @@ package driver
 import (
 	"context"
 	"fmt"
+	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/cloud"
+	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/driver/internal"
 	"os"
-	"sigs.k8s.io/aws-fsx-openzfs-csi-driver/pkg/cloud"
-	"sigs.k8s.io/aws-fsx-openzfs-csi-driver/pkg/driver/internal"
 	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
