@@ -118,6 +118,11 @@ controller:
   podAnnotations: {}
   podLabels: {}
   priorityClassName: system-cluster-critical
+  # AWS region to use. If not specified then the region will be looked up via the AWS EC2 metadata
+  # service.
+  # ---
+  # region: us-east-1
+  region:
   replicaCount: 2
   resources: {}
   updateStrategy:

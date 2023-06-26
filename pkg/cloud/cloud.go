@@ -27,6 +27,7 @@ import (
 	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/util"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
+	"os"
 	"strings"
 	"time"
 )
@@ -39,6 +40,9 @@ const (
 	// PollCheckTimeout specifies the time limit for polling the describe API for a completed create/update operation.
 	PollCheckTimeout = 15 * time.Minute
 )
+
+// Set during build time via -ldflags
+var driverVersion string
 
 // Errors
 var (
@@ -113,20 +117,27 @@ type Cloud interface {
 }
 
 type cloud struct {
-	fsx FSx
+	region string
+	fsx    FSx
 }
 
 // NewCloud returns a new instance of AWS cloud
 // It panics if session is invalid
-func NewCloud(region string) Cloud {
+func NewCloud(region string) (Cloud, error) {
 	awsConfig := &aws.Config{
 		Region:                        aws.String(region),
 		CredentialsChainVerboseErrors: aws.Bool(true),
+		// Set MaxRetries to a high value. It will be "overwritten" if context deadline comes sooner.
+		MaxRetries: aws.Int(8),
 	}
 
+	os.Setenv("AWS_EXECUTION_ENV", "aws-fsx-openzfs-csi-driver-"+driverVersion)
+
+	svc := fsx.New(session.Must(session.NewSession(awsConfig)))
 	return &cloud{
-		fsx: fsx.New(session.Must(session.NewSession(awsConfig))),
-	}
+		region: region,
+		fsx:    svc,
+	}, nil
 }
 
 func (c *cloud) CreateFileSystem(ctx context.Context, parameters map[string]string) (*FileSystem, error) {
