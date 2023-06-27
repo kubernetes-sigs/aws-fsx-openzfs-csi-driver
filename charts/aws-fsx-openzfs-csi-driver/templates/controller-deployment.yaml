@@ -55,6 +55,7 @@ spec:
           image: {{ printf "%s:%s" .Values.image.repository (default (printf "v%s" .Chart.AppVersion) (toString .Values.image.tag)) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
+            - --mode={{ .Values.controller.mode }}
             - --endpoint=$(CSI_ENDPOINT)
             - --logging-format={{ .Values.controller.loggingFormat }}
             - --v={{ .Values.controller.logLevel }}

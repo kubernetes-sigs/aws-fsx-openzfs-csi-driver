@@ -55,6 +55,7 @@ The FSx for OpenZFS CSI Driver is compatible with Kubernetes versions v1.17+ and
 Please read the FAQ before using the FSx for OpenZFS CSI Driver.
 * [FAQ](docs/FAQ.md)
 * [Driver Installation](docs/install.md)
+* [Driver Launch Options](docs/options.md)
 * [StorageClass Parameters](docs/parameters.md)
 * [Volume Tagging](docs/tagging.md)
 * [Guides and Examples](/examples/kubernetes)

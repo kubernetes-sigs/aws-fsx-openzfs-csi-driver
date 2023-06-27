@@ -53,6 +53,7 @@ spec:
           image: {{ printf "%s:%s" .Values.image.repository (default (printf "v%s" .Chart.AppVersion) (toString .Values.image.tag)) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
+            - --mode={{ .Values.node.mode }}
             - --endpoint=$(CSI_ENDPOINT)
             - --logging-format={{ .Values.node.loggingFormat }}
             - --v={{ .Values.node.logLevel }}
@@ -167,7 +168,6 @@ spec:
         - name: {{ . }}
       {{- end }}
       {{- end }}
-      hostNetwork: true
       dnsPolicy: {{ .Values.node.dnsPolicy }}
       {{- with .Values.node.dnsConfig }}
       dnsConfig: {{- toYaml . | nindent 8 }}

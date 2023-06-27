@@ -36,6 +36,7 @@ func main() {
 
 	drv, err := driver.NewDriver(
 		driver.WithEndpoint(options.ServerOptions.Endpoint),
+		driver.WithMode(options.ServerOptions.DriverMode),
 	)
 
 	if err != nil {

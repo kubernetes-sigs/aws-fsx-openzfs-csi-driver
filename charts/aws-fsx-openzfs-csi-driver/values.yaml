@@ -114,6 +114,7 @@ controller:
   envFrom: []
   loggingFormat: text
   logLevel: 2
+  mode: controller
   nodeSelector: {}
   podAnnotations: {}
   podLabels: {}
@@ -188,6 +189,7 @@ node:
   kubeletPath: /var/lib/kubelet
   loggingFormat: text
   logLevel: 2
+  mode: node
   priorityClassName:
   nodeSelector: {}
   podAnnotations: {}

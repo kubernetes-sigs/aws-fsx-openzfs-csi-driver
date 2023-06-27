@@ -126,3 +126,5 @@ generate-kustomize: bin/helm
 	cd charts/aws-fsx-openzfs-csi-driver && ../../bin/helm template kustomize . -s templates/poddisruptionbudget-controller.yaml --api-versions 'policy/v1/PodDisruptionBudget' | sed -e "/namespace: /d" > ../../deploy/kubernetes/base/poddisruptionbudget-controller.yaml
 	cd charts/aws-fsx-openzfs-csi-driver && ../../bin/helm template kustomize . -s templates/controller-serviceaccount.yaml | sed -e "/namespace: /d" > ../../deploy/kubernetes/base/controller-serviceaccount.yaml
 	cd charts/aws-fsx-openzfs-csi-driver && ../../bin/helm template kustomize . -s templates/node-serviceaccount.yaml | sed -e "/namespace: /d" > ../../deploy/kubernetes/base/node-serviceaccount.yaml
+	cd charts/aws-fsx-openzfs-csi-driver && ../../bin/helm template kustomize . -s templates/clusterrole-csi-node.yaml > ../../deploy/kubernetes/base/clusterrole-csi-node.yaml
+	cd charts/aws-fsx-openzfs-csi-driver && ../../bin/helm template kustomize . -s templates/clusterrolebinding-csi-node.yaml > ../../deploy/kubernetes/base/clusterrolebinding-csi-node.yaml

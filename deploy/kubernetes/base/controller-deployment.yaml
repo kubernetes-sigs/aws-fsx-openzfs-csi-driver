@@ -63,6 +63,7 @@ spec:
           image: public.ecr.aws/fsx-csi-driver/aws-fsx-openzfs-csi-driver:v0.1.0
           imagePullPolicy: IfNotPresent
           args:
+            - --mode=controller
             - --endpoint=$(CSI_ENDPOINT)
             - --logging-format=text
             - --v=2

@@ -51,7 +51,7 @@ func GetOptions(fs *flag.FlagSet) *Options {
 		nodeOptions       = options.NodeOptions{}
 	)
 
-	serverOptions.AddFlags(fs)
+	mode := serverOptions.AddFlags(fs)
 
 	c := logsapi.NewLoggingConfiguration()
 
@@ -61,6 +61,21 @@ func GetOptions(fs *flag.FlagSet) *Options {
 	}
 
 	logsapi.AddFlags(c, fs)
+
+	switch {
+	case mode == driver.ControllerMode:
+		controllerOptions.AddFlags(fs)
+
+	case mode == driver.NodeMode:
+		nodeOptions.AddFlags(fs)
+
+	case mode == driver.AllMode:
+		controllerOptions.AddFlags(fs)
+		nodeOptions.AddFlags(fs)
+	default:
+		fmt.Printf("unknown command: %s: expected %q, %q or %q", mode, driver.ControllerMode, driver.NodeMode, driver.AllMode)
+		os.Exit(1)
+	}
 
 	if err := fs.Parse(args); err != nil {
 		panic(err)
