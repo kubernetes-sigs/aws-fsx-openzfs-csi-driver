@@ -5,7 +5,7 @@ kind: CSIDriver
 metadata:
   name: fsx.openzfs.csi.aws.com
   labels:
-    app.kubernetes.io/name: aws-fsx-openzfs-csi-driver
+    app.kubernetes.io/part-of: aws-fsx-openzfs-csi-driver
 spec:
   attachRequired: false
   podInfoOnMount: false

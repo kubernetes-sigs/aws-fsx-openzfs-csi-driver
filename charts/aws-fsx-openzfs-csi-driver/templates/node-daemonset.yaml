@@ -5,18 +5,19 @@ metadata:
   name: fsx-openzfs-csi-node
   namespace: {{ .Release.Namespace }}
   labels:
+    app.kubernetes.io/name: fsx-openzfs-csi-node
     {{- include "aws-fsx-openzfs-csi-driver.labels" . | nindent 4 }}
 spec:
   selector:
     matchLabels:
-      app: fsx-openzfs-csi-node
+      app.kubernetes.io/name: fsx-openzfs-csi-node
       {{- include "aws-fsx-openzfs-csi-driver.selectorLabels" . | nindent 6 }}
   updateStrategy:
     {{- toYaml .Values.node.updateStrategy | nindent 4 }}
   template:
     metadata:
       labels:
-        app: fsx-openzfs-csi-node
+        app.kubernetes.io/name: fsx-openzfs-csi-node
         {{- include "aws-fsx-openzfs-csi-driver.labels" . | nindent 8 }}
         {{- if .Values.node.podLabels }}
         {{- toYaml .Values.node.podLabels | nindent 8 }}

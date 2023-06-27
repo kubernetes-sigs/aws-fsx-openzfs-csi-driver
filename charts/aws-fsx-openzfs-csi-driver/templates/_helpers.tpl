@@ -49,7 +49,7 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 Common selector labels
 */}}
 {{- define "aws-fsx-openzfs-csi-driver.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "aws-fsx-openzfs-csi-driver.name" . }}
+app.kubernetes.io/part-of: {{ include "aws-fsx-openzfs-csi-driver.name" . }}
 {{- if ne .Release.Name "kustomize" }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}

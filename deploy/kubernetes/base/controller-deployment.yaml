@@ -5,7 +5,7 @@ apiVersion: apps/v1
 metadata:
   name: fsx-openzfs-csi-controller
   labels:
-    app.kubernetes.io/name: aws-fsx-openzfs-csi-driver
+    app.kubernetes.io/part-of: aws-fsx-openzfs-csi-driver
 spec:
   replicas: 2
   strategy:
@@ -14,13 +14,13 @@ spec:
     type: RollingUpdate
   selector:
     matchLabels:
-      app: fsx-openzfs-csi-controller
-      app.kubernetes.io/name: aws-fsx-openzfs-csi-driver
+      app.kubernetes.io/name: fsx-openzfs-csi-controller
+      app.kubernetes.io/part-of: aws-fsx-openzfs-csi-driver
   template:
     metadata:
       labels:
-        app: fsx-openzfs-csi-controller
-        app.kubernetes.io/name: aws-fsx-openzfs-csi-driver
+        app.kubernetes.io/name: fsx-openzfs-csi-controller
+        app.kubernetes.io/part-of: aws-fsx-openzfs-csi-driver
     spec:
       nodeSelector:
         kubernetes.io/os: linux
@@ -41,7 +41,7 @@ spec:
           - podAffinityTerm:
               labelSelector:
                 matchExpressions:
-                - key: app
+                - key: app.kubernetes.io/name
                   operator: In
                   values:
                   - fsx-openzfs-csi-controller

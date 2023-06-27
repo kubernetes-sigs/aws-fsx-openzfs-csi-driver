@@ -107,5 +107,5 @@ Review the [configuration values](https://github.com/kubernetes-sigs/aws-fsx-ope
 
 #### Once the driver has been deployed, verify the pods are running:
 ```sh
-kubectl get pods -n kube-system -l app.kubernetes.io/name=aws-fsx-openzfs-csi-driver
+kubectl get pods -n kube-system -l app.kubernetes.io/part-of=aws-fsx-openzfs-csi-driver
 ```
