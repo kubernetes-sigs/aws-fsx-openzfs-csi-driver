@@ -622,6 +622,38 @@ func TestNodePublishVolume(t *testing.T) {
 				mockCtl.Finish()
 			},
 		},
+		{
+			name: "fail: another operation in-flight on given volumeId",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+
+				mockMetadata := cloudMock.NewMockMetadataService(mockCtl)
+				mockMounter := driverMocks.NewMockMounter(mockCtl)
+
+				driver := &nodeService{
+					metadata: mockMetadata,
+					mounter:  mockMounter,
+					inFlight: internal.NewInFlight(),
+				}
+
+				ctx := context.Background()
+				req := &csi.NodePublishVolumeRequest{
+					VolumeId: volumeId,
+					VolumeContext: map[string]string{
+						"DNSName":      dnsName,
+						"ResourceType": volType,
+					},
+					VolumeCapability: stdVolCap,
+					TargetPath:       targetPath,
+				}
+
+				driver.inFlight.Insert(volumeId)
+
+				_, err := driver.NodePublishVolume(ctx, req)
+				expectErr(t, err, codes.Aborted)
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -756,6 +788,33 @@ func TestNodeUnpublishVolume(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "fail: another operation in-flight on given volumeId",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+
+				mockMetadata := cloudMock.NewMockMetadataService(mockCtl)
+				mockMounter := driverMocks.NewMockMounter(mockCtl)
+
+				driver := &nodeService{
+					metadata: mockMetadata,
+					mounter:  mockMounter,
+					inFlight: internal.NewInFlight(),
+				}
+
+				ctx := context.Background()
+				req := &csi.NodeUnpublishVolumeRequest{
+					VolumeId:   volumeId,
+					TargetPath: targetPath,
+				}
+
+				driver.inFlight.Insert(volumeId)
+
+				_, err := driver.NodeUnpublishVolume(ctx, req)
+				expectErr(t, err, codes.Aborted)
+			},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, tc.testFunc)
@@ -887,15 +946,15 @@ func getNodeMock(mockCtl *gomock.Controller, nodeName string, returnNode *corev1
 
 func expectErr(t *testing.T, actualErr error, expectedCode codes.Code) {
 	if actualErr == nil {
-		t.Fatalf("Expect error but got no error")
+		t.Fatalf("Expected error code %d but got no error", expectedCode)
 	}
 
-	status, ok := status.FromError(actualErr)
+	errStatus, ok := status.FromError(actualErr)
 	if !ok {
 		t.Fatalf("Failed to get error status code from error: %v", actualErr)
 	}
 
-	if status.Code() != expectedCode {
-		t.Fatalf("Expected error code %d, got %d message %s", expectedCode, status.Code(), status.Message())
+	if errStatus.Code() != expectedCode {
+		t.Fatalf("Expected error code %d, got %d message %s", expectedCode, errStatus.Code(), errStatus.Message())
 	}
 }
