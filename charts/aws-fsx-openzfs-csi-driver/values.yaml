@@ -3,7 +3,6 @@
 # Declare variables to be passed into your templates.
 
 image:
-  # TODO: replace this temporary private ECR and regenerate the manifests when we are ready to release
   repository: public.ecr.aws/fsx-csi-driver/aws-fsx-openzfs-csi-driver
   # Overrides the image tag whose default is v{{ .Chart.AppVersion }}
   tag: v0.1.0

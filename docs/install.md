@@ -79,6 +79,21 @@ Additionally, the driver node tolerates all taints.
 If you do not wish to deploy the driver node on all nodes, please set Helm `Value.node.tolerateAllTaints` to false before deployment. 
 Add policies to `Value.node.tolerations` to configure customized toleration for nodes.
 
+### Configure node startup taint
+There are potential race conditions on node startup (especially when a node is first joining the cluster) 
+where pods/processes that rely on the FSx for OpenZFS CSI Driver can act on a node before the FSx for OpenZFS CSI Driver is able to start up and become fully ready. 
+To combat this, the FSx for OpenZFS CSI Driver contains a feature to automatically remove a taint from the node on startup. 
+Users can taint their nodes when they join the cluster and/or on startup.  
+This will prevent other pods from running and/or being scheduled on the node prior to the FSx for OpenZFS CSI Driver becoming ready.
+
+This feature is activated by default. Cluster administrators should apply the taint `fsx.openzfs.csi.aws.com/agent-not-ready:NoExecute` to their nodes:
+```shell
+kubectl taint nodes $NODE_NAME fsx.openzfs.csi.aws.com/agent-not-ready:NoExecute
+```
+Note that any effect will work, but `NoExecute` is recommended. 
+
+For example, EKS Managed Node Groups [support automatically tainting nodes](https://docs.aws.amazon.com/eks/latest/userguide/node-taints-managed-node-groups.html).
+
 ### Deploy driver
 You may deploy the FSx for OpenZFS CSI driver via Kustomize or Helm
 
