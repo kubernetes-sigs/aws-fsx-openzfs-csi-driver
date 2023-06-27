@@ -17,11 +17,24 @@ package driver
 
 import (
 	"context"
+	"fmt"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/util"
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 	"net"
+)
+
+// Mode is the operating mode of the CSI driver.
+type Mode string
+
+const (
+	// ControllerMode is the mode that only starts the controller service.
+	ControllerMode = "controller"
+	// NodeMode is the mode that only starts the node service.
+	NodeMode = "node"
+	// AllMode is the mode that only starts both the controller and the node service.
+	AllMode = "all"
 )
 
 const (
@@ -38,6 +51,7 @@ type Driver struct {
 
 type DriverOptions struct {
 	endpoint string
+	mode     string
 }
 
 func NewDriver(options ...func(*DriverOptions)) (*Driver, error) {
@@ -45,15 +59,26 @@ func NewDriver(options ...func(*DriverOptions)) (*Driver, error) {
 
 	driverOptions := DriverOptions{
 		endpoint: DefaultCSIEndpoint,
+		mode:     AllMode,
 	}
 	for _, option := range options {
 		option(&driverOptions)
 	}
 
 	driver := Driver{
-		options:           &driverOptions,
-		controllerService: newControllerService(&driverOptions),
-		nodeService:       newNodeService(&driverOptions),
+		options: &driverOptions,
+	}
+
+	switch driverOptions.mode {
+	case ControllerMode:
+		driver.controllerService = newControllerService(&driverOptions)
+	case NodeMode:
+		driver.nodeService = newNodeService(&driverOptions)
+	case AllMode:
+		driver.controllerService = newControllerService(&driverOptions)
+		driver.nodeService = newNodeService(&driverOptions)
+	default:
+		return nil, fmt.Errorf("unknown mode: %s", driverOptions.mode)
 	}
 
 	return &driver, nil
@@ -73,7 +98,7 @@ func (d *Driver) Run() error {
 	logErr := func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		resp, err := handler(ctx, req)
 		if err != nil {
-			klog.Errorf("GRPC error: %v", err)
+			klog.ErrorS(err, "GRPC error")
 		}
 		return resp, err
 	}
@@ -83,20 +108,36 @@ func (d *Driver) Run() error {
 	d.srv = grpc.NewServer(opts...)
 
 	csi.RegisterIdentityServer(d.srv, d)
-	csi.RegisterControllerServer(d.srv, d)
-	csi.RegisterNodeServer(d.srv, d)
 
-	klog.Infof("Listening for connections on address: %#v", listener.Addr())
+	switch d.options.mode {
+	case ControllerMode:
+		csi.RegisterControllerServer(d.srv, d)
+	case NodeMode:
+		csi.RegisterNodeServer(d.srv, d)
+	case AllMode:
+		csi.RegisterControllerServer(d.srv, d)
+		csi.RegisterNodeServer(d.srv, d)
+	default:
+		return fmt.Errorf("unknown mode: %s", d.options.mode)
+	}
+
+	klog.V(4).InfoS("Listening for connections", "address", listener.Addr())
 	return d.srv.Serve(listener)
 }
 
 func (d *Driver) Stop() {
-	klog.Infof("Stopping server")
+	klog.InfoS("Stopping server")
 	d.srv.Stop()
 }
 
 func WithEndpoint(endpoint string) func(*DriverOptions) {
 	return func(o *DriverOptions) {
 		o.endpoint = endpoint
+	}
+}
+
+func WithMode(mode string) func(*DriverOptions) {
+	return func(o *DriverOptions) {
+		o.mode = mode
 	}
 }

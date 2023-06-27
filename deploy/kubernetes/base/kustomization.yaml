@@ -8,3 +8,5 @@ resources:
   - node-daemonset.yaml
   - node-serviceaccount.yaml
   - poddisruptionbudget-controller.yaml
+  - clusterrole-csi-node.yaml
+  - clusterrolebinding-csi-node.yaml

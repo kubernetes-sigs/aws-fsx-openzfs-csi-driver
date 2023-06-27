@@ -17,7 +17,7 @@ PKG=github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver
 GIT_COMMIT?=$(shell git rev-parse HEAD)
 BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-LDFLAGS?="-X ${PKG}/pkg/driver.driverVersion=${VERSION} -X ${PKG}/pkg/driver.gitCommit=${GIT_COMMIT} -X ${PKG}/pkg/driver.buildDate=${BUILD_DATE} -s -w"
+LDFLAGS?="-X ${PKG}/pkg/driver.driverVersion=${VERSION} -X ${PKG}/pkg/cloud.driverVersion=${VERSION} -X ${PKG}/pkg/driver.gitCommit=${GIT_COMMIT} -X ${PKG}/pkg/driver.buildDate=${BUILD_DATE} -s -w"
 
 GO111MODULE=on
 GOPROXY=direct
@@ -126,3 +126,5 @@ generate-kustomize: bin/helm
 	cd charts/aws-fsx-openzfs-csi-driver && ../../bin/helm template kustomize . -s templates/poddisruptionbudget-controller.yaml --api-versions 'policy/v1/PodDisruptionBudget' | sed -e "/namespace: /d" > ../../deploy/kubernetes/base/poddisruptionbudget-controller.yaml
 	cd charts/aws-fsx-openzfs-csi-driver && ../../bin/helm template kustomize . -s templates/controller-serviceaccount.yaml | sed -e "/namespace: /d" > ../../deploy/kubernetes/base/controller-serviceaccount.yaml
 	cd charts/aws-fsx-openzfs-csi-driver && ../../bin/helm template kustomize . -s templates/node-serviceaccount.yaml | sed -e "/namespace: /d" > ../../deploy/kubernetes/base/node-serviceaccount.yaml
+	cd charts/aws-fsx-openzfs-csi-driver && ../../bin/helm template kustomize . -s templates/clusterrole-csi-node.yaml > ../../deploy/kubernetes/base/clusterrole-csi-node.yaml
+	cd charts/aws-fsx-openzfs-csi-driver && ../../bin/helm template kustomize . -s templates/clusterrolebinding-csi-node.yaml > ../../deploy/kubernetes/base/clusterrolebinding-csi-node.yaml

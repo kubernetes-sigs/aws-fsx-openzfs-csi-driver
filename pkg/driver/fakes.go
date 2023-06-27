@@ -17,6 +17,7 @@ package driver
 
 import (
 	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/cloud"
+	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/driver/internal"
 	"k8s.io/mount-utils"
 )
 
@@ -32,18 +33,28 @@ func NewFakeMounter() Mounter {
 func NewFakeDriver(endpoint string) *Driver {
 	driverOptions := DriverOptions{
 		endpoint: endpoint,
+		mode:     AllMode,
 	}
 
-	nodeService := newNodeService(&driverOptions)
-	nodeService.mounter = NewFakeMounter()
-
-	driver := Driver{
-		options:           &driverOptions,
-		controllerService: newControllerService(&driverOptions),
-		nodeService:       nodeService,
+	driver := &Driver{
+		options: &driverOptions,
+		controllerService: controllerService{
+			cloud:         cloud.NewFakeCloudProvider(),
+			inFlight:      internal.NewInFlight(),
+			driverOptions: &driverOptions,
+		},
+		nodeService: nodeService{
+			metadata: &cloud.Metadata{
+				InstanceID:       "instanceID",
+				Region:           "region",
+				AvailabilityZone: "az",
+			},
+			mounter:       NewFakeMounter(),
+			inFlight:      internal.NewInFlight(),
+			driverOptions: &DriverOptions{},
+		},
 	}
-
-	return &driver
+	return driver
 }
 
 func (d *Driver) ResetCloud() {
