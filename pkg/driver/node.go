@@ -109,6 +109,14 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume: Volume capability not supported")
 	}
 
+	if ok := d.inFlight.Insert(volumeID); !ok {
+		return nil, status.Errorf(codes.Aborted, internal.VolumeOperationAlreadyExistsErrorMsg, volumeID)
+	}
+	defer func() {
+		klog.V(4).InfoS("NodePublishVolume: volume operation finished", "volumeId", volumeID)
+		d.inFlight.Delete(volumeID)
+	}()
+
 	context := req.GetVolumeContext()
 	dnsName := context[volumeContextDnsName]
 	volumePath := context[volumeContextVolumePath]
@@ -208,6 +216,14 @@ func (d *nodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	if len(targetPath) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "NodeUnpublishVolume: Target path not provided")
 	}
+
+	if ok := d.inFlight.Insert(volumeID); !ok {
+		return nil, status.Errorf(codes.Aborted, internal.VolumeOperationAlreadyExistsErrorMsg, volumeID)
+	}
+	defer func() {
+		klog.V(4).InfoS("NodeUnpublishVolume: volume operation finished", "volumeId", volumeID)
+		d.inFlight.Delete(volumeID)
+	}()
 
 	// Check if the target is mounted before unmounting
 	notMnt, _ := d.mounter.IsLikelyNotMountPoint(targetPath)
