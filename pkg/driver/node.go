@@ -94,7 +94,7 @@ func (d *nodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 
 // NodePublishVolume Mounts the PV at the target path.
 func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
-	klog.V(4).Infof("NodePublishVolume: Called with args %+v", req)
+	klog.V(4).InfoS("NodePublishVolume: Called with", "args", *req)
 
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
@@ -165,7 +165,7 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		}
 	}
 
-	klog.V(5).Infof("NodePublishVolume: Creating dir %s", targetPath)
+	klog.V(5).InfoS("NodePublishVolume: creating", "dir", targetPath)
 	if err := d.mounter.MakeDir(targetPath); err != nil {
 		return nil, status.Errorf(codes.Internal, "NodePublishVolume: Could not create target dir %q: %v", targetPath, err)
 	}
@@ -177,9 +177,9 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	}
 
 	if mounted {
-		klog.V(5).Infof("NodePublishVolume: Target dir %q is already mounted with a volume. Not mounting volume source %q", targetPath, source)
+		klog.V(5).InfoS("NodePublishVolume: Target path is already mounted with a volume. Not mounting.", "targetPath", targetPath, "source", source)
 	} else {
-		klog.V(5).Infof("NodePublishVolume: Attempting to mount with volumeID(%v) source(%s) targetPath(%s) mountflags(%v)", volumeID, source, targetPath, mountOptions)
+		klog.V(5).InfoS("NodePublishVolume: Attempting to mount", "volumeId", volumeID, "source", source, "targetPath", targetPath, "mountOptions", mountOptions)
 		err = d.mounter.Mount(source, targetPath, "nfs", mountOptions)
 		if err != nil {
 			if os.IsPermission(err) {
@@ -190,14 +190,14 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 			}
 			return nil, status.Error(codes.Internal, err.Error())
 		}
-		klog.V(5).Infof("NodePublishVolume: Successfully mounted at target path %s", targetPath)
+		klog.V(5).InfoS("NodePublishVolume: Successfully mounted at", "targetPath", targetPath)
 	}
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
 // NodeUnpublishVolume Unmounts the volume from the target path
 func (d *nodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
-	klog.V(4).Infof("NodeUnpublishVolume: Called with args %+v", req)
+	klog.V(4).InfoS("NodeUnpublishVolume: called with", "args", *req)
 
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
@@ -212,11 +212,11 @@ func (d *nodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	// Check if the target is mounted before unmounting
 	notMnt, _ := d.mounter.IsLikelyNotMountPoint(targetPath)
 	if notMnt {
-		klog.V(5).Infof("NodeUnpublishVolume: Target path %s not mounted, skipping unmount", targetPath)
+		klog.V(5).InfoS("NodeUnpublishVolume: Target path not mounted, skipping unmount", "targetPath", targetPath)
 		return &csi.NodeUnpublishVolumeResponse{}, nil
 	}
 
-	klog.V(5).Infof("NodeUnpublishVolume: Unmounting %s", targetPath)
+	klog.V(5).InfoS("NodeUnpublishVolume: Unmounting", "targetPath", targetPath)
 	err := d.mounter.Unmount(targetPath)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "NodeUnpublishVolume: Could not unmount %q: %v", targetPath, err)
@@ -240,7 +240,7 @@ func (d *nodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 
 // NodeGetCapabilities Returns the capabilities of the Node plugin
 func (d *nodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
-	klog.V(4).Infof("NodeGetCapabilities: Called with args %+v", req)
+	klog.V(4).InfoS("NodeGetCapabilities: Called with", "args", req)
 	var caps []*csi.NodeServiceCapability
 	for _, cap := range nodeCaps {
 		c := &csi.NodeServiceCapability{
@@ -257,7 +257,7 @@ func (d *nodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetC
 
 // NodeGetInfo Returns the id of the node on which the plugin is running
 func (d *nodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
-	klog.V(4).Infof("NodeGetInfo: called with args %+v", req)
+	klog.V(4).InfoS("NodeGetInfo: called with", "args", *req)
 	return &csi.NodeGetInfoResponse{
 		NodeId: d.metadata.GetInstanceID(),
 	}, nil
@@ -279,7 +279,7 @@ func (d *nodeService) isMounted(source string, targetPath string) (bool, error) 
 		// If the error is related to a corrupted mount, we can unmount then re-mount the volume.
 		_, pathErr := d.mounter.PathExists(targetPath)
 		if pathErr != nil && d.mounter.IsCorruptedMnt(pathErr) {
-			klog.V(4).Infof("NodePublishVolume: Target path %q is a corrupted mount. Trying to unmount.", targetPath)
+			klog.V(4).InfoS("NodePublishVolume: Target path is a corrupted mount. Trying to unmount.", "targetPath", targetPath)
 			if mntErr := d.mounter.Unmount(targetPath); mntErr != nil {
 				return false, status.Errorf(codes.Internal, "NodePublishVolume: Unable to unmount the target %q : %v", targetPath, mntErr)
 			}
@@ -296,12 +296,12 @@ func (d *nodeService) isMounted(source string, targetPath string) (bool, error) 
 	// and in others it is an error (in Linux, the target mount directory must
 	// exist before mount is called on it)
 	if err != nil && os.IsNotExist(err) {
-		klog.V(5).Infof("[Debug] NodePublishVolume: Target path %q does not exist", targetPath)
+		klog.V(5).InfoS("[Debug] NodePublishVolume: Target path does not exist", "targetPath", targetPath)
 		return false, nil
 	}
 
 	if !notMnt {
-		klog.V(4).Infof("NodePublishVolume: Target path %q is already mounted", targetPath)
+		klog.V(4).InfoS("NodePublishVolume: Target path is already mounted", "targetPath", targetPath)
 	}
 
 	return !notMnt, nil

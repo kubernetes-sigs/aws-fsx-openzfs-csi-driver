@@ -126,7 +126,7 @@ func newControllerService(driverOptions *DriverOptions) controllerService {
 }
 
 func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
-	klog.V(4).Infof("CreateVolume: called with args %#v", req)
+	klog.V(4).InfoS("CreateVolume: called with", "args", *req)
 
 	volName := req.GetName()
 	if len(volName) == 0 {
@@ -200,7 +200,7 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 		fs, err := d.cloud.CreateFileSystem(ctx, volumeParams)
 		if err != nil {
-			klog.V(4).Infof("CreateFileSystem error: ", err.Error())
+			klog.V(4).InfoS("CreateFileSystem", "error", err.Error())
 			switch {
 			case errors.Is(err, cloud.ErrInvalidInput):
 				return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -272,7 +272,7 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 		v, err := d.cloud.CreateVolume(ctx, volumeParams)
 		if err != nil {
-			klog.V(4).Infof("CreateVolume error: ", err.Error())
+			klog.V(4).InfoS("CreateVolume", "error", err.Error())
 			switch {
 			case errors.Is(err, cloud.ErrInvalidInput):
 				return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -349,7 +349,7 @@ func (d *controllerService) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 
 	if err != nil {
 		if err == cloud.ErrNotFound {
-			klog.V(4).Infof("DeleteVolume: volume not found, returning with success")
+			klog.V(4).InfoS("DeleteVolume: volume not found, returning with success", "volumeId", volumeID)
 			return &csi.DeleteVolumeResponse{}, nil
 		}
 		return nil, status.Errorf(codes.Internal, "Could not delete volume ID %q: %v", volumeID, err)
@@ -367,7 +367,7 @@ func (d *controllerService) ControllerUnpublishVolume(ctx context.Context, req *
 }
 
 func (d *controllerService) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
-	klog.V(4).Infof("ValidateVolumeCapabilities: called with args %#v", req)
+	klog.V(4).InfoS("ValidateVolumeCapabilities: called with", "args", *req)
 	var err error
 
 	volumeID := req.GetVolumeId()
@@ -441,7 +441,7 @@ func (d *controllerService) GetCapacity(ctx context.Context, req *csi.GetCapacit
 }
 
 func (d *controllerService) ControllerGetCapabilities(ctx context.Context, req *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
-	klog.V(4).Infof("ControllerGetCapabilities: called with args %#v", req)
+	klog.V(4).InfoS("ControllerGetCapabilities: called with", "args", *req)
 	var caps []*csi.ControllerServiceCapability
 	for _, cap := range controllerCaps {
 		c := &csi.ControllerServiceCapability{
@@ -457,7 +457,7 @@ func (d *controllerService) ControllerGetCapabilities(ctx context.Context, req *
 }
 
 func (d *controllerService) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
-	klog.V(4).Infof("CreateSnapshot: called with args %#v", req)
+	klog.V(4).InfoS("CreateSnapshot: called with", "args", *req)
 
 	if len(req.GetName()) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Snapshot name not provided")
@@ -528,7 +528,7 @@ func (d *controllerService) CreateSnapshot(ctx context.Context, req *csi.CreateS
 }
 
 func (d *controllerService) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
-	klog.V(4).Infof("DeleteSnapshot: called with args %#v", req)
+	klog.V(4).InfoS("DeleteSnapshot: called with", "args", *req)
 	deleteParams := make(map[string]string)
 	snapshotId := req.GetSnapshotId()
 
@@ -547,7 +547,7 @@ func (d *controllerService) DeleteSnapshot(ctx context.Context, req *csi.DeleteS
 
 	if err := d.cloud.DeleteSnapshot(ctx, deleteParams); err != nil {
 		if strings.Contains(err.Error(), "Unable to find snapshot") {
-			klog.V(4).Infof("DeleteSnapshot: Snapshot %s not found, returning with success", snapshotId)
+			klog.V(4).InfoS("DeleteSnapshot: Snapshot not found, returning with success", "snapshotId", snapshotId)
 			return &csi.DeleteSnapshotResponse{}, nil
 		}
 		return nil, status.Errorf(codes.Internal, "DeleteSnapshot: Could not delete snapshot %s, received error %v", snapshotId, err)
@@ -561,7 +561,7 @@ func (d *controllerService) ListSnapshots(ctx context.Context, req *csi.ListSnap
 }
 
 func (d *controllerService) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
-	klog.V(4).Infof("ControllerExpandVolume: called with args %+v", *req)
+	klog.V(4).InfoS("ControllerExpandVolume: called with", "args", *req)
 
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
@@ -597,7 +597,7 @@ func (d *controllerService) ControllerExpandVolume(ctx context.Context, req *csi
 
 		if newCapacity <= fs.StorageCapacity {
 			// Current capacity is sufficient to satisfy the request
-			klog.V(4).Infof("ControllerExpandVolume: current filesystem capacity of %d GiB matches or exceeds requested storage capacity of %d GiB, returning with success", fs.StorageCapacity, newCapacity)
+			klog.V(4).InfoS("ControllerExpandVolume: current filesystem capacity matches or exceeds requested storage capacity, returning with success", "currentStorageCapacityGiB", fs.StorageCapacity, "requestedStorageCapacityGiB", newCapacity)
 			return &csi.ControllerExpandVolumeResponse{
 				CapacityBytes:         util.GiBToBytes(fs.StorageCapacity),
 				NodeExpansionRequired: false,
