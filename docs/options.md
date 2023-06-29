@@ -1,5 +1,5 @@
 # Driver Options
-There are several driver options that can be passed as arguments when deploying the driver.
+There are several driver options that may be passed as arguments when deploying the driver.
 
 | Option argument             | value sample                                      | default                                             | Description                                             |
 |-----------------------------|---------------------------------------------------|-----------------------------------------------------|---------------------------------------------------------|

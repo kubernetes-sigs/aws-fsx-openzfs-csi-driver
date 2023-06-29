@@ -3,16 +3,15 @@
 ## Prerequisites
 
 * Kubernetes Version >= 1.20
-
-* If you are using a self managed cluster, ensure the flag `--allow-privileged=true` for `kube-apiserver`.
+* Cluster running in EKS - the FSx for OpenZFS CSI driver currently does not support usage with self-managed clusters.
 
 * Important: If you intend to use the Volume Snapshot feature, the [Kubernetes Volume Snapshot CRDs](https://github.com/kubernetes-csi/external-snapshotter/tree/master/client/config/crd) must be installed **before** the FSx for OpenZFS CSI driver. For installation instructions, see [CSI Snapshotter Usage](https://github.com/kubernetes-csi/external-snapshotter#usage).
 
 ## Installation
 ### Set up driver permissions
-The driver requires IAM permissions to interact with the Amazon FSx for OpenZFS service to create/delete file systems, volumes, and snapshots on user's behalf. 
+The driver requires IAM permissions to interact with the Amazon FSx for OpenZFS service to create/delete file systems, volumes, and snapshots on the user's behalf. 
 There are several methods to grant the driver IAM permissions:
-* Using [IAM roles for ServiceAccounts](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html) (**Recommended**) - Create a Kubernetes service account for the driver and attach the AmazonFSxFullAccess AWS-managed policy to it with the following command. If your cluster is in the AWS GovCloud Regions, then replace arn:aws: with arn:aws-us-gov. Likewise, if your cluster is in the AWS China Regions, replace arn:aws: with arn:aws-cn:
+* Using [IAM roles for ServiceAccounts](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html) (**Recommended**) - Create a Kubernetes service account for the driver and attach the AmazonFSxFullAccess AWS-managed policy to it with the following command. If your cluster is in the AWS GovCloud Regions, then replace arn:aws: with arn:aws-us-gov. Likewise, if your cluster is in the AWS China Regions, replace arn:aws: with arn:aws-cn.
 ```sh
 eksctl create iamserviceaccount \
     --name fsx-openzfs-csi-controller-sa \
@@ -74,10 +73,10 @@ See [here](https://docs.aws.amazon.com/eks/latest/userguide/create-node-role.htm
 ```
 
 ### Configure driver toleration settings
-By default, the driver controller tolerates taint `CriticalAddonsOnly` and has `tolerationSeconds` configured as `300`. 
-Additionally, the driver node tolerates all taints. 
-If you do not wish to deploy the driver node on all nodes, please set Helm `Value.node.tolerateAllTaints` to false before deployment. 
-Add policies to `Value.node.tolerations` to configure customized toleration for nodes.
+By default, the driver controller pod tolerates taint `CriticalAddonsOnly` and has `tolerationSeconds` configured as `300`. 
+Additionally, the driver node pod tolerates all taints. 
+If you do not wish to deploy the driver node pod on all nodes, please set Helm `Value.node.tolerateAllTaints` to false before deployment. 
+You may then add policies to `Value.node.tolerations` to configure customized tolerations for nodes.
 
 ### Configure node startup taint
 There are potential race conditions on node startup (especially when a node is first joining the cluster) 
@@ -92,7 +91,7 @@ kubectl taint nodes $NODE_NAME fsx.openzfs.csi.aws.com/agent-not-ready:NoExecute
 ```
 Note that any effect will work, but `NoExecute` is recommended. 
 
-For example, EKS Managed Node Groups [support automatically tainting nodes](https://docs.aws.amazon.com/eks/latest/userguide/node-taints-managed-node-groups.html).
+EKS Managed Node Groups support automatically tainting nodes, see [here](https://docs.aws.amazon.com/eks/latest/userguide/node-taints-managed-node-groups.html) for more details.
 
 ### Deploy driver
 You may deploy the FSx for OpenZFS CSI driver via Kustomize or Helm

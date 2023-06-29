@@ -4,11 +4,11 @@ The AWS FSx for OpenZFS CSI Driver supports the dynamic provisioning of both FSx
 To do this, the driver accepts **TWO** forms of storage classes: one for provisioning new file systems, and one for provisioning new volumes.
 A universal `ResourceType` parameter denotes which type of resource is being provisioned.
 
-The parameters that can be inputted to the storage class depends on the respective create and delete APIs.
+The parameters that can be inputted to the storage class depend on the respective create and delete APIs.
 Parameters under key `OpenZFSConfiguration` are flattened as top layer parameters.
 Parameter values should be in JSON format, excluding the CSI specific `ResourceType` parameter which is a plain string.
 Mistakes in parameters such as incorrect keys or values will produce errors.
-Delete parameters must include the suffix `OnDeletion` on the parameter name.
+Delete parameters must include the suffix `OnDeletion` in the parameter name.
 Some fields are populated by the CSI driver, and therefore should not be specified.
 
 ## File System Parameters
@@ -16,10 +16,10 @@ Some fields are populated by the CSI driver, and therefore should not be specifi
 ###### [FSx CreateFileSystem API](https://docs.aws.amazon.com/fsx/latest/APIReference/API_CreateFileSystem.html)
 ###### [FSx DeleteFileSystem API](https://docs.aws.amazon.com/fsx/latest/APIReference/API_DeleteFileSystem.html)
 
-#### Parameters the driver populates
+#### Parameters the driver populates for the user (these are NOT defined in the storage class)
 - ClientRequestToken
 - FileSystemType
-- StorageCapacity
+- StorageCapacity (pulled from the PVC)
 
 Parameters a user can specify when provisioning an FSx OpenZFS file system:
 
@@ -47,7 +47,7 @@ Parameters a user can specify when provisioning an FSx OpenZFS file system:
 ###### [FSx CreateVolume API](https://docs.aws.amazon.com/fsx/latest/APIReference/API_CreateVolume.html)
 ###### [FSx DeleteVolume API](https://docs.aws.amazon.com/fsx/latest/APIReference/API_DeleteVolume.html)
 
-#### Parameters the driver populates
+#### Parameters the driver populates for the user (these are NOT defined in the storage class)
 - ClientRequestToken
 - Name
 - VolumeType
@@ -73,7 +73,7 @@ Parameters a user can specify when provisioning an FSx OpenZFS volume:
 
 ###### [FSx CreateSnapshot API](https://docs.aws.amazon.com/fsx/latest/APIReference/API_CreateSnapshot.html)
 
-#### Parameters the driver populates
+#### Parameters the driver populates for the user (these are NOT defined in the storage class)
 - ClientRequestToken
 - Name
 - VolumeId
