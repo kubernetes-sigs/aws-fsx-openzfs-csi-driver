@@ -228,7 +228,7 @@ func (c *cloud) WaitForFileSystemAvailable(ctx context.Context, fileSystemId str
 		if err != nil {
 			return true, err
 		}
-		klog.V(2).Infof("WaitForFileSystemAvailable filesystem %q status is: %q", fileSystemId, *fs.Lifecycle)
+		klog.V(2).InfoS("WaitForFileSystemAvailable", "filesystem", fileSystemId, "lifecycle", *fs.Lifecycle)
 		switch *fs.Lifecycle {
 		case fsx.FileSystemLifecycleAvailable:
 			return true, nil
@@ -248,7 +248,7 @@ func (c *cloud) WaitForFileSystemResize(ctx context.Context, fileSystemId string
 		if err != nil {
 			return true, err
 		}
-		klog.V(2).Infof("WaitForFileSystemResize filesystem %q update status is: %q", fileSystemId, *updateAction.Status)
+		klog.V(2).InfoS("WaitForFileSystemResize", "filesystem", fileSystemId, "update status", *updateAction.Status)
 		switch *updateAction.Status {
 		case fsx.StatusPending, fsx.StatusInProgress:
 			return false, nil
@@ -328,7 +328,7 @@ func (c *cloud) WaitForVolumeAvailable(ctx context.Context, volumeId string) err
 		if err != nil {
 			return true, err
 		}
-		klog.V(2).Infof("WaitForVolumeAvailable volume %q status is: %q", volumeId, *v.Lifecycle)
+		klog.V(2).InfoS("WaitForVolumeAvailable", "volume", volumeId, "lifecycle", *v.Lifecycle)
 		switch *v.Lifecycle {
 		case fsx.VolumeLifecycleAvailable:
 			return true, nil
@@ -342,13 +342,14 @@ func (c *cloud) WaitForVolumeAvailable(ctx context.Context, volumeId string) err
 	return err
 }
 
+// WaitForVolumeResize TODO: Remove this function and its associated tests.
 func (c *cloud) WaitForVolumeResize(ctx context.Context, volumeId string, resizeGiB int64) error {
 	err := wait.Poll(PollCheckInterval, PollCheckTimeout, func() (done bool, err error) {
 		updateAction, err := c.getUpdateResizeVolumeAdministrativeAction(ctx, volumeId, resizeGiB)
 		if err != nil {
 			return true, err
 		}
-		klog.V(2).Infof("WaitForVolumeResize volume %q update status is: %q", volumeId, *updateAction.Status)
+		klog.V(2).InfoS("WaitForVolumeResize", "volume", volumeId, "update status", *updateAction.Status)
 		switch *updateAction.Status {
 		case fsx.StatusPending, fsx.StatusInProgress:
 			return false, nil
@@ -381,7 +382,7 @@ func (c *cloud) CreateSnapshot(ctx context.Context, parameters map[string]string
 	if output == nil {
 		return nil, fmt.Errorf("nil CreateSnapshotResponse")
 	}
-	klog.V(4).Infof("CreateSnapshotResponse: ", output.GoString())
+	klog.V(4).InfoS("CreateSnapshotResponse", "response", output.GoString())
 	return &Snapshot{
 		SnapshotID:     aws.StringValue(output.Snapshot.SnapshotId),
 		SourceVolumeID: aws.StringValue(output.Snapshot.VolumeId),
@@ -432,7 +433,7 @@ func (c *cloud) WaitForSnapshotAvailable(ctx context.Context, snapshotId string)
 		if err != nil {
 			return true, err
 		}
-		klog.V(2).Infof("WaitForSnapshotAvailable: Snapshot %s status is %q", snapshotId, *snapshot.Lifecycle)
+		klog.V(2).InfoS("WaitForSnapshotAvailable", "snapshot", snapshotId, "lifecycle", *snapshot.Lifecycle)
 		switch *snapshot.Lifecycle {
 		case fsx.SnapshotLifecycleAvailable:
 			return true, nil
