@@ -1,3 +1,19 @@
+# v1.0.0
+
+### Notable changes
+* Modularize the controller and node services; Add support for JSON logging ([#30](https://github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pull/30), [@hughdanliu](https://github.com/hughdanliu/))
+* Add support for operating modes; Perform metadata collection via the Kubernetes API ([#34](https://github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pull/34), [@hughdanliu](https://github.com/hughdanliu/))
+* Add support for node startup taints ([#35](https://github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pull/35), [@hughdanliu](https://github.com/hughdanliu/))
+* Add inflight checks to node mounting operations  ([#36](https://github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pull/36), [@hughdanliu](https://github.com/hughdanliu/))
+
+### Bug Fixes
+* Fix snapshot parameters bug ([#32](https://github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pull/32), [@gomesjason](https://github.com/gomesjason/))
+* Fix update In progress failure during ResizeFileSystem ([#33](https://github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pull/33), [@gomesjason](https://github.com/gomesjason/))
+
+### Improvements
+* Adopt Kubernetes recommended labels ([#29](https://github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pull/29), [@hughdanliu](https://github.com/hughdanliu/))
+* Adopt Kubernetes standard logging patterns ([#38](https://github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pull/38), [@hughdanliu](https://github.com/hughdanliu/))
+
 # v0.1.0
 
 ### Notable changes
