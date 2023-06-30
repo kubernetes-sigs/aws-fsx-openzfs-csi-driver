@@ -102,7 +102,7 @@ controller:
         - podAffinityTerm:
             labelSelector:
               matchExpressions:
-                - key: app
+                - key: app.kubernetes.io/name
                   operator: In
                   values:
                     - fsx-openzfs-csi-controller

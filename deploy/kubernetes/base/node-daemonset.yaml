@@ -6,12 +6,13 @@ apiVersion: apps/v1
 metadata:
   name: fsx-openzfs-csi-node
   labels:
-    app.kubernetes.io/name: aws-fsx-openzfs-csi-driver
+    app.kubernetes.io/name: fsx-openzfs-csi-node
+    app.kubernetes.io/part-of: aws-fsx-openzfs-csi-driver
 spec:
   selector:
     matchLabels:
-      app: fsx-openzfs-csi-node
-      app.kubernetes.io/name: aws-fsx-openzfs-csi-driver
+      app.kubernetes.io/name: fsx-openzfs-csi-node
+      app.kubernetes.io/part-of: aws-fsx-openzfs-csi-driver
   updateStrategy:
     rollingUpdate:
       maxUnavailable: 10%
@@ -19,8 +20,8 @@ spec:
   template:
     metadata:
       labels:
-        app: fsx-openzfs-csi-node
-        app.kubernetes.io/name: aws-fsx-openzfs-csi-driver
+        app.kubernetes.io/name: fsx-openzfs-csi-node
+        app.kubernetes.io/part-of: aws-fsx-openzfs-csi-driver
     spec:
       affinity:
         nodeAffinity:
