@@ -1,7 +1,3 @@
-**WARNING**: This driver is currently in a **Public BETA stage**. This means that there may be backwards compatible breaking changes moving forward. Do NOT use this driver in a production environment in its current state.
-
-**DISCLAIMER**: This is not an officially supported Amazon product.
-
 ## Amazon FSx for OpenZFS CSI Driver
 [![Go Report Card](https://goreportcard.com/badge/github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver)](https://goreportcard.com/report/github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver)
 
