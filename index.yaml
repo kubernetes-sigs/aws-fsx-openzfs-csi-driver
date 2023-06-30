@@ -2,6 +2,27 @@ apiVersion: v1
 entries:
   aws-fsx-openzfs-csi-driver:
   - apiVersion: v2
+    appVersion: 1.0.0
+    created: "2023-06-30T16:51:01.601950691Z"
+    description: A Helm chart for the AWS FSx for OpenZFS CSI Driver
+    digest: 4186fdc36bdaa2e555cbf78cb86d812d7ccdc4d84b418eb427908b64fbed01fb
+    home: https://github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver
+    keywords:
+    - aws
+    - fsx
+    - openzfs
+    - csi
+    kubeVersion: '>=1.17.0-0'
+    maintainers:
+    - name: Kubernetes Authors
+      url: https://github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/
+    name: aws-fsx-openzfs-csi-driver
+    sources:
+    - https://github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver
+    urls:
+    - https://github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/releases/download/helm-chart-aws-fsx-openzfs-csi-driver-1.0.0/aws-fsx-openzfs-csi-driver-1.0.0.tgz
+    version: 1.0.0
+  - apiVersion: v2
     appVersion: 0.1.0
     created: "2023-06-08T21:12:36.490308481Z"
     description: A Helm chart for the AWS FSx for OpenZFS CSI Driver
@@ -22,4 +43,4 @@ entries:
     urls:
     - https://github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/releases/download/helm-chart-aws-fsx-openzfs-csi-driver-0.1.0/aws-fsx-openzfs-csi-driver-0.1.0.tgz
     version: 0.1.0
-generated: "2023-06-08T21:12:36.490319981Z"
+generated: "2023-06-30T16:51:01.601961392Z"
