@@ -44,7 +44,7 @@ spec:
         runAsUser: 0
       containers:
         - name: fsx-openzfs-plugin
-          image: public.ecr.aws/fsx-csi-driver/aws-fsx-openzfs-csi-driver:v0.1.0
+          image: public.ecr.aws/fsx-csi-driver/aws-fsx-openzfs-csi-driver:v1.0.0
           imagePullPolicy: IfNotPresent
           args:
             - --mode=node
