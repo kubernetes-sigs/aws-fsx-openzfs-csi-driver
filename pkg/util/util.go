@@ -138,8 +138,10 @@ func ConvertJsonStringToObject(input string, object any) error {
 	return nil
 }
 
-// ConvertObjectType converts a given object into another object.
-// The to object must be passed in by reference
+// ConvertObjectType converts a given object into another object type.
+// This is done by converting the object into a JSON string, then using the
+// JSON string to populate the parameters of a new object.
+// The "to" object must be passed in by reference
 func ConvertObjectType(from any, to any) error {
 	fromString, err := ConvertObjectToJsonString(from)
 	if err != nil {
@@ -158,6 +160,9 @@ func ConvertObjectType(from any, to any) error {
 func RemoveParametersAndPopulateObject(parameters map[string]string, config any) error {
 	from := ConvertStringMapToAny(parameters)
 	err := ConvertObjectType(from, config)
+	if err != nil && strings.Contains(err.Error(), "error calling MarshalJSON") {
+		return identifyImproperlyFormattedParameter(from)
+	}
 
 	for i := 0; i < reflect.TypeOf(config).Elem().NumField(); i++ {
 		name := reflect.TypeOf(config).Elem().Field(i).Name
@@ -209,4 +214,21 @@ func MapCopy(oldMap map[string]string) map[string]string {
 		newMap[key] = value
 	}
 	return newMap
+}
+
+// identifyImproperlyFormattedParameter is called if the JSON marshal fails to parse the parameter map.
+// It attempts to convert each individual parameter into a JSON string to identify the specific
+// parameter that is improperly formatted on the storage class. This allows us to provide a more
+// granular error message to the user.
+func identifyImproperlyFormattedParameter(parameters map[string]any) error {
+	for key, value := range parameters {
+		parameter := map[string]any{
+			key: value,
+		}
+		_, err := ConvertObjectToJsonString(parameter)
+		if err != nil {
+			return fmt.Errorf("failed to parse parameter key=%s, value=%s with error=%s", key, value, err)
+		}
+	}
+	return fmt.Errorf("failed to parse parameter JSON, but could not determine which parameter could not be parsed")
 }
