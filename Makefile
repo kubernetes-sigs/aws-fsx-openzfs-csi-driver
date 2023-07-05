@@ -51,7 +51,7 @@ word-hyphen = $(word $2,$(subst -, ,$1))
 .PHONY: linux/$(ARCH) bin/aws-fsx-openzfs-csi-driver
 linux/$(ARCH): bin/aws-fsx-openzfs-csi-driver
 bin/aws-fsx-openzfs-csi-driver: | bin
-	CGO_ENABLED=0 GOOS=linux GOARCH=$(ARCH) go build -mod=mod -ldflags ${LDFLAGS} -o bin/aws-fsx-openzfs-csi-driver ./cmd/
+	CGO_ENABLED=0 GOOS=linux GOARCH=$(ARCH) go build -ldflags ${LDFLAGS} -o bin/aws-fsx-openzfs-csi-driver ./cmd/
 
 # Builds all images
 .PHONY: all
@@ -99,6 +99,10 @@ test:
 .PHONY: test-sanity
 test-sanity:
 	go test -v ./tests/sanity/...
+
+.PHONY: test-e2e
+test-e2e:
+	cd ./tests/e2e/ && ginkgo -r --procs=4 --timeout=5h
 
 .PHONY: clean
 clean:
