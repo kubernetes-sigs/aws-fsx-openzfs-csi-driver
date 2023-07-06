@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -243,6 +244,48 @@ func TestConvertJsonStringToObject(t *testing.T) {
 
 			if err == nil && fmt.Sprint(tc.object) != fmt.Sprint(tc.expected) {
 				t.Fatalf(FailureWrongResult, "ConvertObjectToJsonString", tc.object, tc.expected)
+			}
+		})
+	}
+}
+
+func TestIdentifyImproperlyFormattedParameter(t *testing.T) {
+	testCases := []struct {
+		name  string
+		input map[string]string
+		error string
+	}{
+		{
+			name: "Success: Improperly formatted SubnetIds",
+			input: map[string]string{
+				"DeploymentType":            "\"SINGLE_AZ_1\"",
+				"ThroughputCapacity":        "64",
+				"SubnetIds":                 "[\"subnet-016affca9638a1e61\"",
+				"SkipFinalBackupOnDeletion": "true",
+			},
+			error: "failed to parse parameter key=SubnetIds, value=[\"subnet-016affca9638a1e61\"",
+		},
+		{
+			name: "Success: Unable to identify improperly formatted parameter",
+			input: map[string]string{
+				"DeploymentType":            "\"SINGLE_AZ_1\"",
+				"ThroughputCapacity":        "64",
+				"SubnetIds":                 "[\"subnet-016affca9638a1e61\"]",
+				"SkipFinalBackupOnDeletion": "true",
+			},
+			error: "failed to parse parameter JSON, but could not determine which parameter could not be parsed",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := identifyImproperlyFormattedParameter(ConvertStringMapToAny(tc.input))
+			if err == nil {
+				t.Fatalf(FailureExpectedError, "identifyImproperlyFormattedParameter")
+			}
+
+			if !strings.Contains(err.Error(), tc.error) {
+				t.Fatalf(FailureWrongResult, "identifyImproperlyFormattedParameter", err.Error(), tc.error)
 			}
 		})
 	}
