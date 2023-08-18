@@ -3,7 +3,7 @@ module github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver
 go 1.20
 
 require (
-	github.com/aws/aws-sdk-go v1.44.264
+	github.com/aws/aws-sdk-go v1.44.327
 	github.com/container-storage-interface/spec v1.7.0
 	github.com/golang/mock v1.6.0
 	github.com/kubernetes-csi/csi-test/v5 v5.0.0
