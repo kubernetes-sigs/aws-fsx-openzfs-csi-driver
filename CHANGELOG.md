@@ -1,3 +1,9 @@
+# v1.1.0
+
+### Notable changes
+* Add support for Multi-AZ ([#49](https://github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pull/49), [@gomesjason](https://github.com/gomesjason/))
+* Improved error logging for improperly formatted parameters ([#45](https://github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pull/45), [@hughdanliu](https://github.com/hughdanliu/))
+
 # v1.0.0
 
 ### Notable changes
