@@ -1,4 +1,7 @@
 # Helm chart
+# v1.1.0
+* Use driver v1.1.0
+
 # v1.0.0
 * Use driver v1.0.0
 * Add driver modes for controller and node pods

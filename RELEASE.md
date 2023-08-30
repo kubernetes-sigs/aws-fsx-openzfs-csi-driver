@@ -52,9 +52,9 @@ You'll need push privileges for this step.
 
 ```
 git checkout release-0.7
-git pull upstream release-0.7
+git pull origin release-0.7
 git tag v0.7.0
-git push upstream v0.7.0
+git push origin v0.7.0
 ```
 
 ## Verify the release on GitHub
