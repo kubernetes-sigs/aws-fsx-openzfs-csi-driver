@@ -20,13 +20,14 @@ The [Amazon FSx for OpenZFS](https://aws.amazon.com/fsx/openzfs/) Container Stor
 
 | Driver Version | [ECR Public](https://gallery.ecr.aws/fsx-csi-driver/aws-fsx-openzfs-csi-driver) Image |
 |----------------|---------------------------------------------------------------------------------------|
-| v1.0.0         | public.ecr.aws/fsx-csi-driver/aws-fsx-openzfs-csi-driver:v1.0.0                       |   
+| v1.1.0         | public.ecr.aws/fsx-csi-driver/aws-fsx-openzfs-csi-driver:v1.1.0                       |   
 
 <details>
 <summary>Previous Images</summary>
 
 | Driver Version | [ECR Public](https://gallery.ecr.aws/fsx-csi-driver/aws-fsx-openzfs-csi-driver) Image |
 |----------------|---------------------------------------------------------------------------------------|
+| v1.0.0         | public.ecr.aws/fsx-csi-driver/aws-fsx-openzfs-csi-driver:v1.0.0                       |
 | v0.1.0 (Beta)  | public.ecr.aws/fsx-csi-driver/aws-fsx-openzfs-csi-driver:v0.1.0                       | 
 </details>
 
