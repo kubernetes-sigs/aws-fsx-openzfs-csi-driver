@@ -1,0 +1,25 @@
+#!/bin/bash
+
+AWS_REGION="$1"
+TAG_KEY="fsx.openzfs.csi.aws.com/cluster"
+
+if [ -z "$AWS_REGION" ]; then
+  echo "Enter a region as an argument"
+  exit 1
+fi
+
+ids=()
+pagination_token_flag=""
+while true; do
+    response=$(aws resourcegroupstaggingapi get-resources --tag-filters Key=$TAG_KEY --query "{PaginationToken: PaginationToken, ResourceTagMappingList: ResourceTagMappingList[].ResourceARN}" --output json --region "$AWS_REGION""$pagination_token_flag")
+    ids+=("$(echo "$response" | jq -r ".ResourceTagMappingList[]" | xargs -n1 | awk -F'/' '{print $NF}')")
+
+    pagination_token=$(echo "$response" | jq -r .PaginationToken)
+    if [ "$pagination_token" == "null" ]; then
+        break
+    fi
+    pagination_token_flag=$(echo " --pagination-token $pagination_token")
+done
+
+echo "${ids[@]}"
+exit 0
