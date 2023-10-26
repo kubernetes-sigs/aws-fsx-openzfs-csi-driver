@@ -8,6 +8,7 @@ as well as deletion tags that are utilized to support deletion options.
 
 The FSx for OpenZFS CSI driver will automatically add a unique tag to denote the resources it creates.
 This tag is not used by the driver and is only provided to aid the user in resource management.
+You can find all resources created by the OpenZFS CSI driver using this [hack](../hack/print-resources).
 
 The CSI driver attaches the following tag to the resources it creates:
 
@@ -17,13 +18,34 @@ The CSI driver attaches the following tag to the resources it creates:
 
 ## Deletion Tags
 
-The CSI driver also adds deletion parameters that were provided by the user.
-Due to CSI limitations, parameters cannot be defined when deleting resources.
-To get around this, any parameter specified with the `OnDeletion` suffix is saved as a tag on the resource via a Key-Value pair.
+To get around CSI limitations, the driver also tags deletion parameters that were provided by the user.
+Any parameter specified with the key suffix of `OnDeletion` is individually saved as a tag on the respective resource.
 
-Due to restrictions in tags, special characters used in JSON such as `",[]{}` must be encoded.
+It is possible to modify the delete behavior of a resource after it's created due to this design.
+Any parameter additions or modifications must be manually done using our API.
+If tags are incorrect formatted when edited, they will be ignored during delete, and default behavior will take precedence.
+
+The parameter(s) will still be saved as Key-Value pair(s).
+The `OnDeletion` suffix will remain on the tag key for consistency.
+Due to restrictions in tags, special characters used in JSON such as `",[]{}` are encoded.
+
+Example Storage Class:
+
+| Key                         | Value                                      |
+|-----------------------------|--------------------------------------------|
+| `SkipFinalBackupOnDeletion` | `'true'`                                   |
+| `OptionsOnDeletion`         | `'["DELETE_CHILD_VOLUMES_AND_SNAPSHOTS"]'` |
+
+Example Tag Representations:
+
+| Key                         | Value                                            |
+|-----------------------------|--------------------------------------------------|
+| `SkipFinalBackupOnDeletion` | `true`                                           |
+| `OptionsOnDeletion`         | ` -  @ DELETE_CHILD_VOLUMES_AND_SNAPSHOTS @  _ ` |
+**Note: There is a space before and after the value of OptionsOnDeletion**
+
 The following chart contains the translation between JSON characters and their respective tag representation.
-To prevent mistranslation when decoding parameters that contain translate characters, a space is added before and after the tag representation.
+To prevent mistranslation when decoding parameters with special characters, a space is added before and after the tag representations.
 
 | JSON Character | Tag Character |
 |----------------|---------------|
@@ -34,18 +56,3 @@ To prevent mistranslation when decoding parameters that contain translate charac
 | `{`            | ` + `         |
 | `}`            | ` = `         |
 **Note: Tag Characters are proceeded and succeeded by a space**
-
-#### Example:
-
-JSON Representation:
-```json
-["DELETE_CHILD_VOLUMES_AND_SNAPSHOTS"]
-```
-Tag Representation:
-```
-- @ DELETE_CHILD_VOLUMES_AND_SNAPSHOTS @ _
-```
-
-Deletion tags may be manually modified or added to change the delete behavior for a specific resource.
-If tags are incorrect during delete they are ignored and the default behavior occurs.
-The `OnDeletion` suffix remains on the tag key for parsing purposes.

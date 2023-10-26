@@ -114,6 +114,7 @@ helm repo update
 ```sh
 helm upgrade --install aws-fsx-openzfs-csi-driver \
     --namespace kube-system \
+    --set controller.serviceAccount.create=false \
     aws-fsx-openzfs-csi-driver/aws-fsx-openzfs-csi-driver
 ```
 
