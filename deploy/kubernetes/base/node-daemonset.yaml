@@ -127,6 +127,7 @@ spec:
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
+      hostNetwork: false
       dnsPolicy: ClusterFirst
       volumes:
         - name: kubelet-dir
