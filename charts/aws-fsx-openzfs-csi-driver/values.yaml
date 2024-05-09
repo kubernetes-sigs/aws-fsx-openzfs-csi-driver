@@ -176,6 +176,7 @@ node:
                 operator: NotIn
                 values:
                   - fargate
+  hostNetwork: false
   dnsPolicy: ClusterFirst
   dnsConfig: {}
   # Example config which uses the AWS nameservers
