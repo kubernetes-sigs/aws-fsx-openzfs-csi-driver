@@ -96,6 +96,8 @@ EKS Managed Node Groups support automatically tainting nodes, see [here](https:/
 ### Deploy driver
 You may deploy the FSx for OpenZFS CSI driver via Kustomize or Helm
 
+*Note: When using custom [CNI Plugins](https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/) (e.g. Cilium) you might have to enable host networking for mounting the filesystem successfully.*
+
 #### Kustomize
 ```sh
 kubectl apply -k "github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/deploy/kubernetes/overlays/stable/?ref=release-1.1"

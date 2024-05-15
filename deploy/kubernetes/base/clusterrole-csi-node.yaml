@@ -5,7 +5,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: fsx-openzfs-csi-node-role
   labels:
-    app.kubernetes.io/name: aws-fsx-openzfs-csi-driver
+    app.kubernetes.io/part-of: aws-fsx-openzfs-csi-driver
 rules:
   - apiGroups: [""]
     resources: ["nodes"]

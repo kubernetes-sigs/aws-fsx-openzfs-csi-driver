@@ -171,6 +171,7 @@ spec:
         - name: {{ . }}
       {{- end }}
       {{- end }}
+      hostNetwork: {{ .Values.node.hostNetwork }}
       dnsPolicy: {{ .Values.node.dnsPolicy }}
       {{- with .Values.node.dnsConfig }}
       dnsConfig: {{- toYaml . | nindent 8 }}
