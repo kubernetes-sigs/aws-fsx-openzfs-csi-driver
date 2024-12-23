@@ -18,8 +18,6 @@ package driver
 import (
 	"context"
 	"errors"
-	"testing"
-	"time"
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -29,6 +27,8 @@ import (
 	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/driver/mocks"
 	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/util"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"testing"
+	"time"
 )
 
 const (

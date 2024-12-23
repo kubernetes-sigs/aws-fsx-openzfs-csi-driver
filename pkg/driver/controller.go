@@ -19,10 +19,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"strconv"
-	"strings"
-	"time"
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -33,6 +29,10 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"k8s.io/klog/v2"
+	"os"
+	"strconv"
+	"strings"
+	"time"
 )
 
 var (
