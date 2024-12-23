@@ -19,6 +19,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/cenkalti/backoff/v4"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/cloud"
 	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/driver/internal"
@@ -27,9 +33,6 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"k8s.io/klog/v2"
-	"os"
-	"strconv"
-	"strings"
 )
 
 var (
@@ -95,6 +98,7 @@ type controllerService struct {
 	cloud         cloud.Cloud
 	inFlight      *internal.InFlight
 	driverOptions *DriverOptions
+	backoff       backoff.BackOff
 }
 
 // newControllerService creates a new controller service
@@ -122,6 +126,7 @@ func newControllerService(driverOptions *DriverOptions) controllerService {
 		cloud:         cloudSrv,
 		inFlight:      internal.NewInFlight(),
 		driverOptions: driverOptions,
+		backoff:       backoff.NewExponentialBackOff(), // Default spec: https://pkg.go.dev/github.com/cenkalti/backoff/v4#pkg-constants
 	}
 }
 
@@ -355,6 +360,30 @@ func (d *controllerService) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 		return nil, status.Errorf(codes.Internal, "Could not delete volume ID %q: %v", volumeID, err)
 	}
 
+	// Wait until volume not found
+	describeRetry := func() error {
+		if splitVolumeId[0] == cloud.FilesystemPrefix {
+			_, err = d.cloud.DescribeFileSystem(ctx, volumeID)
+		}
+		if splitVolumeId[0] == cloud.VolumePrefix {
+			_, err = d.cloud.DescribeVolume(ctx, volumeID)
+		}
+
+		if err != nil {
+			if err == cloud.ErrNotFound {
+				return nil
+			}
+			return status.Error(codes.Internal, err.Error())
+		}
+		return status.Errorf(codes.Internal, "Volume ID %q still exists", volumeID)
+	}
+
+	err = backoff.RetryNotify(describeRetry, d.backoff, notifyRetryError)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Could not delete volume ID %q: %v", volumeID, err)
+	}
+
+	klog.V(4).InfoS("DeleteVolume: volume not found, returning with success", "volumeId", volumeID)
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
@@ -784,4 +813,8 @@ func (d *controllerService) appendSnapshotARN(ctx context.Context, parameters ma
 	parameters[volumeParamsOriginSnapshot] = originSnapshotJsonString
 
 	return nil
+}
+
+func notifyRetryError(err error, t time.Duration) {
+	klog.ErrorS(err, fmt.Sprintf("Retrying in %f seconds", t.Seconds()))
 }
