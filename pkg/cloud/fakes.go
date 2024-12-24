@@ -114,8 +114,14 @@ func (c *FakeCloudProvider) ResizeFileSystem(ctx context.Context, fileSystemId s
 }
 
 func (c *FakeCloudProvider) DeleteFileSystem(ctx context.Context, parameters map[string]string) error {
+	// parameters["FileSystemId"] in Sanity test is JSON string, eg: "\"fs-1234\""
+	// While actual id is "fs-1234"
+	// For backward compatibility, we can remove both the JSON string and the unquote string
+	unquoteId := strings.Trim(parameters["FileSystemId"], "\"")
 	delete(c.fileSystems, parameters["FileSystemId"])
+	delete(c.fileSystems, unquoteId)
 	delete(c.fileSystemsParameters, parameters["FileSystemId"])
+	delete(c.fileSystemsParameters, unquoteId)
 	return nil
 }
 
@@ -168,8 +174,14 @@ func (c *FakeCloudProvider) CreateVolume(ctx context.Context, parameters map[str
 }
 
 func (c *FakeCloudProvider) DeleteVolume(ctx context.Context, parameters map[string]string) (err error) {
+	// parameters["VolumeId"] in Sanity test is JSON string, eg: "\"fsvol-1234\""
+	// While actual id is "fsvol-1234"
+	// For backward compatibility, we can remove both the JSON string and the unquote string
+	unquoteId := strings.Trim(parameters["VolumeId"], "\"")
 	delete(c.volumes, parameters["VolumeId"])
+	delete(c.volumes, unquoteId)
 	delete(c.volumesParameters, parameters["VolumeId"])
+	delete(c.volumesParameters, unquoteId)
 	return nil
 }
 

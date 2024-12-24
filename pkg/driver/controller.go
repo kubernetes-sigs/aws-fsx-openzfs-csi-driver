@@ -364,18 +364,20 @@ func (d *controllerService) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	describeRetry := func() error {
 		if splitVolumeId[0] == cloud.FilesystemPrefix {
 			_, err = d.cloud.DescribeFileSystem(ctx, volumeID)
-		}
-		if splitVolumeId[0] == cloud.VolumePrefix {
+		} else if splitVolumeId[0] == cloud.VolumePrefix {
 			_, err = d.cloud.DescribeVolume(ctx, volumeID)
+		} else {
+			// Invalid volume ID, return not found immediately
+			return nil
 		}
 
 		if err != nil {
 			if err == cloud.ErrNotFound {
 				return nil
 			}
-			return status.Error(codes.Internal, err.Error())
+			return err
 		}
-		return status.Errorf(codes.Internal, "Volume ID %q still exists", volumeID)
+		return fmt.Errorf("volume ID %q still exists", volumeID)
 	}
 
 	err = backoff.RetryNotify(describeRetry, d.backoff, notifyRetryError)

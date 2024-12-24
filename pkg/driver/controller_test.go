@@ -32,7 +32,8 @@ import (
 )
 
 const (
-	backoffMaxRetries = 10
+	backoffMaxRetries       = 10
+	exceedBackoffMaxRetries = backoffMaxRetries + 1
 )
 
 func defaultControllerService(mockCloud *mocks.MockCloud) controllerService {
@@ -1089,7 +1090,7 @@ func TestDeleteVolume(t *testing.T) {
 				mockCloud.EXPECT().GetDeleteParameters(gomock.Eq(ctx), gomock.Any()).Return(volumeParameters, nil)
 				mockCloud.EXPECT().DeleteFileSystem(gomock.Eq(ctx), gomock.Any()).Return(nil)
 
-				for i := 0; i < backoffMaxRetries+1; i++ {
+				for i := 0; i < exceedBackoffMaxRetries; i++ {
 					mockCloud.EXPECT().DescribeFileSystem(gomock.Eq(ctx), gomock.Any()).Return(&cloud.FileSystem{}, nil)
 				}
 
@@ -1199,7 +1200,7 @@ func TestDeleteVolume(t *testing.T) {
 				mockCloud.EXPECT().GetDeleteParameters(gomock.Eq(ctx), gomock.Any()).Return(volumeParameters, nil)
 				mockCloud.EXPECT().DeleteVolume(gomock.Eq(ctx), gomock.Any()).Return(nil)
 
-				for i := 0; i < backoffMaxRetries+1; i++ {
+				for i := 0; i < exceedBackoffMaxRetries; i++ {
 					mockCloud.EXPECT().DescribeVolume(gomock.Eq(ctx), gomock.Any()).Return(&cloud.Volume{}, nil)
 				}
 
