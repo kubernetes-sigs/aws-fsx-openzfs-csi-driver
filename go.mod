@@ -4,6 +4,7 @@ go 1.20
 
 require (
 	github.com/aws/aws-sdk-go v1.44.327
+	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/container-storage-interface/spec v1.7.0
 	github.com/golang/mock v1.6.0
 	github.com/kubernetes-csi/csi-test/v5 v5.0.0
@@ -29,7 +30,6 @@ require (
 	github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
-	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/coreos/go-semver v0.3.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.4.0 // indirect

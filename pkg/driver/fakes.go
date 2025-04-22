@@ -16,6 +16,7 @@ limitations under the License.
 package driver
 
 import (
+	"github.com/cenkalti/backoff/v4"
 	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/cloud"
 	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/driver/internal"
 	"k8s.io/mount-utils"
@@ -42,6 +43,10 @@ func NewFakeDriver(endpoint string) *Driver {
 			cloud:         cloud.NewFakeCloudProvider(),
 			inFlight:      internal.NewInFlight(),
 			driverOptions: &driverOptions,
+			backoff: backoff.WithMaxRetries(
+				backoff.NewExponentialBackOff(),
+				3,
+			),
 		},
 		nodeService: nodeService{
 			metadata: &cloud.Metadata{
