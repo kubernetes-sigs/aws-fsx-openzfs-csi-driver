@@ -3,8 +3,8 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/fsx"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/fsx"
 	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/driver"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -126,11 +126,11 @@ func (d *fsxDriver) CreateVolume(ctx context.Context, config *storageframework.P
 	if d.parameters[RESOURCETYPE] == RESOURCETYPE_FILESYSTEM {
 		response, err := c.CreateFileSystem(ctx, d.createInput.(fsx.CreateFileSystemInput))
 		framework.ExpectNoError(err, "creating filesystem")
-		err = c.WaitForFilesystemAvailable(ctx, *response.FileSystemId)
+		err = c.WaitForFilesystemAvailable(ctx, aws.ToString(response.FileSystemId))
 		framework.ExpectNoError(err, "creating filesystem")
 		return &FSxFilesystem{
-			filesystemId: *response.FileSystemId,
-			dnsName:      *response.DNSName,
+			filesystemId: aws.ToString(response.FileSystemId),
+			dnsName:      aws.ToString(response.DNSName),
 			fsxResource: FSxResource{
 				deleteInput: d.deleteInput,
 			},
@@ -140,14 +140,14 @@ func (d *fsxDriver) CreateVolume(ctx context.Context, config *storageframework.P
 		input.Name = aws.String(names.SimpleNameGenerator.GenerateName("volume"))
 		response, err := c.CreateVolume(ctx, input)
 		framework.ExpectNoError(err, "creating volume")
-		err = c.WaitForVolumeAvailable(ctx, *response.VolumeId)
+		err = c.WaitForVolumeAvailable(ctx, aws.ToString(response.VolumeId))
 		framework.ExpectNoError(err, "creating volume")
-		dnsName, err := c.GetDNSName(ctx, *response.FileSystemId)
+		dnsName, err := c.GetDNSName(ctx, aws.ToString(response.FileSystemId))
 		framework.ExpectNoError(err, "getting dnsName")
 		return &FSxVolume{
-			volumeId:   *response.VolumeId,
+			volumeId:   aws.ToString(response.VolumeId),
 			dnsName:    dnsName,
-			volumePath: *response.OpenZFSConfiguration.VolumePath,
+			volumePath: aws.ToString(response.OpenZFSConfiguration.VolumePath),
 			fsxResource: FSxResource{
 				deleteInput: d.deleteInput,
 			},
@@ -220,7 +220,7 @@ func (d *fsxDriver) GetTimeouts() *framework.TimeoutContext {
 func (f *FSxFilesystem) DeleteVolume(ctx context.Context) {
 	c := NewCloud(Region)
 	input := f.fsxResource.deleteInput.(fsx.DeleteFileSystemInput)
-	input.FileSystemId = &f.filesystemId
+	input.FileSystemId = aws.String(f.filesystemId)
 	err := c.DeleteFileSystem(ctx, input)
 	framework.ExpectNoError(err, "deleting filesystem")
 }
@@ -228,7 +228,7 @@ func (f *FSxFilesystem) DeleteVolume(ctx context.Context) {
 func (v *FSxVolume) DeleteVolume(ctx context.Context) {
 	c := NewCloud(Region)
 	input := v.fsxResource.deleteInput.(fsx.DeleteVolumeInput)
-	input.VolumeId = &v.volumeId
+	input.VolumeId = aws.String(v.volumeId)
 	err := c.DeleteVolume(ctx, input)
 	framework.ExpectNoError(err, "deleting volume")
 }
