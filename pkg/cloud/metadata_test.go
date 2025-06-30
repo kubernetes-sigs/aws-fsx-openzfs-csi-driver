@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/aws/aws-sdk-go/aws/ec2metadata"
+	"github.com/aws/aws-sdk-go-v2/feature/ec2/imds"
 	"github.com/golang/mock/gomock"
 	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/cloud/mocks"
 	v1 "k8s.io/api/core/v1"
@@ -44,7 +44,7 @@ func TestNewMetadataService(t *testing.T) {
 		name                             string
 		ec2metadataAvailable             bool
 		clientsetReactors                func(*fake.Clientset)
-		getInstanceIdentityDocumentValue ec2metadata.EC2InstanceIdentityDocument
+		getInstanceIdentityDocumentValue imds.InstanceIdentityDocument
 		getInstanceIdentityDocumentError error
 		invalidInstanceIdentityDocument  bool
 		expectedErr                      error
@@ -54,7 +54,7 @@ func TestNewMetadataService(t *testing.T) {
 		{
 			name:                 "success: normal",
 			ec2metadataAvailable: true,
-			getInstanceIdentityDocumentValue: ec2metadata.EC2InstanceIdentityDocument{
+			getInstanceIdentityDocumentValue: imds.InstanceIdentityDocument{
 				InstanceID:       stdInstanceID,
 				InstanceType:     stdInstanceType,
 				Region:           stdRegion,
@@ -89,7 +89,7 @@ func TestNewMetadataService(t *testing.T) {
 		{
 			name:                 "fail: GetInstanceIdentityDocument returned empty instance",
 			ec2metadataAvailable: true,
-			getInstanceIdentityDocumentValue: ec2metadata.EC2InstanceIdentityDocument{
+			getInstanceIdentityDocumentValue: imds.InstanceIdentityDocument{
 				InstanceID:       "",
 				InstanceType:     stdInstanceType,
 				Region:           stdRegion,
@@ -101,7 +101,7 @@ func TestNewMetadataService(t *testing.T) {
 		{
 			name:                 "fail: GetInstanceIdentityDocument returned empty az",
 			ec2metadataAvailable: true,
-			getInstanceIdentityDocumentValue: ec2metadata.EC2InstanceIdentityDocument{
+			getInstanceIdentityDocumentValue: imds.InstanceIdentityDocument{
 				InstanceID:       stdInstanceID,
 				InstanceType:     stdInstanceType,
 				Region:           stdRegion,
@@ -123,12 +123,19 @@ func TestNewMetadataService(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			mockEC2Metadata := mocks.NewMockEC2Metadata(mockCtrl)
 
-			ec2MetadataClient := func() (EC2Metadata, error) { return mockEC2Metadata, nil }
+			ec2MetadataClient := func() (EC2Metadata, error) {
+				if !tc.ec2metadataAvailable {
+					return nil, fmt.Errorf("ec2 metadata not available")
+				}
+				return mockEC2Metadata, nil
+			}
 			k8sAPIClient := func() (kubernetes.Interface, error) { clientsetInitialized = true; return clientset, nil }
 
-			mockEC2Metadata.EXPECT().Available().Return(tc.ec2metadataAvailable)
 			if tc.ec2metadataAvailable {
-				mockEC2Metadata.EXPECT().GetInstanceIdentityDocument().Return(tc.getInstanceIdentityDocumentValue, tc.getInstanceIdentityDocumentError)
+				output := &imds.GetInstanceIdentityDocumentOutput{
+					InstanceIdentityDocument: tc.getInstanceIdentityDocumentValue,
+				}
+				mockEC2Metadata.EXPECT().GetInstanceIdentityDocument(gomock.Any(), gomock.Any()).Return(output, tc.getInstanceIdentityDocumentError)
 
 				if clientsetInitialized == true {
 					t.Errorf("kubernetes client was unexpectedly initialized when metadata is available!")
