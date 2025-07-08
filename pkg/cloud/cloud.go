@@ -62,7 +62,7 @@ const (
 type FileSystem struct {
 	DnsName         string
 	FileSystemId    string
-	StorageCapacity int64
+	StorageCapacity int32
 }
 
 // Volume represents an OpenZFS volume
@@ -81,7 +81,7 @@ type Snapshot struct {
 }
 
 // FSx abstracts FSx client to facilitate its mocking.
-// See https://docs.aws.amazon.com/sdk-for-go/api/service/fsx/ for details
+// See https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/fsx for details
 type FSx interface {
 	CreateFileSystem(context.Context, *fsx.CreateFileSystemInput, ...func(*fsx.Options)) (*fsx.CreateFileSystemOutput, error)
 	UpdateFileSystem(context.Context, *fsx.UpdateFileSystemInput, ...func(*fsx.Options)) (*fsx.UpdateFileSystemOutput, error)
@@ -98,16 +98,16 @@ type FSx interface {
 
 type Cloud interface {
 	CreateFileSystem(ctx context.Context, parameters map[string]string) (*FileSystem, error)
-	ResizeFileSystem(ctx context.Context, fileSystemId string, newSizeGiB int64) (*int64, error)
+	ResizeFileSystem(ctx context.Context, fileSystemId string, newSizeGiB int32) (*int32, error)
 	DeleteFileSystem(ctx context.Context, parameters map[string]string) error
 	DescribeFileSystem(ctx context.Context, fileSystemId string) (*FileSystem, error)
 	WaitForFileSystemAvailable(ctx context.Context, fileSystemId string) error
-	WaitForFileSystemResize(ctx context.Context, fileSystemId string, resizeGiB int64) error
+	WaitForFileSystemResize(ctx context.Context, fileSystemId string, resizeGiB int32) error
 	CreateVolume(ctx context.Context, parameters map[string]string) (*Volume, error)
 	DeleteVolume(ctx context.Context, parameters map[string]string) error
 	DescribeVolume(ctx context.Context, volumeId string) (*Volume, error)
 	WaitForVolumeAvailable(ctx context.Context, volumeId string) error
-	WaitForVolumeResize(ctx context.Context, volumeId string, resizeGiB int64) error
+	WaitForVolumeResize(ctx context.Context, volumeId string, resizeGiB int32) error
 	CreateSnapshot(ctx context.Context, options map[string]string) (*Snapshot, error)
 	DeleteSnapshot(ctx context.Context, parameters map[string]string) error
 	DescribeSnapshot(ctx context.Context, snapshotId string) (*Snapshot, error)
@@ -125,7 +125,7 @@ type cloud struct {
 func NewCloud(region string) (Cloud, error) {
 	os.Setenv("AWS_EXECUTION_ENV", "aws-fsx-openzfs-csi-driver-"+driverVersion)
 
-	cfg, err := config.LoadDefaultConfig(context.TODO(),
+	cfg, err := config.LoadDefaultConfig(context.Background(),
 		config.WithRegion(region),
 		config.WithRetryMaxAttempts(8),
 	)
@@ -159,21 +159,21 @@ func (c *cloud) CreateFileSystem(ctx context.Context, parameters map[string]stri
 	return &FileSystem{
 		DnsName:         aws.ToString(output.FileSystem.DNSName),
 		FileSystemId:    aws.ToString(output.FileSystem.FileSystemId),
-		StorageCapacity: int64(aws.ToInt32(output.FileSystem.StorageCapacity)),
+		StorageCapacity: aws.ToInt32(output.FileSystem.StorageCapacity),
 	}, nil
 }
 
-func (c *cloud) ResizeFileSystem(ctx context.Context, fileSystemId string, newSizeGiB int64) (*int64, error) {
+func (c *cloud) ResizeFileSystem(ctx context.Context, fileSystemId string, newSizeGiB int32) (*int32, error) {
 	input := &fsx.UpdateFileSystemInput{
 		FileSystemId:    aws.String(fileSystemId),
-		StorageCapacity: aws.Int32(int32(newSizeGiB)),
+		StorageCapacity: aws.Int32(newSizeGiB),
 	}
 
 	_, err := c.fsx.UpdateFileSystem(ctx, input)
 	if err != nil {
 		var badRequestErr *types.BadRequest
 		if errors.As(err, &badRequestErr) &&
-			*badRequestErr.Message == "Unable to perform the storage capacity update. There is an update already in progress." {
+			badRequestErr.ErrorMessage() == "Unable to perform the storage capacity update. There is an update already in progress." {
 			// If a previous request timed out and was successful, don't error
 			_, err = c.getUpdateResizeFilesystemAdministrativeAction(ctx, fileSystemId, newSizeGiB)
 			if err != nil {
@@ -215,7 +215,7 @@ func (c *cloud) DescribeFileSystem(ctx context.Context, fileSystemId string) (*F
 	return &FileSystem{
 		DnsName:         aws.ToString(fs.DNSName),
 		FileSystemId:    aws.ToString(fs.FileSystemId),
-		StorageCapacity: int64(aws.ToInt32(fs.StorageCapacity)),
+		StorageCapacity: aws.ToInt32(fs.StorageCapacity),
 	}, nil
 }
 
@@ -239,7 +239,7 @@ func (c *cloud) WaitForFileSystemAvailable(ctx context.Context, fileSystemId str
 	return err
 }
 
-func (c *cloud) WaitForFileSystemResize(ctx context.Context, fileSystemId string, resizeGiB int64) error {
+func (c *cloud) WaitForFileSystemResize(ctx context.Context, fileSystemId string, resizeGiB int32) error {
 	err := wait.Poll(PollCheckInterval, PollCheckTimeout, func() (done bool, err error) {
 		updateAction, err := c.getUpdateResizeFilesystemAdministrativeAction(ctx, fileSystemId, resizeGiB)
 		if err != nil {
@@ -337,7 +337,7 @@ func (c *cloud) WaitForVolumeAvailable(ctx context.Context, volumeId string) err
 	return err
 }
 
-func (c *cloud) WaitForVolumeResize(ctx context.Context, volumeId string, resizeGiB int64) error {
+func (c *cloud) WaitForVolumeResize(ctx context.Context, volumeId string, resizeGiB int32) error {
 	err := wait.Poll(PollCheckInterval, PollCheckTimeout, func() (done bool, err error) {
 		updateAction, err := c.getUpdateResizeVolumeAdministrativeAction(ctx, volumeId, resizeGiB)
 		if err != nil {
@@ -375,7 +375,6 @@ func (c *cloud) CreateSnapshot(ctx context.Context, parameters map[string]string
 	if output == nil {
 		return nil, fmt.Errorf("nil CreateSnapshotResponse")
 	}
-	klog.V(4).InfoS("CreateSnapshotResponse", "response", "created")
 	return &Snapshot{
 		SnapshotID:     aws.ToString(output.Snapshot.SnapshotId),
 		SourceVolumeID: aws.ToString(output.Snapshot.VolumeId),
@@ -459,7 +458,7 @@ func (c *cloud) GetDeleteParameters(ctx context.Context, id string) (map[string]
 		resourceArn = aws.ToString(v.ResourceARN)
 	}
 
-	tags, err := c.getTagsForResource(resourceArn)
+	tags, err := c.getTagsForResource(ctx, resourceArn)
 	if err != nil {
 		return nil, err
 	}
@@ -490,75 +489,75 @@ func (c *cloud) GetDeleteParameters(ctx context.Context, id string) (map[string]
 	return parameters, nil
 }
 
-func (c *cloud) getFileSystem(ctx context.Context, fileSystemId string) (*types.FileSystem, error) {
+func (c *cloud) getFileSystem(ctx context.Context, fileSystemId string) (types.FileSystem, error) {
 	input := &fsx.DescribeFileSystemsInput{
 		FileSystemIds: []string{fileSystemId},
 	}
 
 	output, err := c.fsx.DescribeFileSystems(ctx, input)
 	if err != nil {
-		return nil, err
+		return types.FileSystem{}, err
 	}
 
 	if len(output.FileSystems) == 0 {
-		return nil, ErrNotFound
+		return types.FileSystem{}, ErrNotFound
 	}
 
 	if len(output.FileSystems) > 1 {
-		return nil, ErrMultipleFound
+		return types.FileSystem{}, ErrMultipleFound
 	}
 
-	return &output.FileSystems[0], nil
+	return output.FileSystems[0], nil
 }
 
-func (c *cloud) getVolume(ctx context.Context, volumeId string) (*types.Volume, error) {
+func (c *cloud) getVolume(ctx context.Context, volumeId string) (types.Volume, error) {
 	input := &fsx.DescribeVolumesInput{
 		VolumeIds: []string{volumeId},
 	}
 
 	output, err := c.fsx.DescribeVolumes(ctx, input)
 	if err != nil {
-		return nil, err
+		return types.Volume{}, err
 	}
 
 	if len(output.Volumes) == 0 {
-		return nil, ErrNotFound
+		return types.Volume{}, ErrNotFound
 	}
 
 	if len(output.Volumes) > 1 {
-		return nil, ErrMultipleFound
+		return types.Volume{}, ErrMultipleFound
 	}
 
-	return &output.Volumes[0], nil
+	return output.Volumes[0], nil
 }
 
-func (c *cloud) getSnapshot(ctx context.Context, snapshotId string) (*types.Snapshot, error) {
+func (c *cloud) getSnapshot(ctx context.Context, snapshotId string) (types.Snapshot, error) {
 	input := &fsx.DescribeSnapshotsInput{
 		SnapshotIds: []string{snapshotId},
 	}
 
 	output, err := c.fsx.DescribeSnapshots(ctx, input)
 	if err != nil {
-		return nil, err
+		return types.Snapshot{}, err
 	}
 
 	if len(output.Snapshots) == 0 {
-		return nil, ErrNotFound
+		return types.Snapshot{}, ErrNotFound
 	}
 
 	if len(output.Snapshots) > 1 {
-		return nil, ErrMultipleFound
+		return types.Snapshot{}, ErrMultipleFound
 	}
 
-	return &output.Snapshots[0], nil
+	return output.Snapshots[0], nil
 }
 
-func (c *cloud) getTagsForResource(resourceARN string) ([]types.Tag, error) {
+func (c *cloud) getTagsForResource(ctx context.Context, resourceARN string) ([]types.Tag, error) {
 	input := &fsx.ListTagsForResourceInput{
 		ResourceARN: aws.String(resourceARN),
 	}
 
-	output, err := c.fsx.ListTagsForResource(context.TODO(), input)
+	output, err := c.fsx.ListTagsForResource(ctx, input)
 	if err != nil {
 		return nil, err
 	}
@@ -588,49 +587,49 @@ func (c *cloud) GetVolumeId(ctx context.Context, volumeId string) (string, error
 	}
 }
 
-func (c *cloud) getUpdateResizeFilesystemAdministrativeAction(ctx context.Context, fileSystemId string, resizeGiB int64) (*types.AdministrativeAction, error) {
+func (c *cloud) getUpdateResizeFilesystemAdministrativeAction(ctx context.Context, fileSystemId string, resizeGiB int32) (types.AdministrativeAction, error) {
 	fs, err := c.getFileSystem(ctx, fileSystemId)
 	if err != nil {
-		return nil, fmt.Errorf("DescribeFileSystems failed: %v", err)
+		return types.AdministrativeAction{}, fmt.Errorf("DescribeFileSystems failed: %v", err)
 	}
 
 	if len(fs.AdministrativeActions) == 0 {
-		return nil, fmt.Errorf("there is no update on filesystem %s", fileSystemId)
+		return types.AdministrativeAction{}, fmt.Errorf("there is no update on filesystem %s", fileSystemId)
 	}
 
 	for _, action := range fs.AdministrativeActions {
 		if action.AdministrativeActionType == types.AdministrativeActionTypeFileSystemUpdate &&
 			action.TargetFileSystemValues.StorageCapacity != nil &&
-			int64(aws.ToInt32(action.TargetFileSystemValues.StorageCapacity)) == resizeGiB {
-			return &action, nil
+			aws.ToInt32(action.TargetFileSystemValues.StorageCapacity) == resizeGiB {
+			return action, nil
 		}
 	}
 
-	return nil, fmt.Errorf("there is no update with storage capacity of %d GiB on filesystem %s", resizeGiB, fileSystemId)
+	return types.AdministrativeAction{}, fmt.Errorf("there is no update with storage capacity of %d GiB on filesystem %s", resizeGiB, fileSystemId)
 }
 
-func (c *cloud) getUpdateResizeVolumeAdministrativeAction(ctx context.Context, volumeId string, resizeGiB int64) (*types.AdministrativeAction, error) {
+func (c *cloud) getUpdateResizeVolumeAdministrativeAction(ctx context.Context, volumeId string, resizeGiB int32) (types.AdministrativeAction, error) {
 	v, err := c.getVolume(ctx, volumeId)
 	if err != nil {
-		return nil, fmt.Errorf("DescribeVolumes failed: %v", err)
+		return types.AdministrativeAction{}, fmt.Errorf("DescribeVolumes failed: %v", err)
 	}
 
 	if len(v.AdministrativeActions) == 0 {
-		return nil, fmt.Errorf("there is no update on volume %s", volumeId)
+		return types.AdministrativeAction{}, fmt.Errorf("there is no update on volume %s", volumeId)
 	}
 
 	for _, action := range v.AdministrativeActions {
 		if action.AdministrativeActionType == types.AdministrativeActionTypeVolumeUpdate &&
 			action.TargetVolumeValues.OpenZFSConfiguration != nil &&
 			action.TargetVolumeValues.OpenZFSConfiguration.StorageCapacityQuotaGiB != nil &&
-			int64(aws.ToInt32(action.TargetVolumeValues.OpenZFSConfiguration.StorageCapacityQuotaGiB)) == resizeGiB &&
+			aws.ToInt32(action.TargetVolumeValues.OpenZFSConfiguration.StorageCapacityQuotaGiB) == resizeGiB &&
 			action.TargetVolumeValues.OpenZFSConfiguration.StorageCapacityReservationGiB != nil &&
-			int64(aws.ToInt32(action.TargetVolumeValues.OpenZFSConfiguration.StorageCapacityReservationGiB)) == resizeGiB {
-			return &action, nil
+			aws.ToInt32(action.TargetVolumeValues.OpenZFSConfiguration.StorageCapacityReservationGiB) == resizeGiB {
+			return action, nil
 		}
 	}
 
-	return nil, fmt.Errorf("there is no update with storage capacity of %d GiB on volume %s", resizeGiB, volumeId)
+	return types.AdministrativeAction{}, fmt.Errorf("there is no update with storage capacity of %d GiB on volume %s", resizeGiB, volumeId)
 }
 
 func CollapseCreateFileSystemParameters(parameters map[string]string) error {
@@ -660,6 +659,11 @@ func ValidateDeleteFileSystemParameters(parameters map[string]string) error {
 		return err
 	}
 
+	// Basic validation - FileSystemId is required
+	if config.FileSystemId == nil || *config.FileSystemId == "" {
+		return fmt.Errorf("FileSystemId is required")
+	}
+
 	return nil
 }
 
@@ -668,6 +672,11 @@ func ValidateDeleteVolumeParameters(parameters map[string]string) error {
 	err := util.StrictRemoveParametersAndPopulateObject(parameters, &config)
 	if err != nil {
 		return err
+	}
+
+	// Basic validation - VolumeId is required
+	if config.VolumeId == nil || *config.VolumeId == "" {
+		return fmt.Errorf("VolumeId is required")
 	}
 
 	return nil

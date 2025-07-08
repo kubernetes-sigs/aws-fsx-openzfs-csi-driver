@@ -82,9 +82,10 @@ func TestNewMetadataService(t *testing.T) {
 		},
 		{
 			name:                             "fail: GetInstanceIdentityDocument returned error",
-			ec2metadataAvailable:             true,
+			ec2metadataAvailable:             false,
 			getInstanceIdentityDocumentError: fmt.Errorf("foo"),
-			expectedErr:                      fmt.Errorf("could not get EC2 instance identity metadata: foo"),
+			expectedErr:                      fmt.Errorf("error getting Node %s: nodes \"%s\" not found", nodeName, nodeName),
+			nodeNameEnvVar:                   nodeName,
 		},
 		{
 			name:                 "fail: GetInstanceIdentityDocument returned empty instance",
@@ -124,9 +125,6 @@ func TestNewMetadataService(t *testing.T) {
 			mockEC2Metadata := mocks.NewMockEC2Metadata(mockCtrl)
 
 			ec2MetadataClient := func() (EC2Metadata, error) {
-				if !tc.ec2metadataAvailable {
-					return nil, fmt.Errorf("ec2 metadata not available")
-				}
 				return mockEC2Metadata, nil
 			}
 			k8sAPIClient := func() (kubernetes.Interface, error) { clientsetInitialized = true; return clientset, nil }
@@ -135,8 +133,18 @@ func TestNewMetadataService(t *testing.T) {
 				output := &imds.GetInstanceIdentityDocumentOutput{
 					InstanceIdentityDocument: tc.getInstanceIdentityDocumentValue,
 				}
+				// First call for availability check
 				mockEC2Metadata.EXPECT().GetInstanceIdentityDocument(gomock.Any(), gomock.Any()).Return(output, tc.getInstanceIdentityDocumentError)
+				// Second call for actual metadata retrieval (if first call succeeds)
+				if tc.getInstanceIdentityDocumentError == nil {
+					mockEC2Metadata.EXPECT().GetInstanceIdentityDocument(gomock.Any(), gomock.Any()).Return(output, tc.getInstanceIdentityDocumentError)
+				}
+			} else {
+				// Simulate EC2 metadata not being available by returning an error
+				mockEC2Metadata.EXPECT().GetInstanceIdentityDocument(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("ec2 metadata not available"))
+			}
 
+			if tc.ec2metadataAvailable && tc.getInstanceIdentityDocumentError == nil && !tc.invalidInstanceIdentityDocument {
 				if clientsetInitialized == true {
 					t.Errorf("kubernetes client was unexpectedly initialized when metadata is available!")
 					if len(clientset.Actions()) > 0 {
