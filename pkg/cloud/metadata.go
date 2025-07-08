@@ -71,8 +71,14 @@ func NewMetadataService(ec2MetadataClient EC2MetadataClient, k8sAPIClient Kubern
 	if err != nil {
 		klog.InfoS("error creating ec2 metadata client", "err", err)
 	} else {
-		klog.InfoS("ec2 metadata is available")
-		return EC2MetadataInstanceInfo(svc, region)
+		// Check if EC2 metadata is available by attempting to get instance identity
+		_, err := svc.GetInstanceIdentityDocument(context.Background(), &imds.GetInstanceIdentityDocumentInput{})
+		if err != nil {
+			klog.InfoS("ec2 metadata is not available", "err", err)
+		} else {
+			klog.InfoS("ec2 metadata is available")
+			return EC2MetadataInstanceInfo(svc, region)
+		}
 	}
 
 	klog.InfoS("retrieving instance data from kubernetes api")

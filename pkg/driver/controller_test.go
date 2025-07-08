@@ -83,7 +83,7 @@ func TestCreateVolume(t *testing.T) {
 				filesystem := &cloud.FileSystem{
 					DnsName:         dnsName,
 					FileSystemId:    filesystemId,
-					StorageCapacity: storageCapacity,
+					StorageCapacity: int32(storageCapacity),
 				}
 
 				mockCloud.EXPECT().CreateFileSystem(gomock.Eq(ctx), gomock.Any()).Return(filesystem, nil)
@@ -143,7 +143,7 @@ func TestCreateVolume(t *testing.T) {
 				filesystem := &cloud.FileSystem{
 					DnsName:         dnsName,
 					FileSystemId:    filesystemId,
-					StorageCapacity: storageCapacity,
+					StorageCapacity: int32(storageCapacity),
 				}
 
 				mockCloud.EXPECT().CreateFileSystem(gomock.Eq(ctx), gomock.Any()).Return(filesystem, nil)
@@ -206,7 +206,7 @@ func TestCreateVolume(t *testing.T) {
 				filesystem := &cloud.FileSystem{
 					DnsName:         dnsName,
 					FileSystemId:    filesystemId,
-					StorageCapacity: storageCapacity,
+					StorageCapacity: int32(storageCapacity),
 				}
 
 				ctx := context.Background()
@@ -275,7 +275,7 @@ func TestCreateVolume(t *testing.T) {
 				filesystem := &cloud.FileSystem{
 					DnsName:         dnsName,
 					FileSystemId:    filesystemId,
-					StorageCapacity: storageCapacity,
+					StorageCapacity: int32(storageCapacity),
 				}
 
 				ctx := context.Background()
@@ -351,7 +351,7 @@ func TestCreateVolume(t *testing.T) {
 				filesystem := &cloud.FileSystem{
 					DnsName:         dnsName,
 					FileSystemId:    filesystemId,
-					StorageCapacity: storageCapacity,
+					StorageCapacity: int32(storageCapacity),
 				}
 				snapshot := &cloud.Snapshot{
 					SnapshotID:     snapshotId,
@@ -666,7 +666,7 @@ func TestCreateVolume(t *testing.T) {
 				filesystem := &cloud.FileSystem{
 					DnsName:         dnsName,
 					FileSystemId:    filesystemId,
-					StorageCapacity: storageCapacity,
+					StorageCapacity: int32(storageCapacity),
 				}
 				mockCloud.EXPECT().CreateFileSystem(gomock.Eq(ctx), gomock.Any()).Return(filesystem, nil)
 				mockCloud.EXPECT().WaitForFileSystemAvailable(gomock.Eq(ctx), gomock.Eq(filesystemId)).Return(errors.New("error"))
@@ -1730,13 +1730,14 @@ func TestControllerExpandVolume(t *testing.T) {
 				filesystem := &cloud.FileSystem{
 					DnsName:         dnsName,
 					FileSystemId:    filesystemId,
-					StorageCapacity: storageCapacity,
+					StorageCapacity: int32(storageCapacity),
 				}
 
 				ctx := context.Background()
+				newCapacityInt32 := int32(newCapacity)
 				mockCloud.EXPECT().DescribeFileSystem(gomock.Eq(ctx), gomock.Eq(filesystemId)).Return(filesystem, nil)
-				mockCloud.EXPECT().ResizeFileSystem(gomock.Eq(ctx), gomock.Eq(filesystemId), gomock.Any()).Return(&newCapacity, nil)
-				mockCloud.EXPECT().WaitForFileSystemResize(gomock.Eq(ctx), gomock.Eq(filesystemId), newCapacity).Return(nil)
+				mockCloud.EXPECT().ResizeFileSystem(gomock.Eq(ctx), gomock.Eq(filesystemId), gomock.Any()).Return(&newCapacityInt32, nil)
+				mockCloud.EXPECT().WaitForFileSystemResize(gomock.Eq(ctx), gomock.Eq(filesystemId), newCapacityInt32).Return(nil)
 
 				resp, err := driver.ControllerExpandVolume(ctx, req)
 				if err != nil {
@@ -1803,7 +1804,7 @@ func TestControllerExpandVolume(t *testing.T) {
 				filesystem := &cloud.FileSystem{
 					DnsName:         dnsName,
 					FileSystemId:    filesystemId,
-					StorageCapacity: storageCapacity,
+					StorageCapacity: int32(storageCapacity),
 				}
 
 				ctx := context.Background()
@@ -1959,7 +1960,7 @@ func TestControllerExpandVolume(t *testing.T) {
 				filesystem := &cloud.FileSystem{
 					DnsName:         dnsName,
 					FileSystemId:    filesystemId,
-					StorageCapacity: storageCapacity,
+					StorageCapacity: int32(storageCapacity),
 				}
 
 				ctx := context.Background()
@@ -1996,13 +1997,14 @@ func TestControllerExpandVolume(t *testing.T) {
 				filesystem := &cloud.FileSystem{
 					DnsName:         dnsName,
 					FileSystemId:    filesystemId,
-					StorageCapacity: storageCapacity,
+					StorageCapacity: int32(storageCapacity),
 				}
 
 				ctx := context.Background()
+				newCapacityInt32 := int32(newCapacity)
 				mockCloud.EXPECT().DescribeFileSystem(gomock.Eq(ctx), gomock.Eq(filesystemId)).Return(filesystem, nil)
-				mockCloud.EXPECT().ResizeFileSystem(gomock.Eq(ctx), gomock.Eq(filesystemId), gomock.Any()).Return(&newCapacity, nil)
-				mockCloud.EXPECT().WaitForFileSystemResize(gomock.Eq(ctx), gomock.Eq(filesystemId), newCapacity).Return(errors.New(""))
+				mockCloud.EXPECT().ResizeFileSystem(gomock.Eq(ctx), gomock.Eq(filesystemId), gomock.Any()).Return(&newCapacityInt32, nil)
+				mockCloud.EXPECT().WaitForFileSystemResize(gomock.Eq(ctx), gomock.Eq(filesystemId), newCapacityInt32).Return(errors.New(""))
 
 				_, err := driver.ControllerExpandVolume(ctx, req)
 				if err == nil {
