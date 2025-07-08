@@ -218,7 +218,7 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 		return &csi.CreateVolumeResponse{
 			Volume: &csi.Volume{
-				CapacityBytes: util.GiBToBytes(fs.StorageCapacity),
+				CapacityBytes: util.GiBToBytes(int64(fs.StorageCapacity)),
 				VolumeId:      fs.FileSystemId,
 				VolumeContext: map[string]string{
 					volumeContextDnsName:      fs.DnsName,
@@ -595,16 +595,16 @@ func (d *controllerService) ControllerExpandVolume(ctx context.Context, req *csi
 			return nil, status.Errorf(codes.Internal, "Could not get filesystem with ID %q: %v", volumeID, err)
 		}
 
-		if newCapacity <= fs.StorageCapacity {
+		if newCapacity <= int64(fs.StorageCapacity) {
 			// Current capacity is sufficient to satisfy the request
 			klog.V(4).InfoS("ControllerExpandVolume: current filesystem capacity matches or exceeds requested storage capacity, returning with success", "currentStorageCapacityGiB", fs.StorageCapacity, "requestedStorageCapacityGiB", newCapacity)
 			return &csi.ControllerExpandVolumeResponse{
-				CapacityBytes:         util.GiBToBytes(fs.StorageCapacity),
+				CapacityBytes:         util.GiBToBytes(int64(fs.StorageCapacity)),
 				NodeExpansionRequired: false,
 			}, nil
 		}
 
-		finalCapacity, err := d.cloud.ResizeFileSystem(ctx, volumeID, newCapacity)
+		finalCapacity, err := d.cloud.ResizeFileSystem(ctx, volumeID, int32(newCapacity))
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "resize failed: %v", err)
 		}
@@ -615,7 +615,7 @@ func (d *controllerService) ControllerExpandVolume(ctx context.Context, req *csi
 		}
 
 		return &csi.ControllerExpandVolumeResponse{
-			CapacityBytes:         util.GiBToBytes(*finalCapacity),
+			CapacityBytes:         util.GiBToBytes(int64(*finalCapacity)),
 			NodeExpansionRequired: false,
 		}, nil
 	}
