@@ -38,7 +38,7 @@ func TestCreateVolume(t *testing.T) {
 		snapshotVolumeParameters     map[string]string
 		filesystemId                       = "filesystemId"
 		volumeId                           = "volumeId"
-		storageCapacity              int64 = 64
+		storageCapacity              int32 = 64
 		dnsName                            = "dnsName"
 		snapshotId                         = "fsvolsnap-1234"
 		volumePath                         = "/"
@@ -1698,9 +1698,9 @@ func TestControllerExpandVolume(t *testing.T) {
 		dnsName               = "dnsName"
 		filesystemId          = "fs-1234"
 		volumeId              = "fsvol-1234"
-		storageCapacity int64 = 100
+		storageCapacity int32 = 100
 		currentBytes          = util.GiBToBytes(storageCapacity)
-		newCapacity     int64 = 150
+		newCapacity     int32 = 150
 		requiredBytes         = util.GiBToBytes(newCapacity)
 		limitBytes            = util.GiBToBytes(newCapacity)
 	)

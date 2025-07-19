@@ -280,248 +280,248 @@ func (m *MockCloud) EXPECT() *MockCloudMockRecorder {
 }
 
 // CreateFileSystem mocks base method.
-func (m *MockCloud) CreateFileSystem(ctx context.Context, parameters map[string]string) (*cloud.FileSystem, error) {
+func (m *MockCloud) CreateFileSystem(arg0 context.Context, arg1 map[string]string) (*cloud.FileSystem, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateFileSystem", ctx, parameters)
+	ret := m.ctrl.Call(m, "CreateFileSystem", arg0, arg1)
 	ret0, _ := ret[0].(*cloud.FileSystem)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateFileSystem indicates an expected call of CreateFileSystem.
-func (mr *MockCloudMockRecorder) CreateFileSystem(ctx, parameters interface{}) *gomock.Call {
+func (mr *MockCloudMockRecorder) CreateFileSystem(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateFileSystem", reflect.TypeOf((*MockCloud)(nil).CreateFileSystem), ctx, parameters)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateFileSystem", reflect.TypeOf((*MockCloud)(nil).CreateFileSystem), arg0, arg1)
 }
 
 // CreateSnapshot mocks base method.
-func (m *MockCloud) CreateSnapshot(ctx context.Context, options map[string]string) (*cloud.Snapshot, error) {
+func (m *MockCloud) CreateSnapshot(arg0 context.Context, arg1 map[string]string) (*cloud.Snapshot, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateSnapshot", ctx, options)
+	ret := m.ctrl.Call(m, "CreateSnapshot", arg0, arg1)
 	ret0, _ := ret[0].(*cloud.Snapshot)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateSnapshot indicates an expected call of CreateSnapshot.
-func (mr *MockCloudMockRecorder) CreateSnapshot(ctx, options interface{}) *gomock.Call {
+func (mr *MockCloudMockRecorder) CreateSnapshot(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSnapshot", reflect.TypeOf((*MockCloud)(nil).CreateSnapshot), ctx, options)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSnapshot", reflect.TypeOf((*MockCloud)(nil).CreateSnapshot), arg0, arg1)
 }
 
 // CreateVolume mocks base method.
-func (m *MockCloud) CreateVolume(ctx context.Context, parameters map[string]string) (*cloud.Volume, error) {
+func (m *MockCloud) CreateVolume(arg0 context.Context, arg1 map[string]string) (*cloud.Volume, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateVolume", ctx, parameters)
+	ret := m.ctrl.Call(m, "CreateVolume", arg0, arg1)
 	ret0, _ := ret[0].(*cloud.Volume)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateVolume indicates an expected call of CreateVolume.
-func (mr *MockCloudMockRecorder) CreateVolume(ctx, parameters interface{}) *gomock.Call {
+func (mr *MockCloudMockRecorder) CreateVolume(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateVolume", reflect.TypeOf((*MockCloud)(nil).CreateVolume), ctx, parameters)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateVolume", reflect.TypeOf((*MockCloud)(nil).CreateVolume), arg0, arg1)
 }
 
 // DeleteFileSystem mocks base method.
-func (m *MockCloud) DeleteFileSystem(ctx context.Context, parameters map[string]string) error {
+func (m *MockCloud) DeleteFileSystem(arg0 context.Context, arg1 map[string]string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteFileSystem", ctx, parameters)
+	ret := m.ctrl.Call(m, "DeleteFileSystem", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DeleteFileSystem indicates an expected call of DeleteFileSystem.
-func (mr *MockCloudMockRecorder) DeleteFileSystem(ctx, parameters interface{}) *gomock.Call {
+func (mr *MockCloudMockRecorder) DeleteFileSystem(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteFileSystem", reflect.TypeOf((*MockCloud)(nil).DeleteFileSystem), ctx, parameters)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteFileSystem", reflect.TypeOf((*MockCloud)(nil).DeleteFileSystem), arg0, arg1)
 }
 
 // DeleteSnapshot mocks base method.
-func (m *MockCloud) DeleteSnapshot(ctx context.Context, parameters map[string]string) error {
+func (m *MockCloud) DeleteSnapshot(arg0 context.Context, arg1 map[string]string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteSnapshot", ctx, parameters)
+	ret := m.ctrl.Call(m, "DeleteSnapshot", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DeleteSnapshot indicates an expected call of DeleteSnapshot.
-func (mr *MockCloudMockRecorder) DeleteSnapshot(ctx, parameters interface{}) *gomock.Call {
+func (mr *MockCloudMockRecorder) DeleteSnapshot(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSnapshot", reflect.TypeOf((*MockCloud)(nil).DeleteSnapshot), ctx, parameters)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSnapshot", reflect.TypeOf((*MockCloud)(nil).DeleteSnapshot), arg0, arg1)
 }
 
 // DeleteVolume mocks base method.
-func (m *MockCloud) DeleteVolume(ctx context.Context, parameters map[string]string) error {
+func (m *MockCloud) DeleteVolume(arg0 context.Context, arg1 map[string]string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteVolume", ctx, parameters)
+	ret := m.ctrl.Call(m, "DeleteVolume", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DeleteVolume indicates an expected call of DeleteVolume.
-func (mr *MockCloudMockRecorder) DeleteVolume(ctx, parameters interface{}) *gomock.Call {
+func (mr *MockCloudMockRecorder) DeleteVolume(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteVolume", reflect.TypeOf((*MockCloud)(nil).DeleteVolume), ctx, parameters)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteVolume", reflect.TypeOf((*MockCloud)(nil).DeleteVolume), arg0, arg1)
 }
 
 // DescribeFileSystem mocks base method.
-func (m *MockCloud) DescribeFileSystem(ctx context.Context, fileSystemId string) (*cloud.FileSystem, error) {
+func (m *MockCloud) DescribeFileSystem(arg0 context.Context, arg1 string) (*cloud.FileSystem, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DescribeFileSystem", ctx, fileSystemId)
+	ret := m.ctrl.Call(m, "DescribeFileSystem", arg0, arg1)
 	ret0, _ := ret[0].(*cloud.FileSystem)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // DescribeFileSystem indicates an expected call of DescribeFileSystem.
-func (mr *MockCloudMockRecorder) DescribeFileSystem(ctx, fileSystemId interface{}) *gomock.Call {
+func (mr *MockCloudMockRecorder) DescribeFileSystem(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeFileSystem", reflect.TypeOf((*MockCloud)(nil).DescribeFileSystem), ctx, fileSystemId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeFileSystem", reflect.TypeOf((*MockCloud)(nil).DescribeFileSystem), arg0, arg1)
 }
 
 // DescribeSnapshot mocks base method.
-func (m *MockCloud) DescribeSnapshot(ctx context.Context, snapshotId string) (*cloud.Snapshot, error) {
+func (m *MockCloud) DescribeSnapshot(arg0 context.Context, arg1 string) (*cloud.Snapshot, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DescribeSnapshot", ctx, snapshotId)
+	ret := m.ctrl.Call(m, "DescribeSnapshot", arg0, arg1)
 	ret0, _ := ret[0].(*cloud.Snapshot)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // DescribeSnapshot indicates an expected call of DescribeSnapshot.
-func (mr *MockCloudMockRecorder) DescribeSnapshot(ctx, snapshotId interface{}) *gomock.Call {
+func (mr *MockCloudMockRecorder) DescribeSnapshot(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeSnapshot", reflect.TypeOf((*MockCloud)(nil).DescribeSnapshot), ctx, snapshotId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeSnapshot", reflect.TypeOf((*MockCloud)(nil).DescribeSnapshot), arg0, arg1)
 }
 
 // DescribeVolume mocks base method.
-func (m *MockCloud) DescribeVolume(ctx context.Context, volumeId string) (*cloud.Volume, error) {
+func (m *MockCloud) DescribeVolume(arg0 context.Context, arg1 string) (*cloud.Volume, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DescribeVolume", ctx, volumeId)
+	ret := m.ctrl.Call(m, "DescribeVolume", arg0, arg1)
 	ret0, _ := ret[0].(*cloud.Volume)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // DescribeVolume indicates an expected call of DescribeVolume.
-func (mr *MockCloudMockRecorder) DescribeVolume(ctx, volumeId interface{}) *gomock.Call {
+func (mr *MockCloudMockRecorder) DescribeVolume(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeVolume", reflect.TypeOf((*MockCloud)(nil).DescribeVolume), ctx, volumeId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeVolume", reflect.TypeOf((*MockCloud)(nil).DescribeVolume), arg0, arg1)
 }
 
 // GetDeleteParameters mocks base method.
-func (m *MockCloud) GetDeleteParameters(ctx context.Context, id string) (map[string]string, error) {
+func (m *MockCloud) GetDeleteParameters(arg0 context.Context, arg1 string) (map[string]string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetDeleteParameters", ctx, id)
+	ret := m.ctrl.Call(m, "GetDeleteParameters", arg0, arg1)
 	ret0, _ := ret[0].(map[string]string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetDeleteParameters indicates an expected call of GetDeleteParameters.
-func (mr *MockCloudMockRecorder) GetDeleteParameters(ctx, id interface{}) *gomock.Call {
+func (mr *MockCloudMockRecorder) GetDeleteParameters(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDeleteParameters", reflect.TypeOf((*MockCloud)(nil).GetDeleteParameters), ctx, id)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDeleteParameters", reflect.TypeOf((*MockCloud)(nil).GetDeleteParameters), arg0, arg1)
 }
 
 // GetVolumeId mocks base method.
-func (m *MockCloud) GetVolumeId(ctx context.Context, volumeId string) (string, error) {
+func (m *MockCloud) GetVolumeId(arg0 context.Context, arg1 string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetVolumeId", ctx, volumeId)
+	ret := m.ctrl.Call(m, "GetVolumeId", arg0, arg1)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetVolumeId indicates an expected call of GetVolumeId.
-func (mr *MockCloudMockRecorder) GetVolumeId(ctx, volumeId interface{}) *gomock.Call {
+func (mr *MockCloudMockRecorder) GetVolumeId(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVolumeId", reflect.TypeOf((*MockCloud)(nil).GetVolumeId), ctx, volumeId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVolumeId", reflect.TypeOf((*MockCloud)(nil).GetVolumeId), arg0, arg1)
 }
 
 // ResizeFileSystem mocks base method.
-func (m *MockCloud) ResizeFileSystem(ctx context.Context, fileSystemId string, newSizeGiB int32) (*int32, error) {
+func (m *MockCloud) ResizeFileSystem(arg0 context.Context, arg1 string, arg2 int32) (*int32, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ResizeFileSystem", ctx, fileSystemId, newSizeGiB)
+	ret := m.ctrl.Call(m, "ResizeFileSystem", arg0, arg1, arg2)
 	ret0, _ := ret[0].(*int32)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ResizeFileSystem indicates an expected call of ResizeFileSystem.
-func (mr *MockCloudMockRecorder) ResizeFileSystem(ctx, fileSystemId, newSizeGiB interface{}) *gomock.Call {
+func (mr *MockCloudMockRecorder) ResizeFileSystem(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResizeFileSystem", reflect.TypeOf((*MockCloud)(nil).ResizeFileSystem), ctx, fileSystemId, newSizeGiB)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResizeFileSystem", reflect.TypeOf((*MockCloud)(nil).ResizeFileSystem), arg0, arg1, arg2)
 }
 
 // WaitForFileSystemAvailable mocks base method.
-func (m *MockCloud) WaitForFileSystemAvailable(ctx context.Context, fileSystemId string) error {
+func (m *MockCloud) WaitForFileSystemAvailable(arg0 context.Context, arg1 string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WaitForFileSystemAvailable", ctx, fileSystemId)
+	ret := m.ctrl.Call(m, "WaitForFileSystemAvailable", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // WaitForFileSystemAvailable indicates an expected call of WaitForFileSystemAvailable.
-func (mr *MockCloudMockRecorder) WaitForFileSystemAvailable(ctx, fileSystemId interface{}) *gomock.Call {
+func (mr *MockCloudMockRecorder) WaitForFileSystemAvailable(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForFileSystemAvailable", reflect.TypeOf((*MockCloud)(nil).WaitForFileSystemAvailable), ctx, fileSystemId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForFileSystemAvailable", reflect.TypeOf((*MockCloud)(nil).WaitForFileSystemAvailable), arg0, arg1)
 }
 
 // WaitForFileSystemResize mocks base method.
-func (m *MockCloud) WaitForFileSystemResize(ctx context.Context, fileSystemId string, resizeGiB int32) error {
+func (m *MockCloud) WaitForFileSystemResize(arg0 context.Context, arg1 string, arg2 int32) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WaitForFileSystemResize", ctx, fileSystemId, resizeGiB)
+	ret := m.ctrl.Call(m, "WaitForFileSystemResize", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // WaitForFileSystemResize indicates an expected call of WaitForFileSystemResize.
-func (mr *MockCloudMockRecorder) WaitForFileSystemResize(ctx, fileSystemId, resizeGiB interface{}) *gomock.Call {
+func (mr *MockCloudMockRecorder) WaitForFileSystemResize(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForFileSystemResize", reflect.TypeOf((*MockCloud)(nil).WaitForFileSystemResize), ctx, fileSystemId, resizeGiB)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForFileSystemResize", reflect.TypeOf((*MockCloud)(nil).WaitForFileSystemResize), arg0, arg1, arg2)
 }
 
 // WaitForSnapshotAvailable mocks base method.
-func (m *MockCloud) WaitForSnapshotAvailable(ctx context.Context, snapshotId string) error {
+func (m *MockCloud) WaitForSnapshotAvailable(arg0 context.Context, arg1 string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WaitForSnapshotAvailable", ctx, snapshotId)
+	ret := m.ctrl.Call(m, "WaitForSnapshotAvailable", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // WaitForSnapshotAvailable indicates an expected call of WaitForSnapshotAvailable.
-func (mr *MockCloudMockRecorder) WaitForSnapshotAvailable(ctx, snapshotId interface{}) *gomock.Call {
+func (mr *MockCloudMockRecorder) WaitForSnapshotAvailable(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForSnapshotAvailable", reflect.TypeOf((*MockCloud)(nil).WaitForSnapshotAvailable), ctx, snapshotId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForSnapshotAvailable", reflect.TypeOf((*MockCloud)(nil).WaitForSnapshotAvailable), arg0, arg1)
 }
 
 // WaitForVolumeAvailable mocks base method.
-func (m *MockCloud) WaitForVolumeAvailable(ctx context.Context, volumeId string) error {
+func (m *MockCloud) WaitForVolumeAvailable(arg0 context.Context, arg1 string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WaitForVolumeAvailable", ctx, volumeId)
+	ret := m.ctrl.Call(m, "WaitForVolumeAvailable", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // WaitForVolumeAvailable indicates an expected call of WaitForVolumeAvailable.
-func (mr *MockCloudMockRecorder) WaitForVolumeAvailable(ctx, volumeId interface{}) *gomock.Call {
+func (mr *MockCloudMockRecorder) WaitForVolumeAvailable(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForVolumeAvailable", reflect.TypeOf((*MockCloud)(nil).WaitForVolumeAvailable), ctx, volumeId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForVolumeAvailable", reflect.TypeOf((*MockCloud)(nil).WaitForVolumeAvailable), arg0, arg1)
 }
 
 // WaitForVolumeResize mocks base method.
-func (m *MockCloud) WaitForVolumeResize(ctx context.Context, volumeId string, resizeGiB int32) error {
+func (m *MockCloud) WaitForVolumeResize(arg0 context.Context, arg1 string, arg2 int32) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WaitForVolumeResize", ctx, volumeId, resizeGiB)
+	ret := m.ctrl.Call(m, "WaitForVolumeResize", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // WaitForVolumeResize indicates an expected call of WaitForVolumeResize.
-func (mr *MockCloudMockRecorder) WaitForVolumeResize(ctx, volumeId, resizeGiB interface{}) *gomock.Call {
+func (mr *MockCloudMockRecorder) WaitForVolumeResize(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForVolumeResize", reflect.TypeOf((*MockCloud)(nil).WaitForVolumeResize), ctx, volumeId, resizeGiB)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForVolumeResize", reflect.TypeOf((*MockCloud)(nil).WaitForVolumeResize), arg0, arg1, arg2)
 }

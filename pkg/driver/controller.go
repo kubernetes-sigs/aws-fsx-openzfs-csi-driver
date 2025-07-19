@@ -148,7 +148,7 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return nil, status.Error(codes.InvalidArgument, "Volume capabilities not supported")
 	}
 
-	var storageCapacity int64
+	var storageCapacity int32
 	if req.GetCapacityRange() != nil {
 		storageCapacity = util.BytesToGiB(req.GetCapacityRange().GetRequiredBytes())
 	}
@@ -192,7 +192,9 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 		}
 
 		volumeParams[volumeParamsFileSystemType] = strconv.Quote("OPENZFS")
-		volumeParams[volumeParamsStorageCapacity] = strconv.FormatInt(storageCapacity, 10)
+		volumeParams[volumeParamsStorageCapacity] = strconv.Itoa(
+			int(storageCapacity),
+		)
 		err = cloud.CollapseCreateFileSystemParameters(volumeParams)
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, ErrIncorrectlyFormatted, "OpenZFSConfiguration", err)
@@ -218,7 +220,7 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 		return &csi.CreateVolumeResponse{
 			Volume: &csi.Volume{
-				CapacityBytes: util.GiBToBytes(int64(fs.StorageCapacity)),
+				CapacityBytes: util.GiBToBytes(fs.StorageCapacity),
 				VolumeId:      fs.FileSystemId,
 				VolumeContext: map[string]string{
 					volumeContextDnsName:      fs.DnsName,
@@ -595,16 +597,16 @@ func (d *controllerService) ControllerExpandVolume(ctx context.Context, req *csi
 			return nil, status.Errorf(codes.Internal, "Could not get filesystem with ID %q: %v", volumeID, err)
 		}
 
-		if newCapacity <= int64(fs.StorageCapacity) {
+		if newCapacity <= fs.StorageCapacity {
 			// Current capacity is sufficient to satisfy the request
 			klog.V(4).InfoS("ControllerExpandVolume: current filesystem capacity matches or exceeds requested storage capacity, returning with success", "currentStorageCapacityGiB", fs.StorageCapacity, "requestedStorageCapacityGiB", newCapacity)
 			return &csi.ControllerExpandVolumeResponse{
-				CapacityBytes:         util.GiBToBytes(int64(fs.StorageCapacity)),
+				CapacityBytes:         util.GiBToBytes(fs.StorageCapacity),
 				NodeExpansionRequired: false,
 			}, nil
 		}
 
-		finalCapacity, err := d.cloud.ResizeFileSystem(ctx, volumeID, int32(newCapacity))
+		finalCapacity, err := d.cloud.ResizeFileSystem(ctx, volumeID, newCapacity)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "resize failed: %v", err)
 		}
@@ -615,7 +617,7 @@ func (d *controllerService) ControllerExpandVolume(ctx context.Context, req *csi
 		}
 
 		return &csi.ControllerExpandVolumeResponse{
-			CapacityBytes:         util.GiBToBytes(int64(*finalCapacity)),
+			CapacityBytes:         util.GiBToBytes(*finalCapacity),
 			NodeExpansionRequired: false,
 		}, nil
 	}

@@ -108,7 +108,7 @@ func TestCreateFileSystem(t *testing.T) {
 		parameters = map[string]string{
 			"ClientRequestToken": `"Test"`,
 			"FileSystemType":     `"OPENZFS"`,
-			"StorageCapacity":    strconv.FormatInt(int64(*storageCapacity), 10),
+			"StorageCapacity":    strconv.Itoa(int(*storageCapacity)),
 			"SubnetIds":          `["test","test2"]`,
 		}
 

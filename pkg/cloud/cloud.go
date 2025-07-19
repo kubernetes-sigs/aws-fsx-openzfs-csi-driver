@@ -27,6 +27,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/fsx"
 	"github.com/aws/aws-sdk-go-v2/service/fsx/types"
+	"github.com/aws/smithy-go"
 	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/util"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
@@ -123,6 +124,9 @@ type cloud struct {
 
 // NewCloud returns a new instance of AWS cloud
 func NewCloud(region string) (Cloud, error) {
+
+	// Set MaxRetries to a high value. It will be "overwritten" if context deadline comes sooner.
+
 	os.Setenv("AWS_EXECUTION_ENV", "aws-fsx-openzfs-csi-driver-"+driverVersion)
 
 	cfg, err := config.LoadDefaultConfig(context.Background(),
@@ -565,6 +569,10 @@ func (c *cloud) getTagsForResource(ctx context.Context, resourceARN string) ([]t
 	return output.Tags, nil
 }
 
+// GetVolumeId getVolumeId Parses the volumeId to determine if it is the id of a file system or an OpenZFS volume.
+// If the volumeId references a file system, this function retrieves the file system's root volume id.
+// If the volumeId references an OpenZFS volume, this function returns a pointer to the volumeId.
+
 func (c *cloud) GetVolumeId(ctx context.Context, volumeId string) (string, error) {
 	splitVolumeId := strings.Split(volumeId, "-")
 	if len(splitVolumeId) != 2 {
@@ -659,13 +667,30 @@ func ValidateDeleteFileSystemParameters(parameters map[string]string) error {
 		return err
 	}
 
-	// Basic validation - FileSystemId is required
-	if config.FileSystemId == nil || *config.FileSystemId == "" {
-		return fmt.Errorf("FileSystemId is required")
+	// Note: FileSystemId validation is skipped since this is called during Create
+	// when no FileSystemId exists yet. The ID will be set during actual deletion.
+	// We're using the AWS SDK's internal validation function but ignoring FileSystemId validation
+	validationErr := validateOpDeleteFileSystemInput(&config)
+
+	// If there's a validation error, check if it's only about the missing FileSystemId
+	if validationErr != nil {
+		// If it's only complaining about FileSystemId being nil, we can ignore it
+		if invalidParams, ok := validationErr.(*smithy.InvalidParamsError); ok {
+			// Check if the only error is about FileSystemId
+			if invalidParams.Len() == 1 && strings.Contains(invalidParams.Error(), "FileSystemId") {
+				return nil
+			}
+		}
+		return validationErr
 	}
 
 	return nil
 }
+
+// ValidateDeleteVolumeParameters is used in CreateVolume to remove all delete parameters from the parameters map, and ensure they are valid.
+// Parameters should be unique map containing only delete parameters without the OnDeletion suffix
+// This method expects there to be no remaining delete parameters and errors if there are any
+// Verifies parameters are valid in accordance to the API to prevent unknown errors from occurring during DeleteVolume
 
 func ValidateDeleteVolumeParameters(parameters map[string]string) error {
 	config := fsx.DeleteVolumeInput{}
@@ -674,9 +699,21 @@ func ValidateDeleteVolumeParameters(parameters map[string]string) error {
 		return err
 	}
 
-	// Basic validation - VolumeId is required
-	if config.VolumeId == nil || *config.VolumeId == "" {
-		return fmt.Errorf("VolumeId is required")
+	// Note: VolumeId validation is skipped since this is called during Create
+	// when no VolumeId exists yet. The ID will be set during actual deletion.
+	// We're using the AWS SDK's internal validation function but ignoring VolumeId validation
+	validationErr := validateOpDeleteVolumeInput(&config)
+
+	// If there's a validation error, check if it's only about the missing VolumeId
+	if validationErr != nil {
+		// If it's only complaining about VolumeId being nil, we can ignore it
+		if invalidParams, ok := validationErr.(*smithy.InvalidParamsError); ok {
+			// Check if the only error is about VolumeId
+			if invalidParams.Len() == 1 && strings.Contains(invalidParams.Error(), "VolumeId") {
+				return nil
+			}
+		}
+		return validationErr
 	}
 
 	return nil

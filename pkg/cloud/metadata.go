@@ -33,6 +33,7 @@ type MetadataService interface {
 
 type EC2Metadata interface {
 	GetInstanceIdentityDocument(context.Context, *imds.GetInstanceIdentityDocumentInput, ...func(*imds.Options)) (*imds.GetInstanceIdentityDocumentOutput, error)
+	GetMetadata(ctx context.Context, params *imds.GetMetadataInput, optFns ...func(*imds.Options)) (*imds.GetMetadataOutput, error)
 }
 
 type Metadata struct {
@@ -71,8 +72,8 @@ func NewMetadataService(ec2MetadataClient EC2MetadataClient, k8sAPIClient Kubern
 	if err != nil {
 		klog.InfoS("error creating ec2 metadata client", "err", err)
 	} else {
-		// Check if EC2 metadata is available by attempting to get instance identity
-		_, err := svc.GetInstanceIdentityDocument(context.Background(), &imds.GetInstanceIdentityDocumentInput{})
+		// Check if EC2 metadata is available by attempting to get metadata
+		_, err := svc.GetMetadata(context.Background(), &imds.GetMetadataInput{Path: "instance-id"})
 		if err != nil {
 			klog.InfoS("ec2 metadata is not available", "err", err)
 		} else {
