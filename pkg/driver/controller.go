@@ -148,7 +148,7 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return nil, status.Error(codes.InvalidArgument, "Volume capabilities not supported")
 	}
 
-	var storageCapacity int64
+	var storageCapacity int32
 	if req.GetCapacityRange() != nil {
 		storageCapacity = util.BytesToGiB(req.GetCapacityRange().GetRequiredBytes())
 	}
@@ -192,7 +192,9 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 		}
 
 		volumeParams[volumeParamsFileSystemType] = strconv.Quote("OPENZFS")
-		volumeParams[volumeParamsStorageCapacity] = strconv.FormatInt(storageCapacity, 10)
+		volumeParams[volumeParamsStorageCapacity] = strconv.Itoa(
+			int(storageCapacity),
+		)
 		err = cloud.CollapseCreateFileSystemParameters(volumeParams)
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, ErrIncorrectlyFormatted, "OpenZFSConfiguration", err)
