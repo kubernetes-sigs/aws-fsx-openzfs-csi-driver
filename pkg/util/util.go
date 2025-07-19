@@ -55,12 +55,12 @@ func ParseEndpoint(endpoint string) (string, string, error) {
 	return scheme, addr, nil
 }
 
-func BytesToGiB(volumeSizeGiB int64) int64 {
-	return volumeSizeGiB / GiB
+func BytesToGiB(volumeSizeGiB int64) int32 {
+	return int32(volumeSizeGiB / GiB)
 }
 
-func GiBToBytes(volumeSizeGiB int64) int64 {
-	return volumeSizeGiB * GiB
+func GiBToBytes(volumeSizeGiB int32) int64 {
+	return int64(volumeSizeGiB) * GiB
 }
 
 func Contains(slice []string, element string) bool {

@@ -54,3 +54,23 @@ func (mr *MockEC2MetadataMockRecorder) GetInstanceIdentityDocument(arg0, arg1 in
 	varargs := append([]interface{}{arg0, arg1}, arg2...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetInstanceIdentityDocument", reflect.TypeOf((*MockEC2Metadata)(nil).GetInstanceIdentityDocument), varargs...)
 }
+
+// GetMetadata mocks base method.
+func (m *MockEC2Metadata) GetMetadata(arg0 context.Context, arg1 *imds.GetMetadataInput, arg2 ...func(*imds.Options)) (*imds.GetMetadataOutput, error) {
+	m.ctrl.T.Helper()
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetMetadata", varargs...)
+	ret0, _ := ret[0].(*imds.GetMetadataOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetMetadata indicates an expected call of GetMetadata.
+func (mr *MockEC2MetadataMockRecorder) GetMetadata(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMetadata", reflect.TypeOf((*MockEC2Metadata)(nil).GetMetadata), varargs...)
+}

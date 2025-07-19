@@ -38,7 +38,7 @@ func TestCreateVolume(t *testing.T) {
 		snapshotVolumeParameters     map[string]string
 		filesystemId                       = "filesystemId"
 		volumeId                           = "volumeId"
-		storageCapacity              int64 = 64
+		storageCapacity              int32 = 64
 		dnsName                            = "dnsName"
 		snapshotId                         = "fsvolsnap-1234"
 		volumePath                         = "/"
@@ -821,6 +821,102 @@ func TestCreateVolume(t *testing.T) {
 				_, err := driver.CreateVolume(ctx, req)
 				if err == nil {
 					t.Fatal("CreateVolume is not failed")
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "success: INTELLIGENT_TIERING filesystem with 1Gi",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockCloud := mocks.NewMockCloud(mockCtl)
+
+				driver := controllerService{
+					cloud:         mockCloud,
+					inFlight:      internal.NewInFlight(),
+					driverOptions: &DriverOptions{},
+				}
+
+				intelligentTieringParams := map[string]string{
+					"ResourceType":              "filesystem",
+					"StorageType":               `"INTELLIGENT_TIERING"`,
+					"DeploymentType":            `"MULTI_AZ_1"`,
+					"ThroughputCapacity":        `160`,
+					"SubnetIds":                 `["subnet-test"]`,
+					"SkipFinalBackupOnDeletion": `true`,
+				}
+
+				req := &csi.CreateVolumeRequest{
+					Name: filesystemId,
+					CapacityRange: &csi.CapacityRange{
+						RequiredBytes: util.GiBToBytes(1),
+						LimitBytes:    util.GiBToBytes(1),
+					},
+					VolumeCapabilities: []*csi.VolumeCapability{stdVolCap},
+					Parameters:         intelligentTieringParams,
+				}
+
+				ctx := context.Background()
+				filesystem := &cloud.FileSystem{
+					DnsName:         dnsName,
+					FileSystemId:    filesystemId,
+					StorageCapacity: 1,
+				}
+
+				mockCloud.EXPECT().CreateFileSystem(gomock.Eq(ctx), gomock.Any()).DoAndReturn(
+					func(ctx context.Context, params map[string]string) (*cloud.FileSystem, error) {
+						if _, exists := params["StorageCapacity"]; exists {
+							t.Error("StorageCapacity should be removed for INTELLIGENT_TIERING")
+						}
+						return filesystem, nil
+					})
+				mockCloud.EXPECT().WaitForFileSystemAvailable(gomock.Eq(ctx), gomock.Eq(filesystemId)).Return(nil)
+
+				_, err := driver.CreateVolume(ctx, req)
+				if err != nil {
+					t.Fatalf("CreateVolume failed: %v", err)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: INTELLIGENT_TIERING filesystem with non-1Gi",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockCloud := mocks.NewMockCloud(mockCtl)
+
+				driver := controllerService{
+					cloud:         mockCloud,
+					inFlight:      internal.NewInFlight(),
+					driverOptions: &DriverOptions{},
+				}
+
+				intelligentTieringParams := map[string]string{
+					"ResourceType":              "filesystem",
+					"StorageType":               `"INTELLIGENT_TIERING"`,
+					"DeploymentType":            `"MULTI_AZ_1"`,
+					"ThroughputCapacity":        `160`,
+					"SubnetIds":                 `["subnet-test"]`,
+					"SkipFinalBackupOnDeletion": `true`,
+				}
+
+				req := &csi.CreateVolumeRequest{
+					Name: filesystemId,
+					CapacityRange: &csi.CapacityRange{
+						RequiredBytes: util.GiBToBytes(100),
+						LimitBytes:    util.GiBToBytes(100),
+					},
+					VolumeCapabilities: []*csi.VolumeCapability{stdVolCap},
+					Parameters:         intelligentTieringParams,
+				}
+
+				ctx := context.Background()
+
+				_, err := driver.CreateVolume(ctx, req)
+				if err == nil {
+					t.Fatal("CreateVolume should have failed")
 				}
 
 				mockCtl.Finish()
@@ -1698,9 +1794,9 @@ func TestControllerExpandVolume(t *testing.T) {
 		dnsName               = "dnsName"
 		filesystemId          = "fs-1234"
 		volumeId              = "fsvol-1234"
-		storageCapacity int64 = 100
+		storageCapacity int32 = 100
 		currentBytes          = util.GiBToBytes(storageCapacity)
-		newCapacity     int64 = 150
+		newCapacity     int32 = 150
 		requiredBytes         = util.GiBToBytes(newCapacity)
 		limitBytes            = util.GiBToBytes(newCapacity)
 	)

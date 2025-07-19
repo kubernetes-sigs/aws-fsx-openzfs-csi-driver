@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
-	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/fsx"
-	fsxtypes "github.com/aws/aws-sdk-go-v2/service/fsx/types"
-	"time"
+	"github.com/aws/aws-sdk-go-v2/service/fsx/types"
 )
 
 type Cloud struct {
@@ -19,7 +20,7 @@ type Cloud struct {
 }
 
 func NewCloud(region string) *Cloud {
-	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(region))
+	cfg, err := config.LoadDefaultConfig(context.Background(), config.WithRegion(region))
 	if err != nil {
 		panic(err)
 	}
@@ -30,7 +31,7 @@ func NewCloud(region string) *Cloud {
 	}
 }
 
-func (c *Cloud) CreateFileSystem(ctx context.Context, input fsx.CreateFileSystemInput) (*fsxtypes.FileSystem, error) {
+func (c *Cloud) CreateFileSystem(ctx context.Context, input fsx.CreateFileSystemInput) (*types.FileSystem, error) {
 	response, err := c.FSx.CreateFileSystem(ctx, &input)
 	if err != nil {
 		return nil, err
@@ -44,7 +45,7 @@ func (c *Cloud) DeleteFileSystem(ctx context.Context, input fsx.DeleteFileSystem
 	return err
 }
 
-func (c *Cloud) CreateVolume(ctx context.Context, input fsx.CreateVolumeInput) (*fsxtypes.Volume, error) {
+func (c *Cloud) CreateVolume(ctx context.Context, input fsx.CreateVolumeInput) (*types.Volume, error) {
 	response, err := c.FSx.CreateVolume(ctx, &input)
 	if err != nil {
 		return nil, err
@@ -71,9 +72,9 @@ func (c *Cloud) GetDNSName(ctx context.Context, filesystemId string) (string, er
 	return aws.ToString(response.FileSystems[0].DNSName), nil
 }
 
-func (c *Cloud) GetNodeInstance(ctx context.Context, clusterName string) (*types.Instance, error) {
+func (c *Cloud) GetNodeInstance(ctx context.Context, clusterName string) (*ec2types.Instance, error) {
 	request := &ec2.DescribeInstancesInput{
-		Filters: []types.Filter{
+		Filters: []ec2types.Filter{
 			{
 				Name:   aws.String("tag:eks:cluster-name"),
 				Values: []string{clusterName},
@@ -81,7 +82,7 @@ func (c *Cloud) GetNodeInstance(ctx context.Context, clusterName string) (*types
 		},
 	}
 
-	var instances []types.Instance
+	var instances []ec2types.Instance
 	response, err := c.EC2client.DescribeInstances(ctx, request)
 	if err != nil {
 		return nil, err
@@ -97,7 +98,7 @@ func (c *Cloud) GetNodeInstance(ctx context.Context, clusterName string) (*types
 	return &instances[0], nil
 }
 
-func (c *Cloud) GetSecurityGroupIds(node *types.Instance) []string {
+func (c *Cloud) GetSecurityGroupIds(node *ec2types.Instance) []string {
 	var groups []string
 	for _, sg := range node.SecurityGroups {
 		groups = append(groups, aws.ToString(sg.GroupId))
@@ -121,7 +122,7 @@ func (c *Cloud) WaitForFilesystemAvailable(ctx context.Context, filesystemId str
 			return errors.New("no filesystem found")
 		}
 
-		if response.FileSystems[0].Lifecycle == fsxtypes.FileSystemLifecycleAvailable {
+		if response.FileSystems[0].Lifecycle == types.FileSystemLifecycleAvailable {
 			return nil
 		}
 	}
@@ -144,7 +145,7 @@ func (c *Cloud) WaitForVolumeAvailable(ctx context.Context, volumeId string) err
 			return errors.New("no volume found")
 		}
 
-		if response.Volumes[0].Lifecycle == fsxtypes.VolumeLifecycleAvailable {
+		if response.Volumes[0].Lifecycle == types.VolumeLifecycleAvailable {
 			return nil
 		}
 	}
