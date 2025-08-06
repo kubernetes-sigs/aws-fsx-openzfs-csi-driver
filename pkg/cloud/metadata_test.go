@@ -18,9 +18,11 @@ package cloud
 
 import (
 	"fmt"
+	"io"
 	"os"
+	"strings"
 
-	"github.com/aws/aws-sdk-go/aws/ec2metadata"
+	"github.com/aws/aws-sdk-go-v2/feature/ec2/imds"
 	"github.com/golang/mock/gomock"
 	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/cloud/mocks"
 	v1 "k8s.io/api/core/v1"
@@ -39,12 +41,17 @@ const (
 	stdAvailabilityZone = "us-west-2b"
 )
 
+// Helper function to create a ReadCloser from a string
+func createReadCloserFromString(s string) io.ReadCloser {
+	return io.NopCloser(strings.NewReader(s))
+}
+
 func TestNewMetadataService(t *testing.T) {
 	testCases := []struct {
 		name                             string
 		ec2metadataAvailable             bool
 		clientsetReactors                func(*fake.Clientset)
-		getInstanceIdentityDocumentValue ec2metadata.EC2InstanceIdentityDocument
+		getInstanceIdentityDocumentValue imds.InstanceIdentityDocument
 		getInstanceIdentityDocumentError error
 		invalidInstanceIdentityDocument  bool
 		expectedErr                      error
@@ -54,7 +61,7 @@ func TestNewMetadataService(t *testing.T) {
 		{
 			name:                 "success: normal",
 			ec2metadataAvailable: true,
-			getInstanceIdentityDocumentValue: ec2metadata.EC2InstanceIdentityDocument{
+			getInstanceIdentityDocumentValue: imds.InstanceIdentityDocument{
 				InstanceID:       stdInstanceID,
 				InstanceType:     stdInstanceType,
 				Region:           stdRegion,
@@ -84,12 +91,13 @@ func TestNewMetadataService(t *testing.T) {
 			name:                             "fail: GetInstanceIdentityDocument returned error",
 			ec2metadataAvailable:             true,
 			getInstanceIdentityDocumentError: fmt.Errorf("foo"),
-			expectedErr:                      fmt.Errorf("could not get EC2 instance identity metadata: foo"),
+			expectedErr:                      fmt.Errorf("error getting Node %s: nodes \"%s\" not found", nodeName, nodeName),
+			nodeNameEnvVar:                   nodeName,
 		},
 		{
 			name:                 "fail: GetInstanceIdentityDocument returned empty instance",
 			ec2metadataAvailable: true,
-			getInstanceIdentityDocumentValue: ec2metadata.EC2InstanceIdentityDocument{
+			getInstanceIdentityDocumentValue: imds.InstanceIdentityDocument{
 				InstanceID:       "",
 				InstanceType:     stdInstanceType,
 				Region:           stdRegion,
@@ -101,7 +109,7 @@ func TestNewMetadataService(t *testing.T) {
 		{
 			name:                 "fail: GetInstanceIdentityDocument returned empty az",
 			ec2metadataAvailable: true,
-			getInstanceIdentityDocumentValue: ec2metadata.EC2InstanceIdentityDocument{
+			getInstanceIdentityDocumentValue: imds.InstanceIdentityDocument{
 				InstanceID:       stdInstanceID,
 				InstanceType:     stdInstanceType,
 				Region:           stdRegion,
@@ -123,13 +131,37 @@ func TestNewMetadataService(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			mockEC2Metadata := mocks.NewMockEC2Metadata(mockCtrl)
 
-			ec2MetadataClient := func() (EC2Metadata, error) { return mockEC2Metadata, nil }
+			ec2MetadataClient := func() (EC2Metadata, error) {
+				return mockEC2Metadata, nil
+			}
 			k8sAPIClient := func() (kubernetes.Interface, error) { clientsetInitialized = true; return clientset, nil }
 
-			mockEC2Metadata.EXPECT().Available().Return(tc.ec2metadataAvailable)
 			if tc.ec2metadataAvailable {
-				mockEC2Metadata.EXPECT().GetInstanceIdentityDocument().Return(tc.getInstanceIdentityDocumentValue, tc.getInstanceIdentityDocumentError)
+				// Mock GetMetadata for instance-id check (initial availability check)
+				instanceIDOutput := &imds.GetMetadataOutput{}
+				if tc.getInstanceIdentityDocumentError == nil {
+					instanceIDOutput.Content = createReadCloserFromString(tc.getInstanceIdentityDocumentValue.InstanceID)
+				}
+				mockEC2Metadata.EXPECT().GetMetadata(gomock.Any(), gomock.Eq(&imds.GetMetadataInput{Path: "instance-id"})).Return(instanceIDOutput, tc.getInstanceIdentityDocumentError).AnyTimes()
 
+				// If first call succeeds, expect more calls for other metadata
+				if tc.getInstanceIdentityDocumentError == nil {
+					// Mock GetMetadata for instance-type
+					instanceTypeOutput := &imds.GetMetadataOutput{}
+					instanceTypeOutput.Content = createReadCloserFromString(tc.getInstanceIdentityDocumentValue.InstanceType)
+					mockEC2Metadata.EXPECT().GetMetadata(gomock.Any(), gomock.Eq(&imds.GetMetadataInput{Path: "instance-type"})).Return(instanceTypeOutput, nil).AnyTimes()
+
+					// Mock GetMetadata for availability-zone
+					azOutput := &imds.GetMetadataOutput{}
+					azOutput.Content = createReadCloserFromString(tc.getInstanceIdentityDocumentValue.AvailabilityZone)
+					mockEC2Metadata.EXPECT().GetMetadata(gomock.Any(), gomock.Eq(&imds.GetMetadataInput{Path: "placement/availability-zone"})).Return(azOutput, nil).AnyTimes()
+				}
+			} else {
+				// Simulate EC2 metadata not being available by returning an error
+				mockEC2Metadata.EXPECT().GetMetadata(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("ec2 metadata not available")).AnyTimes()
+			}
+
+			if tc.ec2metadataAvailable && tc.getInstanceIdentityDocumentError == nil && !tc.invalidInstanceIdentityDocument {
 				if clientsetInitialized == true {
 					t.Errorf("kubernetes client was unexpectedly initialized when metadata is available!")
 					if len(clientset.Actions()) > 0 {
