@@ -44,8 +44,10 @@ Due to the complex nature of our configurations, we also decided it would be bes
 FSx for OpenZFS allows users to set StorageCapacityReservation and StorageCapacityQuota which can impact the storage requirements of a given volume.
 There is truly no one size fits all, as there are different requirements based on use case.
 Because of this, we decided to ignore the storage value is when creating the volume, and instead have users utilize the StorageClass parameters.
-For INTELLIGENT_TIERING storage type the value should be "1Gi",  as INTELLIGENT_TIERING filesystems manage capacity dynamically without requiring upfront capacity specification.
-To minimize operator confusion, and to keep the door open for possible changes, **the driver will fail to create or modify a volume if the user specifies a value other than 1Gi**.
+
+### Why must I set storage on a PersistentVolumeClaim to 1 when using StorageType INTELLIGENT_TIERING?
+Filesystems created with the StorageType INTELLIGENT_TIERING leverage elastic storage and therefore do not expect a StorageCapacity on create.
+Because of this, we must ignore the storage value provided. To minimize operator confusion and align with previous design decisions, the driver will fail to create if the user specifies a value other than 1Gi.
 
 ## Volume Expansion
 

@@ -55,8 +55,12 @@ func ParseEndpoint(endpoint string) (string, string, error) {
 	return scheme, addr, nil
 }
 
-func BytesToGiB(volumeSizeGiB int64) int32 {
-	return int32(volumeSizeGiB / GiB)
+func BytesToGiB(volumeSizeBytes int64) (int32, error) {
+	volumeGiB := volumeSizeBytes / GiB
+	if volumeGiB > math.MaxInt32 {
+		return 0, fmt.Errorf("volume size %d GiB exceeds maximum supported size of %d GiB", volumeGiB, math.MaxInt32)
+	}
+	return int32(volumeGiB), nil
 }
 
 func GiBToBytes(volumeSizeGiB int32) int64 {
