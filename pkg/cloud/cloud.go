@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -689,24 +688,4 @@ func ValidateDeleteVolumeParameters(parameters map[string]string) error {
 	config.VolumeId = aws.String("fsvol-fake-validation-id")
 
 	return validateOpDeleteVolumeInput(&config)
-}
-
-	// Note: VolumeId validation is skipped since this is called during Create
-	// when no VolumeId exists yet. The ID will be set during actual deletion.
-	// We're using the AWS SDK's internal validation function but ignoring VolumeId validation
-	validationErr := validateOpDeleteVolumeInput(&config)
-
-	// If there's a validation error, check if it's only about the missing VolumeId
-	if validationErr != nil {
-		// If it's only complaining about VolumeId being nil, we can ignore it
-		if invalidParams, ok := validationErr.(*smithy.InvalidParamsError); ok {
-			// Check if the only error is about VolumeId
-			if invalidParams.Len() == 1 && strings.Contains(invalidParams.Error(), "VolumeId") {
-				return nil
-			}
-		}
-		return validationErr
-	}
-
-	return nil
 }
