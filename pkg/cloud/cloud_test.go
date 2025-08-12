@@ -285,8 +285,9 @@ func TestResizeFileSystem(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				badRequestErr := &types.BadRequest{}
-				badRequestErr.Message = aws.String("Unable to perform the storage capacity update. There is an update already in progress.")
+				badRequestErr := &types.BadRequest{
+					Message: aws.String("Unable to perform the storage capacity update. There is an update already in progress."),
+				}
 				mockFSx.EXPECT().UpdateFileSystem(gomock.Eq(ctx), gomock.Any()).Return(nil, badRequestErr)
 				mockFSx.EXPECT().DescribeFileSystems(gomock.Eq(ctx), gomock.Any()).Return(describeOutput, nil)
 				resp, err := c.ResizeFileSystem(ctx, fileSystemId, newSizeGiB)
@@ -351,8 +352,9 @@ func TestResizeFileSystem(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				badRequestErr := &types.BadRequest{}
-				badRequestErr.Message = aws.String("Unable to perform the storage capacity update. There is an update already in progress.")
+				badRequestErr := &types.BadRequest{
+					Message: aws.String("Unable to perform the storage capacity update. There is an update already in progress."),
+				}
 				mockFSx.EXPECT().UpdateFileSystem(gomock.Eq(ctx), gomock.Any()).Return(nil, badRequestErr)
 				mockFSx.EXPECT().DescribeFileSystems(gomock.Eq(ctx), gomock.Any()).Return(describeOutput, nil)
 				_, err := c.ResizeFileSystem(ctx, fileSystemId, newSizeGiB)

@@ -19,6 +19,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/aws/aws-sdk-go-v2/service/fsx/types"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/cloud"
 	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/driver/internal"
@@ -103,7 +104,7 @@ func newControllerService(driverOptions *DriverOptions) controllerService {
 	region := os.Getenv("AWS_REGION")
 	if region == "" {
 		klog.V(5).InfoS("[Debug] Retrieving region from metadata service")
-		metadata, err := cloud.NewMetadataService(cloud.DefaultEC2MetadataClient, cloud.DefaultKubernetesAPIClient, region)
+		metadata, err := cloud.NewMetadataService(cloud.DefaultIMDSClient, cloud.DefaultKubernetesAPIClient, region)
 		if err != nil {
 			klog.ErrorS(err, "Could not determine region from any metadata service. The region can be manually supplied via the AWS_REGION environment variable.")
 			panic(err)
@@ -150,7 +151,11 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	var storageCapacity int32
 	if req.GetCapacityRange() != nil {
-		storageCapacity = util.BytesToGiB(req.GetCapacityRange().GetRequiredBytes())
+		var err error
+		storageCapacity, err = util.BytesToGiB(req.GetCapacityRange().GetRequiredBytes())
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
 	}
 
 	volumeParams := req.GetParameters()
@@ -192,14 +197,12 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 		}
 
 		volumeParams[volumeParamsFileSystemType] = strconv.Quote("OPENZFS")
-		volumeParams[volumeParamsStorageCapacity] = strconv.Itoa(
-			int(storageCapacity),
-		)
+		volumeParams[volumeParamsStorageCapacity] = strconv.Itoa(int(storageCapacity))
 
 		storageType := volumeParams["StorageType"]
-		if storageType == `"INTELLIGENT_TIERING"` {
+		if storageType == strconv.Quote(string(types.StorageTypeIntelligentTiering)) {
 			if storageCapacity != 1 {
-				return nil, status.Error(codes.InvalidArgument, "storageType INTELLIGENT_TIERING expects storage capacity to be 1Gi")
+				return nil, status.Error(codes.InvalidArgument, "StorageType INTELLIGENT_TIERING expects storage to be 1Gi")
 			}
 			delete(volumeParams, volumeParamsStorageCapacity)
 		}
@@ -593,7 +596,10 @@ func (d *controllerService) ControllerExpandVolume(ctx context.Context, req *csi
 		return nil, status.Errorf(codes.OutOfRange, "Requested storage capacity of %d bytes exceeds capacity limit of %d bytes.", capRange.GetRequiredBytes(), capRange.GetLimitBytes())
 	}
 
-	newCapacity := util.BytesToGiB(capRange.GetRequiredBytes())
+	newCapacity, err := util.BytesToGiB(capRange.GetRequiredBytes())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
 
 	splitVolumeId := strings.SplitN(volumeID, "-", 2)
 	if splitVolumeId[0] == cloud.FilesystemPrefix {
@@ -605,7 +611,7 @@ func (d *controllerService) ControllerExpandVolume(ctx context.Context, req *csi
 			return nil, status.Errorf(codes.Internal, "Could not get filesystem with ID %q: %v", volumeID, err)
 		}
 
-		if newCapacity <= (fs.StorageCapacity) {
+		if newCapacity <= fs.StorageCapacity {
 			// Current capacity is sufficient to satisfy the request
 			klog.V(4).InfoS("ControllerExpandVolume: current filesystem capacity matches or exceeds requested storage capacity, returning with success", "currentStorageCapacityGiB", fs.StorageCapacity, "requestedStorageCapacityGiB", newCapacity)
 			return &csi.ControllerExpandVolumeResponse{

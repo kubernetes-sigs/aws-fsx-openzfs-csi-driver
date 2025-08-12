@@ -31,7 +31,7 @@ type MetadataService interface {
 	GetAvailabilityZone() string
 }
 
-type EC2Metadata interface {
+type IMDS interface {
 	GetInstanceIdentityDocument(context.Context, *imds.GetInstanceIdentityDocumentInput, ...func(*imds.Options)) (*imds.GetInstanceIdentityDocumentOutput, error)
 	GetMetadata(ctx context.Context, params *imds.GetMetadataInput, optFns ...func(*imds.Options)) (*imds.GetMetadataOutput, error)
 }
@@ -65,20 +65,20 @@ func (m *Metadata) GetAvailabilityZone() string {
 	return m.AvailabilityZone
 }
 
-// NewMetadataService returns a new MetadataServiceImplementation.
-func NewMetadataService(ec2MetadataClient EC2MetadataClient, k8sAPIClient KubernetesAPIClient, region string) (MetadataService, error) {
-	klog.InfoS("retrieving instance data from ec2 metadata")
-	svc, err := ec2MetadataClient()
+// NewMetadataService returns a new MetadataService implementation.
+func NewMetadataService(imdsClient IMDSClient, k8sAPIClient KubernetesAPIClient, region string) (MetadataService, error) {
+	klog.InfoS("retrieving instance data from IMDS")
+	svc, err := imdsClient()
 	if err != nil {
-		klog.InfoS("error creating ec2 metadata client", "err", err)
+		klog.InfoS("error creating IMDS client", "err", err)
 	} else {
-		// Check if EC2 metadata is available by attempting to get metadata
+		// Check if IMDS is available by attempting to get metadata
 		_, err := svc.GetMetadata(context.Background(), &imds.GetMetadataInput{Path: "instance-id"})
 		if err != nil {
-			klog.InfoS("ec2 metadata is not available", "err", err)
+			klog.InfoS("IMDS is not available", "err", err)
 		} else {
-			klog.InfoS("ec2 metadata is available")
-			return EC2MetadataInstanceInfo(svc, region)
+			klog.InfoS("IMDS is available")
+			return IMDSInstanceInfo(svc, region)
 		}
 	}
 
@@ -91,5 +91,5 @@ func NewMetadataService(ec2MetadataClient EC2MetadataClient, k8sAPIClient Kubern
 		return KubernetesAPIInstanceInfo(clientset)
 	}
 
-	return nil, fmt.Errorf("error getting instance data from ec2 metadata or kubernetes api")
+	return nil, fmt.Errorf("error getting instance data from IMDS or kubernetes api")
 }
