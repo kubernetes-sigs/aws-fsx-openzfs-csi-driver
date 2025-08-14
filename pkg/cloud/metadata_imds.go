@@ -31,6 +31,9 @@ func IMDSInstanceInfo(svc IMDS, regionFromSession string) (*Metadata, error) {
 	if len(doc.InstanceIdentityDocument.InstanceID) == 0 {
 		return nil, fmt.Errorf("could not get valid instance ID from IMDS")
 	}
+	if len(doc.InstanceIdentityDocument.InstanceType) == 0 {
+		return nil, fmt.Errorf("could not get valid instance type from IMDS")
+	}
 
 	if len(doc.InstanceIdentityDocument.AvailabilityZone) == 0 {
 		return nil, fmt.Errorf("could not get valid availability zone from IMDS")
@@ -39,6 +42,14 @@ func IMDSInstanceInfo(svc IMDS, regionFromSession string) (*Metadata, error) {
 	region := doc.InstanceIdentityDocument.Region
 	if len(region) == 0 && len(regionFromSession) != 0 {
 		region = regionFromSession
+	}
+
+	if len(region) == 0 {
+		az := doc.InstanceIdentityDocument.AvailabilityZone
+		if len(az) >= 1 {
+			// Remove the last character from AZ to get the region
+			region = az[:len(az)-1]
+		}
 	}
 
 	if len(region) == 0 {

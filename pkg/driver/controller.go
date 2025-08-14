@@ -19,7 +19,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/aws/aws-sdk-go-v2/service/fsx/types"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/cloud"
 	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/driver/internal"
@@ -200,7 +199,7 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 		volumeParams[volumeParamsStorageCapacity] = strconv.Itoa(int(storageCapacity))
 
 		storageType := volumeParams["StorageType"]
-		if storageType == strconv.Quote(string(types.StorageTypeIntelligentTiering)) {
+		if cloud.IsStorageTypeIntelligentTiering(storageType) {
 			if storageCapacity != 1 {
 				return nil, status.Error(codes.InvalidArgument, "StorageType INTELLIGENT_TIERING expects storage to be 1Gi")
 			}
@@ -620,7 +619,7 @@ func (d *controllerService) ControllerExpandVolume(ctx context.Context, req *csi
 			}, nil
 		}
 
-		finalCapacity, err := d.cloud.ResizeFileSystem(ctx, volumeID, int32(newCapacity))
+		finalCapacity, err := d.cloud.ResizeFileSystem(ctx, volumeID, newCapacity)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "resize failed: %v", err)
 		}

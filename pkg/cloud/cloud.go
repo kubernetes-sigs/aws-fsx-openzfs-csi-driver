@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -123,14 +124,15 @@ type cloud struct {
 }
 
 // NewCloud returns a new instance of AWS cloud
-// It panics if session is invalid
-func NewCloud(region string) (*cloud, error) {
+// Returns error if configuration is invalid
+func NewCloud(region string) (Cloud, error) {
 
 	os.Setenv("AWS_EXECUTION_ENV", "aws-fsx-openzfs-csi-driver-"+driverVersion)
 
 	cfg, err := config.LoadDefaultConfig(context.Background(),
 		config.WithRegion(region),
-		// Set MaxRetries to a high value. It will be "overwritten" if context deadline comes sooner.
+		// Set MaxRetries to a high value.
+		//It will be "overwritten" if context deadline comes sooner.
 		config.WithRetryMaxAttempts(8),
 	)
 	if err != nil {
@@ -594,7 +596,8 @@ func (c *cloud) GetVolumeId(ctx context.Context, volumeId string) (string, error
 	}
 }
 
-// getUpdateResizeFilesystemAdministrativeAction retrieves the AdministrativeAction associated with a file system update with the given target storage capacity, if one exists.
+// getUpdateResizeFilesystemAdministrativeAction retrieves the AdministrativeAction associated with a file system update with the
+// given target storage capacity, if one exists.
 func (c *cloud) getUpdateResizeFilesystemAdministrativeAction(ctx context.Context, fileSystemId string, resizeGiB int32) (types.AdministrativeAction, error) {
 	fs, err := c.getFileSystem(ctx, fileSystemId)
 	if err != nil {
@@ -646,6 +649,11 @@ func CollapseCreateFileSystemParameters(parameters map[string]string) error {
 	return util.ReplaceParametersAndPopulateObject("OpenZFSConfiguration", parameters, &config)
 }
 
+// IsStorageTypeIntelligentTiering checks if the storage type is INTELLIGENT_TIERING
+func IsStorageTypeIntelligentTiering(storageType string) bool {
+	return storageType == strconv.Quote(string(types.StorageTypeIntelligentTiering))
+}
+
 func CollapseDeleteFileSystemParameters(parameters map[string]string) error {
 	config := types.DeleteFileSystemOpenZFSConfiguration{}
 	return util.ReplaceParametersAndPopulateObject("OpenZFSConfiguration", parameters, &config)
@@ -662,14 +670,17 @@ func CollapseDeleteVolumeParameters(parameters map[string]string) error {
 }
 
 // ValidateDeleteFileSystemParameters is used in CreateVolume to remove all delete parameters from the parameters map, and ensure they are valid.
+// Parameters should be unique map containing only delete parameters without the OnDeletion suffix
+// This method expects there to be no remaining delete parameters and errors if there are any
+// Verifies parameters are valid in accordance to the API to prevent unknown errors from occurring during DeleteVolume
 func ValidateDeleteFileSystemParameters(parameters map[string]string) error {
 	config := fsx.DeleteFileSystemInput{}
 	err := util.StrictRemoveParametersAndPopulateObject(parameters, &config)
 	if err != nil {
 		return err
 	}
-	// Add fake FileSystemId for validation to avoid blackbox validation issues
-	config.FileSystemId = aws.String("fs-fake-validation-id")
+	// Add valid format FileSystemId for validation to avoid blackbox validation issues
+	config.FileSystemId = aws.String("fs-01234567890abcdef")
 
 	return validateOpDeleteFileSystemInput(&config)
 }
@@ -684,8 +695,8 @@ func ValidateDeleteVolumeParameters(parameters map[string]string) error {
 	if err != nil {
 		return err
 	}
-	// Add fake VolumeId for validation to avoid blackbox validation issues
-	config.VolumeId = aws.String("fsvol-fake-validation-id")
+	// Add valid format VolumeId for validation to avoid blackbox validation issues
+	config.VolumeId = aws.String("fsvol-01234567890abcdef")
 
 	return validateOpDeleteVolumeInput(&config)
 }

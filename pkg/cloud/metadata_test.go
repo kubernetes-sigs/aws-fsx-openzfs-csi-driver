@@ -53,6 +53,8 @@ func TestNewMetadataService(t *testing.T) {
 		clientsetReactors                func(*fake.Clientset)
 		getInstanceIdentityDocumentValue imds.InstanceIdentityDocument
 		getInstanceIdentityDocumentError error
+		getMetadataOutput                *imds.GetMetadataOutput
+		getMetadataError                 error
 		invalidInstanceIdentityDocument  bool
 		expectedErr                      error
 		node                             v1.Node
@@ -67,6 +69,9 @@ func TestNewMetadataService(t *testing.T) {
 				Region:           stdRegion,
 				AvailabilityZone: stdAvailabilityZone,
 			},
+			getMetadataOutput: &imds.GetMetadataOutput{
+				Content: createReadCloserFromString(stdInstanceID),
+			},
 			expectedErr: nil,
 		},
 		// TODO: Once topology is implemented, add test cases for kubernetes metadata
@@ -78,12 +83,14 @@ func TestNewMetadataService(t *testing.T) {
 					return true, nil, fmt.Errorf("client failure")
 				})
 			},
-			expectedErr:    fmt.Errorf("error getting Node %s: client failure", nodeName),
-			nodeNameEnvVar: nodeName,
+			getMetadataError: fmt.Errorf("IMDS not available"),
+			expectedErr:      fmt.Errorf("error getting Node %s: client failure", nodeName),
+			nodeNameEnvVar:   nodeName,
 		},
 		{
 			name:                 "failure: metadata not available, node name env var not set",
 			ec2metadataAvailable: false,
+			getMetadataError:     fmt.Errorf("IMDS not available"),
 			expectedErr:          fmt.Errorf("CSI_NODE_NAME env var not set"),
 			nodeNameEnvVar:       "",
 		},
@@ -91,6 +98,7 @@ func TestNewMetadataService(t *testing.T) {
 			name:                             "fail: GetInstanceIdentityDocument returned error",
 			ec2metadataAvailable:             true,
 			getInstanceIdentityDocumentError: fmt.Errorf("foo"),
+			getMetadataError:                 fmt.Errorf("foo"),
 			expectedErr:                      fmt.Errorf("error getting Node %s: nodes \"%s\" not found", nodeName, nodeName),
 			nodeNameEnvVar:                   nodeName,
 		},
@@ -103,6 +111,9 @@ func TestNewMetadataService(t *testing.T) {
 				Region:           stdRegion,
 				AvailabilityZone: stdAvailabilityZone,
 			},
+			getMetadataOutput: &imds.GetMetadataOutput{
+				Content: createReadCloserFromString(""),
+			},
 			invalidInstanceIdentityDocument: true,
 			expectedErr:                     fmt.Errorf("could not get valid instance ID from IMDS"),
 		},
@@ -114,6 +125,9 @@ func TestNewMetadataService(t *testing.T) {
 				InstanceType:     stdInstanceType,
 				Region:           stdRegion,
 				AvailabilityZone: "",
+			},
+			getMetadataOutput: &imds.GetMetadataOutput{
+				Content: createReadCloserFromString(stdInstanceID),
 			},
 			invalidInstanceIdentityDocument: true,
 			expectedErr:                     fmt.Errorf("could not get valid availability zone from IMDS"),
@@ -138,11 +152,7 @@ func TestNewMetadataService(t *testing.T) {
 
 			if tc.ec2metadataAvailable {
 				// Mock GetMetadata for instance-id check (initial availability check)
-				instanceIDOutput := &imds.GetMetadataOutput{}
-				if tc.getInstanceIdentityDocumentError == nil {
-					instanceIDOutput.Content = createReadCloserFromString(tc.getInstanceIdentityDocumentValue.InstanceID)
-				}
-				mockIMDS.EXPECT().GetMetadata(gomock.Any(), gomock.Eq(&imds.GetMetadataInput{Path: "instance-id"})).Return(instanceIDOutput, tc.getInstanceIdentityDocumentError).AnyTimes()
+				mockIMDS.EXPECT().GetMetadata(gomock.Any(), gomock.Eq(&imds.GetMetadataInput{Path: "instance-id"})).Return(tc.getMetadataOutput, tc.getMetadataError).AnyTimes()
 
 				// If first call succeeds, expect GetInstanceIdentityDocument call
 				if tc.getInstanceIdentityDocumentError == nil {
@@ -153,7 +163,7 @@ func TestNewMetadataService(t *testing.T) {
 				}
 			} else {
 				// Simulate IMDS not being available by returning an error
-				mockIMDS.EXPECT().GetMetadata(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("IMDS not available")).AnyTimes()
+				mockIMDS.EXPECT().GetMetadata(gomock.Any(), gomock.Any()).Return(nil, tc.getMetadataError).AnyTimes()
 			}
 
 			if tc.ec2metadataAvailable && tc.getInstanceIdentityDocumentError == nil && !tc.invalidInstanceIdentityDocument {

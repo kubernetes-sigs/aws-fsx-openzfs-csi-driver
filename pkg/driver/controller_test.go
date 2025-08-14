@@ -1815,10 +1815,9 @@ func TestControllerExpandVolume(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				newCapacityInt32 := newCapacity
 				mockCloud.EXPECT().DescribeFileSystem(gomock.Eq(ctx), gomock.Eq(filesystemId)).Return(filesystem, nil)
-				mockCloud.EXPECT().ResizeFileSystem(gomock.Eq(ctx), gomock.Eq(filesystemId), gomock.Any()).Return(&newCapacityInt32, nil)
-				mockCloud.EXPECT().WaitForFileSystemResize(gomock.Eq(ctx), gomock.Eq(filesystemId), newCapacityInt32).Return(nil)
+				mockCloud.EXPECT().ResizeFileSystem(gomock.Eq(ctx), gomock.Eq(filesystemId), gomock.Any()).Return(&newCapacity, nil)
+				mockCloud.EXPECT().WaitForFileSystemResize(gomock.Eq(ctx), gomock.Eq(filesystemId), newCapacity).Return(nil)
 
 				resp, err := driver.ControllerExpandVolume(ctx, req)
 				if err != nil {
@@ -2082,10 +2081,9 @@ func TestControllerExpandVolume(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				newCapacityInt32 := newCapacity
 				mockCloud.EXPECT().DescribeFileSystem(gomock.Eq(ctx), gomock.Eq(filesystemId)).Return(filesystem, nil)
-				mockCloud.EXPECT().ResizeFileSystem(gomock.Eq(ctx), gomock.Eq(filesystemId), gomock.Any()).Return(&newCapacityInt32, nil)
-				mockCloud.EXPECT().WaitForFileSystemResize(gomock.Eq(ctx), gomock.Eq(filesystemId), newCapacityInt32).Return(errors.New(""))
+				mockCloud.EXPECT().ResizeFileSystem(gomock.Eq(ctx), gomock.Eq(filesystemId), gomock.Any()).Return(&newCapacity, nil)
+				mockCloud.EXPECT().WaitForFileSystemResize(gomock.Eq(ctx), gomock.Eq(filesystemId), newCapacity).Return(errors.New(""))
 
 				_, err := driver.ControllerExpandVolume(ctx, req)
 				if err == nil {
