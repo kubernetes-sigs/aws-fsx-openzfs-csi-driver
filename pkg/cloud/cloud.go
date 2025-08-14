@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -28,7 +27,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/fsx"
 	"github.com/aws/aws-sdk-go-v2/service/fsx/types"
-
+	"github.com/aws/smithy-go"
 	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/util"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
@@ -124,15 +123,14 @@ type cloud struct {
 }
 
 // NewCloud returns a new instance of AWS cloud
-// Returns error if configuration is invalid
 func NewCloud(region string) (Cloud, error) {
+
+	// Set MaxRetries to a high value. It will be "overwritten" if context deadline comes sooner.
 
 	os.Setenv("AWS_EXECUTION_ENV", "aws-fsx-openzfs-csi-driver-"+driverVersion)
 
 	cfg, err := config.LoadDefaultConfig(context.Background(),
 		config.WithRegion(region),
-		// Set MaxRetries to a high value.
-		//It will be "overwritten" if context deadline comes sooner.
 		config.WithRetryMaxAttempts(8),
 	)
 	if err != nil {
@@ -574,6 +572,7 @@ func (c *cloud) getTagsForResource(ctx context.Context, resourceARN string) ([]t
 // GetVolumeId getVolumeId Parses the volumeId to determine if it is the id of a file system or an OpenZFS volume.
 // If the volumeId references a file system, this function retrieves the file system's root volume id.
 // If the volumeId references an OpenZFS volume, this function returns a pointer to the volumeId.
+
 func (c *cloud) GetVolumeId(ctx context.Context, volumeId string) (string, error) {
 	splitVolumeId := strings.Split(volumeId, "-")
 	if len(splitVolumeId) != 2 {
@@ -596,8 +595,6 @@ func (c *cloud) GetVolumeId(ctx context.Context, volumeId string) (string, error
 	}
 }
 
-// getUpdateResizeFilesystemAdministrativeAction retrieves the AdministrativeAction associated with a file system update with the
-// given target storage capacity, if one exists.
 func (c *cloud) getUpdateResizeFilesystemAdministrativeAction(ctx context.Context, fileSystemId string, resizeGiB int32) (types.AdministrativeAction, error) {
 	fs, err := c.getFileSystem(ctx, fileSystemId)
 	if err != nil {
@@ -607,7 +604,7 @@ func (c *cloud) getUpdateResizeFilesystemAdministrativeAction(ctx context.Contex
 	if len(fs.AdministrativeActions) == 0 {
 		return types.AdministrativeAction{}, fmt.Errorf("there is no update on filesystem %s", fileSystemId)
 	}
-	// AdministrativeActions are sorted from newest to oldest
+
 	for _, action := range fs.AdministrativeActions {
 		if action.AdministrativeActionType == types.AdministrativeActionTypeFileSystemUpdate &&
 			action.TargetFileSystemValues.StorageCapacity != nil &&
@@ -619,7 +616,6 @@ func (c *cloud) getUpdateResizeFilesystemAdministrativeAction(ctx context.Contex
 	return types.AdministrativeAction{}, fmt.Errorf("there is no update with storage capacity of %d GiB on filesystem %s", resizeGiB, fileSystemId)
 }
 
-// getUpdateResizeVolumeAdministrativeAction retrieves the AdministrativeAction associated with a volume update with the given target storage capacity, if one exists.
 func (c *cloud) getUpdateResizeVolumeAdministrativeAction(ctx context.Context, volumeId string, resizeGiB int32) (types.AdministrativeAction, error) {
 	v, err := c.getVolume(ctx, volumeId)
 	if err != nil {
@@ -629,7 +625,7 @@ func (c *cloud) getUpdateResizeVolumeAdministrativeAction(ctx context.Context, v
 	if len(v.AdministrativeActions) == 0 {
 		return types.AdministrativeAction{}, fmt.Errorf("there is no update on volume %s", volumeId)
 	}
-	// AdministrativeActions are sorted from newest to oldest
+
 	for _, action := range v.AdministrativeActions {
 		if action.AdministrativeActionType == types.AdministrativeActionTypeVolumeUpdate &&
 			action.TargetVolumeValues.OpenZFSConfiguration != nil &&
@@ -649,11 +645,6 @@ func CollapseCreateFileSystemParameters(parameters map[string]string) error {
 	return util.ReplaceParametersAndPopulateObject("OpenZFSConfiguration", parameters, &config)
 }
 
-// IsStorageTypeIntelligentTiering checks if the storage type is INTELLIGENT_TIERING
-func IsStorageTypeIntelligentTiering(storageType string) bool {
-	return storageType == strconv.Quote(string(types.StorageTypeIntelligentTiering))
-}
-
 func CollapseDeleteFileSystemParameters(parameters map[string]string) error {
 	config := types.DeleteFileSystemOpenZFSConfiguration{}
 	return util.ReplaceParametersAndPopulateObject("OpenZFSConfiguration", parameters, &config)
@@ -669,34 +660,61 @@ func CollapseDeleteVolumeParameters(parameters map[string]string) error {
 	return util.ReplaceParametersAndPopulateObject("OpenZFSConfiguration", parameters, &config)
 }
 
-// ValidateDeleteFileSystemParameters is used in CreateVolume to remove all delete parameters from the parameters map, and ensure they are valid.
-// Parameters should be unique map containing only delete parameters without the OnDeletion suffix
-// This method expects there to be no remaining delete parameters and errors if there are any
-// Verifies parameters are valid in accordance to the API to prevent unknown errors from occurring during DeleteVolume
 func ValidateDeleteFileSystemParameters(parameters map[string]string) error {
 	config := fsx.DeleteFileSystemInput{}
 	err := util.StrictRemoveParametersAndPopulateObject(parameters, &config)
 	if err != nil {
 		return err
 	}
-	// Add valid format FileSystemId for validation to avoid blackbox validation issues
-	config.FileSystemId = aws.String("fs-01234567890abcdef")
 
-	return validateOpDeleteFileSystemInput(&config)
+	// Note: FileSystemId validation is skipped since this is called during Create
+	// when no FileSystemId exists yet. The ID will be set during actual deletion.
+	// We're using the AWS SDK's internal validation function but ignoring FileSystemId validation
+	validationErr := validateOpDeleteFileSystemInput(&config)
+
+	// If there's a validation error, check if it's only about the missing FileSystemId
+	if validationErr != nil {
+		// If it's only complaining about FileSystemId being nil, we can ignore it
+		if invalidParams, ok := validationErr.(*smithy.InvalidParamsError); ok {
+			// Check if the only error is about FileSystemId
+			if invalidParams.Len() == 1 && strings.Contains(invalidParams.Error(), "FileSystemId") {
+				return nil
+			}
+		}
+		return validationErr
+	}
+
+	return nil
 }
 
 // ValidateDeleteVolumeParameters is used in CreateVolume to remove all delete parameters from the parameters map, and ensure they are valid.
 // Parameters should be unique map containing only delete parameters without the OnDeletion suffix
 // This method expects there to be no remaining delete parameters and errors if there are any
 // Verifies parameters are valid in accordance to the API to prevent unknown errors from occurring during DeleteVolume
+
 func ValidateDeleteVolumeParameters(parameters map[string]string) error {
 	config := fsx.DeleteVolumeInput{}
 	err := util.StrictRemoveParametersAndPopulateObject(parameters, &config)
 	if err != nil {
 		return err
 	}
-	// Add valid format VolumeId for validation to avoid blackbox validation issues
-	config.VolumeId = aws.String("fsvol-01234567890abcdef")
 
-	return validateOpDeleteVolumeInput(&config)
+	// Note: VolumeId validation is skipped since this is called during Create
+	// when no VolumeId exists yet. The ID will be set during actual deletion.
+	// We're using the AWS SDK's internal validation function but ignoring VolumeId validation
+	validationErr := validateOpDeleteVolumeInput(&config)
+
+	// If there's a validation error, check if it's only about the missing VolumeId
+	if validationErr != nil {
+		// If it's only complaining about VolumeId being nil, we can ignore it
+		if invalidParams, ok := validationErr.(*smithy.InvalidParamsError); ok {
+			// Check if the only error is about VolumeId
+			if invalidParams.Len() == 1 && strings.Contains(invalidParams.Error(), "VolumeId") {
+				return nil
+			}
+		}
+		return validationErr
+	}
+
+	return nil
 }
