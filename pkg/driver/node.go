@@ -46,6 +46,7 @@ type nodeService struct {
 	mounter       Mounter
 	inFlight      *internal.InFlight
 	driverOptions *DriverOptions
+	csi.UnimplementedNodeServer
 }
 
 // Struct for JSON patch operations
@@ -58,7 +59,7 @@ type JSONPatch struct {
 func newNodeService(driverOptions *DriverOptions) nodeService {
 	klog.V(5).InfoS("[Debug] Retrieving node info from metadata service")
 	region := os.Getenv("AWS_REGION")
-	metadata, err := cloud.NewMetadataService(cloud.DefaultEC2MetadataClient, cloud.DefaultKubernetesAPIClient, region)
+	metadata, err := cloud.NewMetadataService(cloud.DefaultIMDSClient, cloud.DefaultKubernetesAPIClient, region)
 	if err != nil {
 		panic(err)
 	}

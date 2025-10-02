@@ -2,10 +2,10 @@ package e2e
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/fsx"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/fsx"
+	"github.com/aws/aws-sdk-go-v2/service/fsx/types"
 	. "github.com/onsi/ginkgo/v2"
 	_ "github.com/onsi/gomega"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -33,21 +33,29 @@ var (
 	PullRequest      string
 	subnetIds        []string
 	securityGroupIds []string
-	filesystem       *fsx.FileSystem
+	filesystem       *types.FileSystem
 )
 
 var _ = BeforeSuite(func() {
 	c := NewCloud(Region)
+	instance, err := c.GetNodeInstance(context.Background(), ClusterName)
+	framework.ExpectNoError(err)
+
+	subnetIds = []string{*instance.SubnetId}
+	securityGroupIds = c.GetSecurityGroupIds(instance)
+
+	filesystem, err = c.CreateFileSystem(context.Background(), getDefaultCreateFilesystemInput([]string{*instance.SubnetId}, c.GetSecurityGroupIds(instance)))
+	framework.ExpectNoError(err)
 
 	input := fsx.DeleteFileSystemInput{
 		FileSystemId: filesystem.FileSystemId,
-		OpenZFSConfiguration: &fsx.DeleteFileSystemOpenZFSConfiguration{
-			Options:         []*string{aws.String(fsx.DeleteFileSystemOpenZFSOptionDeleteChildVolumesAndSnapshots)},
+		OpenZFSConfiguration: &types.DeleteFileSystemOpenZFSConfiguration{
+			Options:         []types.DeleteFileSystemOpenZFSOption{types.DeleteFileSystemOpenZFSOptionDeleteChildVolumesAndSnapshots},
 			SkipFinalBackup: aws.Bool(true)},
 	}
 	DeferCleanup(c.DeleteFileSystem, context.Background(), input)
 
-	err := c.WaitForFilesystemAvailable(context.Background(), *filesystem.FileSystemId)
+	err = c.WaitForFilesystemAvailable(context.Background(), *filesystem.FileSystemId)
 	framework.ExpectNoError(err)
 })
 
@@ -60,13 +68,7 @@ var _ = Describe("FSx for OpenZFS Filesystem", func() {
 			}
 		})
 
-		subnetIdsJson, _ := json.Marshal(subnetIds)
-		securityGroupIdsJson, _ := json.Marshal(securityGroupIds)
-
-		dynamicParameters := getDefaultFilesystemParameters(string(subnetIdsJson), string(securityGroupIdsJson))
-		staticCreateInput := getDefaultCreateFilesystemInput(subnetIds, securityGroupIds)
-		driver := InitFSxCSIDriver(dynamicParameters, getDefaultRestoreSnapshotParameters(), getDefaultSnapshotParameters(), staticCreateInput, getDefaultDeleteFilesystemInput())
-
+		driver := InitFSxCSIDriver(RESOURCETYPE_FILESYSTEM)
 		storageframework.DefineTestSuites(driver, defaultSuites)
 	})
 })
@@ -80,10 +82,7 @@ var _ = Describe("FSx for OpenZFS Volumes", func() {
 			}
 		})
 
-		dynamicParameters := getDefaultVolumeParameters(strconv.Quote(*filesystem.OpenZFSConfiguration.RootVolumeId))
-		staticCreateInput := getDefaultCreateVolumeInput(*filesystem.OpenZFSConfiguration.RootVolumeId)
-		driver := InitFSxCSIDriver(dynamicParameters, getDefaultRestoreSnapshotParameters(), getDefaultSnapshotParameters(), staticCreateInput, getDefaultDeleteVolumeInput())
-
+		driver := InitFSxCSIDriver(RESOURCETYPE_VOLUME)
 		storageframework.DefineTestSuites(driver, defaultSuites)
 	})
 })
@@ -102,15 +101,15 @@ func getDefaultFilesystemParameters(subnetIds string, securityGroupIds string) m
 
 func getDefaultCreateFilesystemInput(subnetIds []string, securityGroupIds []string) fsx.CreateFileSystemInput {
 	return fsx.CreateFileSystemInput{
-		FileSystemType: aws.String("OPENZFS"),
-		OpenZFSConfiguration: &fsx.CreateFileSystemOpenZFSConfiguration{
-			DeploymentType:     aws.String("SINGLE_AZ_1"),
-			ThroughputCapacity: aws.Int64(64),
+		FileSystemType: types.FileSystemTypeOpenzfs,
+		OpenZFSConfiguration: &types.CreateFileSystemOpenZFSConfiguration{
+			DeploymentType:     types.OpenZFSDeploymentTypeSingleAz1,
+			ThroughputCapacity: aws.Int32(64),
 		},
-		SecurityGroupIds: aws.StringSlice(securityGroupIds),
-		StorageCapacity:  aws.Int64(64),
-		SubnetIds:        aws.StringSlice(subnetIds),
-		Tags: []*fsx.Tag{
+		SecurityGroupIds: securityGroupIds,
+		StorageCapacity:  aws.Int32(64),
+		SubnetIds:        subnetIds,
+		Tags: []types.Tag{
 			{
 				Key:   aws.String(CSIDriverE2ETagKey),
 				Value: aws.String(PullRequest),
@@ -122,7 +121,7 @@ func getDefaultCreateFilesystemInput(subnetIds []string, securityGroupIds []stri
 func getDefaultDeleteFilesystemInput() fsx.DeleteFileSystemInput {
 	return fsx.DeleteFileSystemInput{
 		//FileSystemId is required but is unknown, therefore it is defined in driver.go
-		OpenZFSConfiguration: &fsx.DeleteFileSystemOpenZFSConfiguration{
+		OpenZFSConfiguration: &types.DeleteFileSystemOpenZFSConfiguration{
 			SkipFinalBackup: aws.Bool(true),
 		},
 	}
@@ -139,11 +138,11 @@ func getDefaultVolumeParameters(parentVolumeId string) map[string]string {
 func getDefaultCreateVolumeInput(parentVolumeId string) fsx.CreateVolumeInput {
 	return fsx.CreateVolumeInput{
 		//Name is required and must be unique, therefore it is defined in driver.go
-		OpenZFSConfiguration: &fsx.CreateOpenZFSVolumeConfiguration{
+		OpenZFSConfiguration: &types.CreateOpenZFSVolumeConfiguration{
 			ParentVolumeId: &parentVolumeId,
 		},
-		VolumeType: aws.String("OPENZFS"),
-		Tags: []*fsx.Tag{
+		VolumeType: types.VolumeTypeOpenzfs,
+		Tags: []types.Tag{
 			{
 				Key:   aws.String(CSIDriverE2ETagKey),
 				Value: aws.String(PullRequest),

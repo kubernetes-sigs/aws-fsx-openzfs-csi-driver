@@ -18,6 +18,7 @@ package cloud
 import (
 	"context"
 	"fmt"
+	"github.com/aws/aws-sdk-go-v2/service/fsx/types"
 	"math/rand"
 	"reflect"
 	"strconv"
@@ -49,6 +50,7 @@ func NewFakeCloudProvider() *FakeCloudProvider {
 		DnsName:         "test.us-east-1.fsx.amazonaws.com",
 		FileSystemId:    filesystemId,
 		StorageCapacity: 100,
+		StorageType:     types.StorageTypeSsd,
 	}
 
 	return &FakeCloudProvider{
@@ -89,21 +91,22 @@ func (c *FakeCloudProvider) CreateFileSystem(ctx context.Context, parameters map
 		}
 	}
 
-	storageCapacity, err := strconv.ParseInt(parameters["StorageCapacity"], 10, 64)
+	storageCapacity, err := strconv.ParseInt(parameters["StorageCapacity"], 10, 32)
 	if err != nil {
 		return nil, err
 	}
 	fs := &FileSystem{
 		DnsName:         "test.us-east-1.fsx.amazonaws.com",
 		FileSystemId:    fmt.Sprintf("fs-%d", random.Uint64()),
-		StorageCapacity: storageCapacity,
+		StorageCapacity: int32(storageCapacity),
+		StorageType:     types.StorageTypeSsd,
 	}
 	c.fileSystems[fs.FileSystemId] = fs
 	c.fileSystemsParameters[fs.FileSystemId] = parameters
 	return fs, nil
 }
 
-func (c *FakeCloudProvider) ResizeFileSystem(ctx context.Context, fileSystemId string, newSizeGiB int64) (*int64, error) {
+func (c *FakeCloudProvider) ResizeFileSystem(ctx context.Context, fileSystemId string, newSizeGiB int32) (*int32, error) {
 	for _, fs := range c.fileSystems {
 		if fs.FileSystemId == fileSystemId {
 			fs.StorageCapacity = newSizeGiB
@@ -132,7 +135,7 @@ func (c *FakeCloudProvider) WaitForFileSystemAvailable(ctx context.Context, file
 	return nil
 }
 
-func (c *FakeCloudProvider) WaitForFileSystemResize(ctx context.Context, fileSystemId string, newSizeGiB int64) error {
+func (c *FakeCloudProvider) WaitForFileSystemResize(ctx context.Context, fileSystemId string, newSizeGiB int32) error {
 	return nil
 }
 
@@ -186,7 +189,7 @@ func (c *FakeCloudProvider) WaitForVolumeAvailable(ctx context.Context, volumeId
 	return nil
 }
 
-func (c *FakeCloudProvider) WaitForVolumeResize(ctx context.Context, volumeId string, newSizeGiB int64) error {
+func (c *FakeCloudProvider) WaitForVolumeResize(ctx context.Context, volumeId string, newSizeGiB int32) error {
 	return nil
 }
 

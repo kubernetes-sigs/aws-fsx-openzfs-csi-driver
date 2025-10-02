@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"context"
 	"flag"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
@@ -40,16 +39,5 @@ func init() {
 
 func TestFSxCSI(t *testing.T) {
 	RegisterFailHandler(Fail)
-
-	c := NewCloud(Region)
-	instance, err := c.GetNodeInstance(context.Background(), ClusterName)
-	framework.ExpectNoError(err)
-
-	subnetIds = []string{*instance.SubnetId}
-	securityGroupIds = c.GetSecurityGroupIds(instance)
-
-	filesystem, err = c.CreateFileSystem(context.Background(), getDefaultCreateFilesystemInput([]string{*instance.SubnetId}, c.GetSecurityGroupIds(instance)))
-	framework.ExpectNoError(err)
-
 	RunSpecs(t, "AWS FSx OpenZFS CSI Driver End-to-End Tests")
 }

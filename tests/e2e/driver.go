@@ -2,9 +2,10 @@ package e2e
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/fsx"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/fsx"
 	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/driver"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -17,6 +18,7 @@ import (
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	"strconv"
 	"time"
 )
 
@@ -33,6 +35,7 @@ type FSxTestDriver interface {
 
 type fsxDriver struct {
 	driverInfo                storageframework.DriverInfo
+	resourceType              string
 	parameters                map[string]string
 	restoreSnapshotParameters map[string]string
 	snapshotParameters        map[string]string
@@ -65,13 +68,13 @@ type FSxVolume struct {
 	volumePath  string
 }
 
-func InitFSxCSIDriver(parameters map[string]string, restoreSnapshotParameters map[string]string, snapshotParameters map[string]string, createInput any, deleteInput any) storageframework.TestDriver {
+func InitFSxCSIDriver(resourceType string) storageframework.TestDriver {
 	var min string
 	var max string
-	if parameters[RESOURCETYPE] == RESOURCETYPE_FILESYSTEM {
+	if resourceType == RESOURCETYPE_FILESYSTEM {
 		min = "64Gi"
 		max = "512Ti"
-	} else if parameters[RESOURCETYPE] == RESOURCETYPE_VOLUME {
+	} else if resourceType == RESOURCETYPE_VOLUME {
 		min = "1Gi"
 		max = "1Gi"
 	}
@@ -93,11 +96,7 @@ func InitFSxCSIDriver(parameters map[string]string, restoreSnapshotParameters ma
 				storageframework.CapControllerExpansion: true,
 			},
 		},
-		parameters:                parameters,
-		restoreSnapshotParameters: restoreSnapshotParameters,
-		snapshotParameters:        snapshotParameters,
-		createInput:               createInput,
-		deleteInput:               deleteInput,
+		resourceType: resourceType,
 	}
 }
 
@@ -114,6 +113,19 @@ func (d *fsxDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
 }
 
 func (d *fsxDriver) PrepareTest(ctx context.Context, f *framework.Framework) *storageframework.PerTestConfig {
+	if d.resourceType == RESOURCETYPE_FILESYSTEM {
+		subnetIdsJson, _ := json.Marshal(subnetIds)
+		securityGroupIdsJson, _ := json.Marshal(securityGroupIds)
+		d.parameters = getDefaultFilesystemParameters(string(subnetIdsJson), string(securityGroupIdsJson))
+		d.createInput = getDefaultCreateFilesystemInput(subnetIds, securityGroupIds)
+	} else if d.resourceType == RESOURCETYPE_VOLUME {
+		d.parameters = getDefaultVolumeParameters(strconv.Quote(*filesystem.OpenZFSConfiguration.RootVolumeId))
+		d.createInput = getDefaultCreateVolumeInput(*filesystem.OpenZFSConfiguration.RootVolumeId)
+	}
+	d.restoreSnapshotParameters = getDefaultRestoreSnapshotParameters()
+	d.snapshotParameters = getDefaultSnapshotParameters()
+	d.deleteInput = getDefaultDeleteFilesystemInput()
+
 	return &storageframework.PerTestConfig{
 		Driver:    d,
 		Prefix:    "fsx-openzfs",

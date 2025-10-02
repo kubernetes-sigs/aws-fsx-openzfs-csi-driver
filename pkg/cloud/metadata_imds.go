@@ -1,23 +1,26 @@
 package cloud
 
 import (
+	"context"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/ec2metadata"
-	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/feature/ec2/imds"
 	"k8s.io/klog/v2"
 )
 
-type EC2MetadataClient func() (EC2Metadata, error)
+type IMDSClient func() (IMDS, error)
 
-var DefaultEC2MetadataClient = func() (EC2Metadata, error) {
-	sess := session.Must(session.NewSession(&aws.Config{}))
-	svc := ec2metadata.New(sess)
+var DefaultIMDSClient = func() (IMDS, error) {
+	cfg, err := config.LoadDefaultConfig(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	svc := imds.NewFromConfig(cfg)
 	return svc, nil
 }
 
-func EC2MetadataInstanceInfo(svc EC2Metadata, regionFromSession string) (*Metadata, error) {
-	doc, err := svc.GetInstanceIdentityDocument()
+func IMDSInstanceInfo(svc IMDS, regionFromSession string) (*Metadata, error) {
+	doc, err := svc.GetInstanceIdentityDocument(context.Background(), &imds.GetInstanceIdentityDocumentInput{})
 	klog.InfoS("Retrieving EC2 instance identity Metadata", "regionFromSession", regionFromSession)
 	if err != nil {
 		return nil, fmt.Errorf("could not get EC2 instance identity metadata: %w", err)

@@ -19,11 +19,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/request"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/fsx"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/fsx"
+	"github.com/aws/aws-sdk-go-v2/service/fsx/types"
 	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/util"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
@@ -62,7 +61,8 @@ const (
 type FileSystem struct {
 	DnsName         string
 	FileSystemId    string
-	StorageCapacity int64
+	StorageCapacity int32
+	StorageType     types.StorageType
 }
 
 // Volume represents an OpenZFS volume
@@ -81,33 +81,33 @@ type Snapshot struct {
 }
 
 // FSx abstracts FSx client to facilitate its mocking.
-// See https://docs.aws.amazon.com/sdk-for-go/api/service/fsx/ for details
+// See https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/fsx for details
 type FSx interface {
-	CreateFileSystemWithContext(aws.Context, *fsx.CreateFileSystemInput, ...request.Option) (*fsx.CreateFileSystemOutput, error)
-	UpdateFileSystemWithContext(aws.Context, *fsx.UpdateFileSystemInput, ...request.Option) (*fsx.UpdateFileSystemOutput, error)
-	DeleteFileSystemWithContext(aws.Context, *fsx.DeleteFileSystemInput, ...request.Option) (*fsx.DeleteFileSystemOutput, error)
-	DescribeFileSystemsWithContext(aws.Context, *fsx.DescribeFileSystemsInput, ...request.Option) (*fsx.DescribeFileSystemsOutput, error)
-	CreateVolumeWithContext(aws.Context, *fsx.CreateVolumeInput, ...request.Option) (*fsx.CreateVolumeOutput, error)
-	DeleteVolumeWithContext(aws.Context, *fsx.DeleteVolumeInput, ...request.Option) (*fsx.DeleteVolumeOutput, error)
-	DescribeVolumesWithContext(aws.Context, *fsx.DescribeVolumesInput, ...request.Option) (*fsx.DescribeVolumesOutput, error)
-	CreateSnapshotWithContext(aws.Context, *fsx.CreateSnapshotInput, ...request.Option) (*fsx.CreateSnapshotOutput, error)
-	DeleteSnapshotWithContext(aws.Context, *fsx.DeleteSnapshotInput, ...request.Option) (*fsx.DeleteSnapshotOutput, error)
-	DescribeSnapshotsWithContext(aws.Context, *fsx.DescribeSnapshotsInput, ...request.Option) (*fsx.DescribeSnapshotsOutput, error)
-	ListTagsForResource(*fsx.ListTagsForResourceInput) (*fsx.ListTagsForResourceOutput, error)
+	CreateFileSystem(context.Context, *fsx.CreateFileSystemInput, ...func(*fsx.Options)) (*fsx.CreateFileSystemOutput, error)
+	UpdateFileSystem(context.Context, *fsx.UpdateFileSystemInput, ...func(*fsx.Options)) (*fsx.UpdateFileSystemOutput, error)
+	DeleteFileSystem(context.Context, *fsx.DeleteFileSystemInput, ...func(*fsx.Options)) (*fsx.DeleteFileSystemOutput, error)
+	DescribeFileSystems(context.Context, *fsx.DescribeFileSystemsInput, ...func(*fsx.Options)) (*fsx.DescribeFileSystemsOutput, error)
+	CreateVolume(context.Context, *fsx.CreateVolumeInput, ...func(*fsx.Options)) (*fsx.CreateVolumeOutput, error)
+	DeleteVolume(context.Context, *fsx.DeleteVolumeInput, ...func(*fsx.Options)) (*fsx.DeleteVolumeOutput, error)
+	DescribeVolumes(context.Context, *fsx.DescribeVolumesInput, ...func(*fsx.Options)) (*fsx.DescribeVolumesOutput, error)
+	CreateSnapshot(context.Context, *fsx.CreateSnapshotInput, ...func(*fsx.Options)) (*fsx.CreateSnapshotOutput, error)
+	DeleteSnapshot(context.Context, *fsx.DeleteSnapshotInput, ...func(*fsx.Options)) (*fsx.DeleteSnapshotOutput, error)
+	DescribeSnapshots(context.Context, *fsx.DescribeSnapshotsInput, ...func(*fsx.Options)) (*fsx.DescribeSnapshotsOutput, error)
+	ListTagsForResource(context.Context, *fsx.ListTagsForResourceInput, ...func(*fsx.Options)) (*fsx.ListTagsForResourceOutput, error)
 }
 
 type Cloud interface {
 	CreateFileSystem(ctx context.Context, parameters map[string]string) (*FileSystem, error)
-	ResizeFileSystem(ctx context.Context, fileSystemId string, newSizeGiB int64) (*int64, error)
+	ResizeFileSystem(ctx context.Context, fileSystemId string, newSizeGiB int32) (*int32, error)
 	DeleteFileSystem(ctx context.Context, parameters map[string]string) error
 	DescribeFileSystem(ctx context.Context, fileSystemId string) (*FileSystem, error)
 	WaitForFileSystemAvailable(ctx context.Context, fileSystemId string) error
-	WaitForFileSystemResize(ctx context.Context, fileSystemId string, resizeGiB int64) error
+	WaitForFileSystemResize(ctx context.Context, fileSystemId string, resizeGiB int32) error
 	CreateVolume(ctx context.Context, parameters map[string]string) (*Volume, error)
 	DeleteVolume(ctx context.Context, parameters map[string]string) error
 	DescribeVolume(ctx context.Context, volumeId string) (*Volume, error)
 	WaitForVolumeAvailable(ctx context.Context, volumeId string) error
-	WaitForVolumeResize(ctx context.Context, volumeId string, resizeGiB int64) error
+	WaitForVolumeResize(ctx context.Context, volumeId string, resizeGiB int32) error
 	CreateSnapshot(ctx context.Context, options map[string]string) (*Snapshot, error)
 	DeleteSnapshot(ctx context.Context, parameters map[string]string) error
 	DescribeSnapshot(ctx context.Context, snapshotId string) (*Snapshot, error)
@@ -122,18 +122,19 @@ type cloud struct {
 }
 
 // NewCloud returns a new instance of AWS cloud
-// It panics if session is invalid
 func NewCloud(region string) (Cloud, error) {
-	awsConfig := &aws.Config{
-		Region:                        aws.String(region),
-		CredentialsChainVerboseErrors: aws.Bool(true),
+	cfg, err := config.LoadDefaultConfig(context.Background(),
+		config.WithRegion(region),
 		// Set MaxRetries to a high value. It will be "overwritten" if context deadline comes sooner.
-		MaxRetries: aws.Int(8),
+		config.WithRetryMaxAttempts(8),
+	)
+	if err != nil {
+		return nil, err
 	}
 
 	os.Setenv("AWS_EXECUTION_ENV", "aws-fsx-openzfs-csi-driver-"+driverVersion)
 
-	svc := fsx.New(session.Must(session.NewSession(awsConfig)))
+	svc := fsx.NewFromConfig(cfg)
 	return &cloud{
 		region: region,
 		fsx:    svc,
@@ -147,41 +148,40 @@ func (c *cloud) CreateFileSystem(ctx context.Context, parameters map[string]stri
 		return nil, err
 	}
 
-	output, err := c.fsx.CreateFileSystemWithContext(ctx, &input)
+	output, err := c.fsx.CreateFileSystem(ctx, &input)
 	if err != nil {
-		if awsErr, ok := err.(awserr.Error); ok {
-			if awsErr.Code() == fsx.ErrCodeIncompatibleParameterError {
-				return nil, ErrAlreadyExists
-			}
+		var incompatibleParamErr *types.IncompatibleParameterError
+		if errors.As(err, &incompatibleParamErr) {
+			return nil, ErrAlreadyExists
 		}
 		return nil, err
 	}
 
 	return &FileSystem{
-		DnsName:         aws.StringValue(output.FileSystem.DNSName),
-		FileSystemId:    aws.StringValue(output.FileSystem.FileSystemId),
-		StorageCapacity: aws.Int64Value(output.FileSystem.StorageCapacity),
+		DnsName:         aws.ToString(output.FileSystem.DNSName),
+		FileSystemId:    aws.ToString(output.FileSystem.FileSystemId),
+		StorageCapacity: aws.ToInt32(output.FileSystem.StorageCapacity),
+		StorageType:     output.FileSystem.StorageType,
 	}, nil
 }
 
-func (c *cloud) ResizeFileSystem(ctx context.Context, fileSystemId string, newSizeGiB int64) (*int64, error) {
+func (c *cloud) ResizeFileSystem(ctx context.Context, fileSystemId string, newSizeGiB int32) (*int32, error) {
 	input := &fsx.UpdateFileSystemInput{
 		FileSystemId:    aws.String(fileSystemId),
-		StorageCapacity: aws.Int64(newSizeGiB),
+		StorageCapacity: aws.Int32(newSizeGiB),
 	}
 
-	_, err := c.fsx.UpdateFileSystemWithContext(ctx, input)
+	_, err := c.fsx.UpdateFileSystem(ctx, input)
 	if err != nil {
-		if awsErr, ok := err.(awserr.Error); ok {
-			if awsErr.Code() == fsx.ErrCodeBadRequest &&
-				awsErr.Message() == "Unable to perform the storage capacity update. There is an update already in progress." {
-				// If a previous request timed out and was successful, don't error
-				_, err = c.getUpdateResizeFilesystemAdministrativeAction(ctx, fileSystemId, newSizeGiB)
-				if err != nil {
-					return nil, err
-				}
-				return &newSizeGiB, nil
+		var badRequestErr *types.BadRequest
+		if errors.As(err, &badRequestErr) &&
+			badRequestErr.ErrorMessage() == "Unable to perform the storage capacity update. There is an update already in progress." {
+			// If a previous request timed out and was successful, don't error
+			_, err = c.getUpdateResizeFilesystemAdministrativeAction(ctx, fileSystemId, newSizeGiB)
+			if err != nil {
+				return nil, err
 			}
+			return &newSizeGiB, nil
 		}
 		return nil, fmt.Errorf("UpdateFileSystem failed: %v", err)
 	}
@@ -196,12 +196,11 @@ func (c *cloud) DeleteFileSystem(ctx context.Context, parameters map[string]stri
 		return err
 	}
 
-	_, err = c.fsx.DeleteFileSystemWithContext(ctx, &input)
+	_, err = c.fsx.DeleteFileSystem(ctx, &input)
 	if err != nil {
-		if awsErr, ok := err.(awserr.Error); ok {
-			if awsErr.Code() == fsx.ErrCodeFileSystemNotFound {
-				return ErrNotFound
-			}
+		var fileSystemNotFoundErr *types.FileSystemNotFound
+		if errors.As(err, &fileSystemNotFoundErr) {
+			return ErrNotFound
 		}
 		return err
 	}
@@ -216,9 +215,10 @@ func (c *cloud) DescribeFileSystem(ctx context.Context, fileSystemId string) (*F
 	}
 
 	return &FileSystem{
-		DnsName:         aws.StringValue(fs.DNSName),
-		FileSystemId:    aws.StringValue(fs.FileSystemId),
-		StorageCapacity: aws.Int64Value(fs.StorageCapacity),
+		DnsName:         aws.ToString(fs.DNSName),
+		FileSystemId:    aws.ToString(fs.FileSystemId),
+		StorageCapacity: aws.ToInt32(fs.StorageCapacity),
+		StorageType:     fs.StorageType,
 	}, nil
 }
 
@@ -228,31 +228,31 @@ func (c *cloud) WaitForFileSystemAvailable(ctx context.Context, fileSystemId str
 		if err != nil {
 			return true, err
 		}
-		klog.V(2).InfoS("WaitForFileSystemAvailable", "filesystem", fileSystemId, "lifecycle", *fs.Lifecycle)
-		switch *fs.Lifecycle {
-		case fsx.FileSystemLifecycleAvailable:
+		klog.V(2).InfoS("WaitForFileSystemAvailable", "filesystem", fileSystemId, "lifecycle", fs.Lifecycle)
+		switch fs.Lifecycle {
+		case types.FileSystemLifecycleAvailable:
 			return true, nil
-		case fsx.FileSystemLifecycleCreating:
+		case types.FileSystemLifecycleCreating:
 			return false, nil
 		default:
-			return true, fmt.Errorf("unexpected state for filesystem %s: %q", fileSystemId, *fs.Lifecycle)
+			return true, fmt.Errorf("unexpected state for filesystem %s: %q", fileSystemId, fs.Lifecycle)
 		}
 	})
 
 	return err
 }
 
-func (c *cloud) WaitForFileSystemResize(ctx context.Context, fileSystemId string, resizeGiB int64) error {
+func (c *cloud) WaitForFileSystemResize(ctx context.Context, fileSystemId string, resizeGiB int32) error {
 	err := wait.Poll(PollCheckInterval, PollCheckTimeout, func() (done bool, err error) {
 		updateAction, err := c.getUpdateResizeFilesystemAdministrativeAction(ctx, fileSystemId, resizeGiB)
 		if err != nil {
 			return true, err
 		}
-		klog.V(2).InfoS("WaitForFileSystemResize", "filesystem", fileSystemId, "update status", *updateAction.Status)
-		switch *updateAction.Status {
-		case fsx.StatusPending, fsx.StatusInProgress:
+		klog.V(2).InfoS("WaitForFileSystemResize", "filesystem", fileSystemId, "update status", updateAction.Status)
+		switch updateAction.Status {
+		case types.StatusPending, types.StatusInProgress:
 			return false, nil
-		case fsx.StatusUpdatedOptimizing, fsx.StatusCompleted:
+		case types.StatusUpdatedOptimizing, types.StatusCompleted:
 			return true, nil
 		default:
 			return true, fmt.Errorf("update failed for filesystem %s: %q", fileSystemId, *updateAction.FailureDetails.Message)
@@ -273,20 +273,19 @@ func (c *cloud) CreateVolume(ctx context.Context, parameters map[string]string) 
 		return nil, ErrInvalidInput
 	}
 
-	output, err := c.fsx.CreateVolumeWithContext(ctx, &input)
+	output, err := c.fsx.CreateVolume(ctx, &input)
 	if err != nil {
-		if awsErr, ok := err.(awserr.Error); ok {
-			if awsErr.Code() == fsx.ErrCodeIncompatibleParameterError {
-				return nil, ErrAlreadyExists
-			}
+		var incompatibleParamErr *types.IncompatibleParameterError
+		if errors.As(err, &incompatibleParamErr) {
+			return nil, ErrAlreadyExists
 		}
 		return nil, err
 	}
 
 	return &Volume{
-		FileSystemId: aws.StringValue(output.Volume.FileSystemId),
-		VolumeId:     aws.StringValue(output.Volume.VolumeId),
-		VolumePath:   aws.StringValue(output.Volume.OpenZFSConfiguration.VolumePath),
+		FileSystemId: aws.ToString(output.Volume.FileSystemId),
+		VolumeId:     aws.ToString(output.Volume.VolumeId),
+		VolumePath:   aws.ToString(output.Volume.OpenZFSConfiguration.VolumePath),
 	}, nil
 }
 
@@ -297,12 +296,11 @@ func (c *cloud) DeleteVolume(ctx context.Context, parameters map[string]string) 
 		return err
 	}
 
-	_, err = c.fsx.DeleteVolumeWithContext(ctx, &input)
+	_, err = c.fsx.DeleteVolume(ctx, &input)
 	if err != nil {
-		if awsErr, ok := err.(awserr.Error); ok {
-			if awsErr.Code() == fsx.ErrCodeVolumeNotFound {
-				return ErrNotFound
-			}
+		var volumeNotFoundErr *types.VolumeNotFound
+		if errors.As(err, &volumeNotFoundErr) {
+			return ErrNotFound
 		}
 		return err
 	}
@@ -317,8 +315,8 @@ func (c *cloud) DescribeVolume(ctx context.Context, volumeId string) (*Volume, e
 	}
 
 	return &Volume{
-		VolumeId:   aws.StringValue(v.VolumeId),
-		VolumePath: aws.StringValue(v.OpenZFSConfiguration.VolumePath),
+		VolumeId:   aws.ToString(v.VolumeId),
+		VolumePath: aws.ToString(v.OpenZFSConfiguration.VolumePath),
 	}, nil
 }
 
@@ -328,14 +326,14 @@ func (c *cloud) WaitForVolumeAvailable(ctx context.Context, volumeId string) err
 		if err != nil {
 			return true, err
 		}
-		klog.V(2).InfoS("WaitForVolumeAvailable", "volume", volumeId, "lifecycle", *v.Lifecycle)
-		switch *v.Lifecycle {
-		case fsx.VolumeLifecycleAvailable:
+		klog.V(2).InfoS("WaitForVolumeAvailable", "volume", volumeId, "lifecycle", v.Lifecycle)
+		switch v.Lifecycle {
+		case types.VolumeLifecycleAvailable:
 			return true, nil
-		case fsx.VolumeLifecyclePending, fsx.VolumeLifecycleCreating:
+		case types.VolumeLifecyclePending, types.VolumeLifecycleCreating:
 			return false, nil
 		default:
-			return true, fmt.Errorf("unexpected state for volume %s: %q", volumeId, *v.Lifecycle)
+			return true, fmt.Errorf("unexpected state for volume %s: %q", volumeId, v.Lifecycle)
 		}
 	})
 
@@ -343,17 +341,17 @@ func (c *cloud) WaitForVolumeAvailable(ctx context.Context, volumeId string) err
 }
 
 // WaitForVolumeResize TODO: Remove this function and its associated tests.
-func (c *cloud) WaitForVolumeResize(ctx context.Context, volumeId string, resizeGiB int64) error {
+func (c *cloud) WaitForVolumeResize(ctx context.Context, volumeId string, resizeGiB int32) error {
 	err := wait.Poll(PollCheckInterval, PollCheckTimeout, func() (done bool, err error) {
 		updateAction, err := c.getUpdateResizeVolumeAdministrativeAction(ctx, volumeId, resizeGiB)
 		if err != nil {
 			return true, err
 		}
-		klog.V(2).InfoS("WaitForVolumeResize", "volume", volumeId, "update status", *updateAction.Status)
-		switch *updateAction.Status {
-		case fsx.StatusPending, fsx.StatusInProgress:
+		klog.V(2).InfoS("WaitForVolumeResize", "volume", volumeId, "update status", updateAction.Status)
+		switch updateAction.Status {
+		case types.StatusPending, types.StatusInProgress:
 			return false, nil
-		case fsx.StatusUpdatedOptimizing, fsx.StatusCompleted:
+		case types.StatusUpdatedOptimizing, types.StatusCompleted:
 			return true, nil
 		default:
 			return true, fmt.Errorf("update failed for volume %s: %q", volumeId, *updateAction.FailureDetails.Message)
@@ -370,24 +368,22 @@ func (c *cloud) CreateSnapshot(ctx context.Context, parameters map[string]string
 		return nil, err
 	}
 
-	output, err := c.fsx.CreateSnapshotWithContext(ctx, &input)
+	output, err := c.fsx.CreateSnapshot(ctx, &input)
 	if err != nil {
-		if awsErr, ok := err.(awserr.Error); ok {
-			if awsErr.Code() == fsx.ErrCodeIncompatibleParameterError {
-				return nil, ErrAlreadyExists
-			}
+		var incompatibleParamErr *types.IncompatibleParameterError
+		if errors.As(err, &incompatibleParamErr) {
+			return nil, ErrAlreadyExists
 		}
 		return nil, fmt.Errorf("error creating snapshot of volume %s: %w", *input.VolumeId, err)
 	}
 	if output == nil {
 		return nil, fmt.Errorf("nil CreateSnapshotResponse")
 	}
-	klog.V(4).InfoS("CreateSnapshotResponse", "response", output.GoString())
 	return &Snapshot{
-		SnapshotID:     aws.StringValue(output.Snapshot.SnapshotId),
-		SourceVolumeID: aws.StringValue(output.Snapshot.VolumeId),
-		ResourceARN:    aws.StringValue(output.Snapshot.ResourceARN),
-		CreationTime:   aws.TimeValue(output.Snapshot.CreationTime),
+		SnapshotID:     aws.ToString(output.Snapshot.SnapshotId),
+		SourceVolumeID: aws.ToString(output.Snapshot.VolumeId),
+		ResourceARN:    aws.ToString(output.Snapshot.ResourceARN),
+		CreationTime:   aws.ToTime(output.Snapshot.CreationTime),
 	}, nil
 }
 
@@ -398,11 +394,10 @@ func (c *cloud) DeleteSnapshot(ctx context.Context, parameters map[string]string
 		return err
 	}
 
-	if _, err = c.fsx.DeleteSnapshotWithContext(ctx, &input); err != nil {
-		if awsErr, ok := err.(awserr.Error); ok {
-			if awsErr.Code() == fsx.ErrCodeSnapshotNotFound {
-				return fmt.Errorf("DeleteSnapshot: Unable to find snapshot %s", *input.SnapshotId)
-			}
+	if _, err = c.fsx.DeleteSnapshot(ctx, &input); err != nil {
+		var snapshotNotFoundErr *types.SnapshotNotFound
+		if errors.As(err, &snapshotNotFoundErr) {
+			return fmt.Errorf("DeleteSnapshot: Unable to find snapshot %s", *input.SnapshotId)
 		}
 		return fmt.Errorf("DeleteSnapshot: Failed to delete snapshot %s, received error %v", *input.SnapshotId, err)
 	}
@@ -416,10 +411,10 @@ func (c *cloud) DescribeSnapshot(ctx context.Context, snapshotId string) (*Snaps
 	}
 
 	return &Snapshot{
-		SnapshotID:     aws.StringValue(snapshot.SnapshotId),
-		SourceVolumeID: aws.StringValue(snapshot.VolumeId),
-		ResourceARN:    aws.StringValue(snapshot.ResourceARN),
-		CreationTime:   aws.TimeValue(snapshot.CreationTime),
+		SnapshotID:     aws.ToString(snapshot.SnapshotId),
+		SourceVolumeID: aws.ToString(snapshot.VolumeId),
+		ResourceARN:    aws.ToString(snapshot.ResourceARN),
+		CreationTime:   aws.ToTime(snapshot.CreationTime),
 	}, nil
 }
 
@@ -433,14 +428,14 @@ func (c *cloud) WaitForSnapshotAvailable(ctx context.Context, snapshotId string)
 		if err != nil {
 			return true, err
 		}
-		klog.V(2).InfoS("WaitForSnapshotAvailable", "snapshot", snapshotId, "lifecycle", *snapshot.Lifecycle)
-		switch *snapshot.Lifecycle {
-		case fsx.SnapshotLifecycleAvailable:
+		klog.V(2).InfoS("WaitForSnapshotAvailable", "snapshot", snapshotId, "lifecycle", snapshot.Lifecycle)
+		switch snapshot.Lifecycle {
+		case types.SnapshotLifecycleAvailable:
 			return true, nil
-		case fsx.SnapshotLifecyclePending, fsx.SnapshotLifecycleCreating:
+		case types.SnapshotLifecyclePending, types.SnapshotLifecycleCreating:
 			return false, nil
 		default:
-			return true, fmt.Errorf("WaitForSnapshotAvailable: Snapshot %s has unexpected status %q", snapshotId, *snapshot.Lifecycle)
+			return true, fmt.Errorf("WaitForSnapshotAvailable: Snapshot %s has unexpected status %q", snapshotId, snapshot.Lifecycle)
 		}
 	})
 
@@ -467,7 +462,7 @@ func (c *cloud) GetDeleteParameters(ctx context.Context, id string) (map[string]
 		resourceArn = *v.ResourceARN
 	}
 
-	tags, err := c.getTagsForResource(resourceArn)
+	tags, err := c.getTagsForResource(ctx, resourceArn)
 	if err != nil {
 		return nil, err
 	}
@@ -483,10 +478,10 @@ func (c *cloud) GetDeleteParameters(ctx context.Context, id string) (map[string]
 				deleteKey: deleteValue,
 			}
 			if splitVolumeId[0] == FilesystemPrefix {
-				err = util.StrictRemoveParametersAndPopulateObject(deleteMap, &fsx.DeleteFileSystemOpenZFSConfiguration{})
+				err = util.StrictRemoveParametersAndPopulateObject(deleteMap, &types.DeleteFileSystemOpenZFSConfiguration{})
 			}
 			if splitVolumeId[0] == VolumePrefix {
-				err = util.StrictRemoveParametersAndPopulateObject(deleteMap, &fsx.DeleteVolumeOpenZFSConfiguration{})
+				err = util.StrictRemoveParametersAndPopulateObject(deleteMap, &types.DeleteVolumeOpenZFSConfiguration{})
 			}
 
 			if err != nil {
@@ -498,75 +493,75 @@ func (c *cloud) GetDeleteParameters(ctx context.Context, id string) (map[string]
 	return parameters, nil
 }
 
-func (c *cloud) getFileSystem(ctx context.Context, fileSystemId string) (*fsx.FileSystem, error) {
+func (c *cloud) getFileSystem(ctx context.Context, fileSystemId string) (types.FileSystem, error) {
 	input := &fsx.DescribeFileSystemsInput{
-		FileSystemIds: []*string{aws.String(fileSystemId)},
+		FileSystemIds: []string{fileSystemId},
 	}
 
-	output, err := c.fsx.DescribeFileSystemsWithContext(ctx, input)
+	output, err := c.fsx.DescribeFileSystems(ctx, input)
 	if err != nil {
-		return nil, err
+		return types.FileSystem{}, err
 	}
 
 	if len(output.FileSystems) == 0 {
-		return nil, ErrNotFound
+		return types.FileSystem{}, ErrNotFound
 	}
 
 	if len(output.FileSystems) > 1 {
-		return nil, ErrMultipleFound
+		return types.FileSystem{}, ErrMultipleFound
 	}
 
 	return output.FileSystems[0], nil
 }
 
-func (c *cloud) getVolume(ctx context.Context, volumeId string) (*fsx.Volume, error) {
+func (c *cloud) getVolume(ctx context.Context, volumeId string) (types.Volume, error) {
 	input := &fsx.DescribeVolumesInput{
-		VolumeIds: []*string{aws.String(volumeId)},
+		VolumeIds: []string{volumeId},
 	}
 
-	output, err := c.fsx.DescribeVolumesWithContext(ctx, input)
+	output, err := c.fsx.DescribeVolumes(ctx, input)
 	if err != nil {
-		return nil, err
+		return types.Volume{}, err
 	}
 
 	if len(output.Volumes) == 0 {
-		return nil, ErrNotFound
+		return types.Volume{}, ErrNotFound
 	}
 
 	if len(output.Volumes) > 1 {
-		return nil, ErrMultipleFound
+		return types.Volume{}, ErrMultipleFound
 	}
 
 	return output.Volumes[0], nil
 }
 
-func (c *cloud) getSnapshot(ctx context.Context, snapshotId string) (*fsx.Snapshot, error) {
+func (c *cloud) getSnapshot(ctx context.Context, snapshotId string) (types.Snapshot, error) {
 	input := &fsx.DescribeSnapshotsInput{
-		SnapshotIds: []*string{aws.String(snapshotId)},
+		SnapshotIds: []string{snapshotId},
 	}
 
-	output, err := c.fsx.DescribeSnapshotsWithContext(ctx, input)
+	output, err := c.fsx.DescribeSnapshots(ctx, input)
 	if err != nil {
-		return nil, err
+		return types.Snapshot{}, err
 	}
 
 	if len(output.Snapshots) == 0 {
-		return nil, ErrNotFound
+		return types.Snapshot{}, ErrNotFound
 	}
 
 	if len(output.Snapshots) > 1 {
-		return nil, ErrMultipleFound
+		return types.Snapshot{}, ErrMultipleFound
 	}
 
 	return output.Snapshots[0], nil
 }
 
-func (c *cloud) getTagsForResource(resourceARN string) ([]*fsx.Tag, error) {
+func (c *cloud) getTagsForResource(ctx context.Context, resourceARN string) ([]types.Tag, error) {
 	input := &fsx.ListTagsForResourceInput{
 		ResourceARN: aws.String(resourceARN),
 	}
 
-	output, err := c.fsx.ListTagsForResource(input)
+	output, err := c.fsx.ListTagsForResource(ctx, input)
 	if err != nil {
 		return nil, err
 	}
@@ -601,43 +596,43 @@ func (c *cloud) GetVolumeId(ctx context.Context, volumeId string) (string, error
 
 // getUpdateResizeFilesystemAdministrativeAction retrieves the AdministrativeAction associated with a file system update with the
 // given target storage capacity, if one exists.
-func (c *cloud) getUpdateResizeFilesystemAdministrativeAction(ctx context.Context, fileSystemId string, resizeGiB int64) (*fsx.AdministrativeAction, error) {
+func (c *cloud) getUpdateResizeFilesystemAdministrativeAction(ctx context.Context, fileSystemId string, resizeGiB int32) (types.AdministrativeAction, error) {
 	fs, err := c.getFileSystem(ctx, fileSystemId)
 	if err != nil {
-		return nil, fmt.Errorf("DescribeFileSystems failed: %v", err)
+		return types.AdministrativeAction{}, fmt.Errorf("DescribeFileSystems failed: %v", err)
 	}
 
 	if len(fs.AdministrativeActions) == 0 {
-		return nil, fmt.Errorf("there is no update on filesystem %s", fileSystemId)
+		return types.AdministrativeAction{}, fmt.Errorf("there is no update on filesystem %s", fileSystemId)
 	}
 
 	// AdministrativeActions are sorted from newest to oldest
 	for _, action := range fs.AdministrativeActions {
-		if *action.AdministrativeActionType == fsx.AdministrativeActionTypeFileSystemUpdate &&
+		if action.AdministrativeActionType == types.AdministrativeActionTypeFileSystemUpdate &&
 			action.TargetFileSystemValues.StorageCapacity != nil &&
 			*action.TargetFileSystemValues.StorageCapacity == resizeGiB {
 			return action, nil
 		}
 	}
 
-	return nil, fmt.Errorf("there is no update with storage capacity of %d GiB on filesystem %s", resizeGiB, fileSystemId)
+	return types.AdministrativeAction{}, fmt.Errorf("there is no update with storage capacity of %d GiB on filesystem %s", resizeGiB, fileSystemId)
 }
 
 // getUpdateResizeVolumeAdministrativeAction retrieves the AdministrativeAction associated with a volume update with the
 // given target storage capacity, if one exists.
-func (c *cloud) getUpdateResizeVolumeAdministrativeAction(ctx context.Context, volumeId string, resizeGiB int64) (*fsx.AdministrativeAction, error) {
+func (c *cloud) getUpdateResizeVolumeAdministrativeAction(ctx context.Context, volumeId string, resizeGiB int32) (types.AdministrativeAction, error) {
 	v, err := c.getVolume(ctx, volumeId)
 	if err != nil {
-		return nil, fmt.Errorf("DescribeVolumes failed: %v", err)
+		return types.AdministrativeAction{}, fmt.Errorf("DescribeVolumes failed: %v", err)
 	}
 
 	if len(v.AdministrativeActions) == 0 {
-		return nil, fmt.Errorf("there is no update on volume %s", volumeId)
+		return types.AdministrativeAction{}, fmt.Errorf("there is no update on volume %s", volumeId)
 	}
 
 	// AdministrativeActions are sorted from newest to oldest
 	for _, action := range v.AdministrativeActions {
-		if *action.AdministrativeActionType == fsx.AdministrativeActionTypeVolumeUpdate &&
+		if action.AdministrativeActionType == types.AdministrativeActionTypeVolumeUpdate &&
 			action.TargetVolumeValues.OpenZFSConfiguration != nil &&
 			action.TargetVolumeValues.OpenZFSConfiguration.StorageCapacityQuotaGiB != nil &&
 			*action.TargetVolumeValues.OpenZFSConfiguration.StorageCapacityQuotaGiB == resizeGiB &&
@@ -647,26 +642,26 @@ func (c *cloud) getUpdateResizeVolumeAdministrativeAction(ctx context.Context, v
 		}
 	}
 
-	return nil, fmt.Errorf("there is no update with storage capacity of %d GiB on volume %s", resizeGiB, volumeId)
+	return types.AdministrativeAction{}, fmt.Errorf("there is no update with storage capacity of %d GiB on volume %s", resizeGiB, volumeId)
 }
 
 func CollapseCreateFileSystemParameters(parameters map[string]string) error {
-	config := fsx.CreateFileSystemOpenZFSConfiguration{}
+	config := types.CreateFileSystemOpenZFSConfiguration{}
 	return util.ReplaceParametersAndPopulateObject("OpenZFSConfiguration", parameters, &config)
 }
 
 func CollapseDeleteFileSystemParameters(parameters map[string]string) error {
-	config := fsx.DeleteFileSystemOpenZFSConfiguration{}
+	config := types.DeleteFileSystemOpenZFSConfiguration{}
 	return util.ReplaceParametersAndPopulateObject("OpenZFSConfiguration", parameters, &config)
 }
 
 func CollapseCreateVolumeParameters(parameters map[string]string) error {
-	config := fsx.CreateOpenZFSVolumeConfiguration{}
+	config := types.CreateOpenZFSVolumeConfiguration{}
 	return util.ReplaceParametersAndPopulateObject("OpenZFSConfiguration", parameters, &config)
 }
 
 func CollapseDeleteVolumeParameters(parameters map[string]string) error {
-	config := fsx.DeleteVolumeOpenZFSConfiguration{}
+	config := types.DeleteVolumeOpenZFSConfiguration{}
 	return util.ReplaceParametersAndPopulateObject("OpenZFSConfiguration", parameters, &config)
 }
 
@@ -681,7 +676,7 @@ func ValidateDeleteFileSystemParameters(parameters map[string]string) error {
 		return err
 	}
 
-	return config.Validate()
+	return validateDeleteFileSystemInput(&config)
 }
 
 // ValidateDeleteVolumeParameters is used in CreateVolume to remove all delete parameters from the parameters map, and ensure they are valid.
@@ -695,5 +690,5 @@ func ValidateDeleteVolumeParameters(parameters map[string]string) error {
 		return err
 	}
 
-	return config.Validate()
+	return validateDeleteVolumeInput(&config)
 }
