@@ -198,10 +198,10 @@ func (mr *MockCloudMockRecorder) GetVolumeId(arg0, arg1 interface{}) *gomock.Cal
 }
 
 // ResizeFileSystem mocks base method.
-func (m *MockCloud) ResizeFileSystem(arg0 context.Context, arg1 string, arg2 int64) (*int64, error) {
+func (m *MockCloud) ResizeFileSystem(arg0 context.Context, arg1 string, arg2 int32) (*int32, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ResizeFileSystem", arg0, arg1, arg2)
-	ret0, _ := ret[0].(*int64)
+	ret0, _ := ret[0].(*int32)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -227,7 +227,7 @@ func (mr *MockCloudMockRecorder) WaitForFileSystemAvailable(arg0, arg1 interface
 }
 
 // WaitForFileSystemResize mocks base method.
-func (m *MockCloud) WaitForFileSystemResize(arg0 context.Context, arg1 string, arg2 int64) error {
+func (m *MockCloud) WaitForFileSystemResize(arg0 context.Context, arg1 string, arg2 int32) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "WaitForFileSystemResize", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -269,7 +269,7 @@ func (mr *MockCloudMockRecorder) WaitForVolumeAvailable(arg0, arg1 interface{}) 
 }
 
 // WaitForVolumeResize mocks base method.
-func (m *MockCloud) WaitForVolumeResize(arg0 context.Context, arg1 string, arg2 int64) error {
+func (m *MockCloud) WaitForVolumeResize(arg0 context.Context, arg1 string, arg2 int32) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "WaitForVolumeResize", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)

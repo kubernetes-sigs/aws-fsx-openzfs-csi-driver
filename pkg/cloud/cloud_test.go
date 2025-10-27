@@ -18,9 +18,9 @@ package cloud
 import (
 	"context"
 	"errors"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/fsx"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/fsx"
+	"github.com/aws/aws-sdk-go-v2/service/fsx/types"
 	"github.com/golang/mock/gomock"
 	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/cloud/mocks"
 	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/util"
@@ -34,7 +34,7 @@ func TestCreateFileSystem(t *testing.T) {
 	var (
 		fileSystemId       = aws.String("fs-1234")
 		dnsName            = aws.String("https://aws.com")
-		storageCapacity    = aws.Int64(64)
+		storageCapacity    = aws.Int32(64)
 		parameters         map[string]string
 		requiredParameters map[string]string
 	)
@@ -52,7 +52,7 @@ func TestCreateFileSystem(t *testing.T) {
 				}
 
 				output := &fsx.CreateFileSystemOutput{
-					FileSystem: &fsx.FileSystem{
+					FileSystem: &types.FileSystem{
 						DNSName:         dnsName,
 						FileSystemId:    fileSystemId,
 						StorageCapacity: storageCapacity,
@@ -60,7 +60,7 @@ func TestCreateFileSystem(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().CreateFileSystemWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
+				mockFSx.EXPECT().CreateFileSystem(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
 				resp, err := c.CreateFileSystem(ctx, parameters)
 				if err != nil {
 					t.Fatalf("CreateFileSystem is failed: %v", err)
@@ -70,15 +70,15 @@ func TestCreateFileSystem(t *testing.T) {
 					t.Fatal("resp is nil")
 				}
 
-				if resp.DnsName != aws.StringValue(dnsName) {
+				if resp.DnsName != aws.ToString(dnsName) {
 					t.Fatalf("DnsName mismatches. actual: %v expected: %v", resp.DnsName, dnsName)
 				}
 
-				if resp.FileSystemId != aws.StringValue(fileSystemId) {
+				if resp.FileSystemId != aws.ToString(fileSystemId) {
 					t.Fatalf("FileSystemId mismatches. actual: %v expected: %v", resp.FileSystemId, fileSystemId)
 				}
 
-				if resp.StorageCapacity != aws.Int64Value(storageCapacity) {
+				if resp.StorageCapacity != aws.ToInt32(storageCapacity) {
 					t.Fatalf("StorageCapacity mismatches. actual: %v expected: %v", resp.StorageCapacity, storageCapacity)
 				}
 
@@ -95,7 +95,7 @@ func TestCreateFileSystem(t *testing.T) {
 				}
 
 				output := &fsx.CreateFileSystemOutput{
-					FileSystem: &fsx.FileSystem{
+					FileSystem: &types.FileSystem{
 						DNSName:         dnsName,
 						FileSystemId:    fileSystemId,
 						StorageCapacity: storageCapacity,
@@ -103,7 +103,7 @@ func TestCreateFileSystem(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().CreateFileSystemWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
+				mockFSx.EXPECT().CreateFileSystem(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
 				resp, err := c.CreateFileSystem(ctx, requiredParameters)
 				if err != nil {
 					t.Fatalf("CreateFileSystem is failed: %v", err)
@@ -113,15 +113,15 @@ func TestCreateFileSystem(t *testing.T) {
 					t.Fatal("resp is nil")
 				}
 
-				if resp.DnsName != aws.StringValue(dnsName) {
+				if resp.DnsName != aws.ToString(dnsName) {
 					t.Fatalf("DnsName mismatches. actual: %v expected: %v", resp.DnsName, dnsName)
 				}
 
-				if resp.FileSystemId != aws.StringValue(fileSystemId) {
+				if resp.FileSystemId != aws.ToString(fileSystemId) {
 					t.Fatalf("FileSystemId mismatches. actual: %v expected: %v", resp.FileSystemId, fileSystemId)
 				}
 
-				if resp.StorageCapacity != aws.Int64Value(storageCapacity) {
+				if resp.StorageCapacity != aws.ToInt32(storageCapacity) {
 					t.Fatalf("StorageCapacity mismatches. actual: %v expected: %v", resp.StorageCapacity, storageCapacity)
 				}
 
@@ -150,7 +150,7 @@ func TestCreateFileSystem(t *testing.T) {
 			},
 		},
 		{
-			name: "fail: CreateFileSystemWithContext return ErrCodeIncompatibleParameterError error",
+			name: "fail: CreateFileSystem return ErrCodeIncompatibleParameterError error",
 			testFunc: func(t *testing.T) {
 				mockCtl := gomock.NewController(t)
 				mockFSx := mocks.NewMockFSx(mockCtl)
@@ -159,17 +159,17 @@ func TestCreateFileSystem(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().CreateFileSystemWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, awserr.New(fsx.ErrCodeIncompatibleParameterError, "", errors.New("")))
+				mockFSx.EXPECT().CreateFileSystem(gomock.Eq(ctx), gomock.Any()).Return(nil, &types.IncompatibleParameterError{})
 				_, err := c.CreateFileSystem(ctx, parameters)
 				if !errors.Is(err, ErrAlreadyExists) {
-					t.Fatal("CreateVolume is not ErrAlreadyExists")
+					t.Fatal("CreateFileSystem is not ErrAlreadyExists")
 				}
 
 				mockCtl.Finish()
 			},
 		},
 		{
-			name: "fail: CreateFileSystemWithContext return error",
+			name: "fail: CreateFileSystem return error",
 			testFunc: func(t *testing.T) {
 				mockCtl := gomock.NewController(t)
 				mockFSx := mocks.NewMockFSx(mockCtl)
@@ -178,7 +178,7 @@ func TestCreateFileSystem(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().CreateFileSystemWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New("CreateFileSystemWithContext failed"))
+				mockFSx.EXPECT().CreateFileSystem(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New("CreateFileSystem failed"))
 				_, err := c.CreateFileSystem(ctx, parameters)
 				if err == nil {
 					t.Fatal("CreateFileSystem is not failed")
@@ -196,7 +196,7 @@ func TestCreateFileSystem(t *testing.T) {
 			"KmsKeyId":             `"1234abcd-12ab-34cd-56ef-1234567890ab"`,
 			"OpenZFSConfiguration": `{"AutomaticBackupRetentionDays":1,"CopyTagsToBackups":false,"CopyTagsToVolumes":false,"DailyAutomaticBackupStartTime":"00:00","DeploymentType":"SINGLE_AZ_1","DiskIopsConfiguration":{"Iops":300,"Mode":"USER_PROVISIONED"},"RootVolumeConfiguration":{"CopyTagsToSnapshots":false,"DataCompressionType":"NONE","NfsExports":[{"ClientConfigurations":[{"Clients":"*","Options":["rw","crossmnt"]}]}],"ReadOnly":true,"RecordSizeKiB":null,"UserAndGroupQuotas":[{"Id":1,"StorageCapacityQuotaGiB":10,"Type":"User"}]},"ThroughputCapacity":64,"WeeklyMaintenanceStartTime":"7:09:00"}`,
 			"SecurityGroupIds":     `["test","test2"]`,
-			"StorageCapacity":      strconv.FormatInt(*storageCapacity, 10),
+			"StorageCapacity":      strconv.Itoa(int(*storageCapacity)),
 			"StorageType":          `"SSD"`,
 			"SubnetIds":            `["test","test2"]`,
 			"Tags":                 `[{"Key": "OPENZFS", "Value": "TRUE"}]`,
@@ -205,7 +205,7 @@ func TestCreateFileSystem(t *testing.T) {
 			"ClientRequestToken":   `"Test"`,
 			"FileSystemType":       `"OPENZFS"`,
 			"OpenZFSConfiguration": `{"DeploymentType":"SINGLE_AZ_1","ThroughputCapacity":64}`,
-			"StorageCapacity":      strconv.FormatInt(*storageCapacity, 10),
+			"StorageCapacity":      strconv.Itoa(int(*storageCapacity)),
 			"SubnetIds":            `["test","test2"]`,
 		}
 
@@ -216,8 +216,8 @@ func TestCreateFileSystem(t *testing.T) {
 func TestResizeFileSystem(t *testing.T) {
 	var (
 		fileSystemId         = "fs-1234"
-		currentSizeGiB int64 = 100
-		newSizeGiB     int64 = 150
+		currentSizeGiB int32 = 100
+		newSizeGiB     int32 = 150
 	)
 	testCases := []struct {
 		name     string
@@ -233,14 +233,14 @@ func TestResizeFileSystem(t *testing.T) {
 				}
 
 				updateOutput := &fsx.UpdateFileSystemOutput{
-					FileSystem: &fsx.FileSystem{
+					FileSystem: &types.FileSystem{
 						FileSystemId:    aws.String(fileSystemId),
-						StorageCapacity: aws.Int64(newSizeGiB),
+						StorageCapacity: aws.Int32(newSizeGiB),
 					},
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().UpdateFileSystemWithContext(gomock.Eq(ctx), gomock.Any()).Return(updateOutput, nil)
+				mockFSx.EXPECT().UpdateFileSystem(gomock.Eq(ctx), gomock.Any()).Return(updateOutput, nil)
 				resp, err := c.ResizeFileSystem(ctx, fileSystemId, newSizeGiB)
 				if err != nil {
 					t.Fatalf("ResizeFileSystem is failed: %v", err)
@@ -267,25 +267,25 @@ func TestResizeFileSystem(t *testing.T) {
 				}
 
 				describeOutput := &fsx.DescribeFileSystemsOutput{
-					FileSystems: []*fsx.FileSystem{
+					FileSystems: []types.FileSystem{
 						{
-							AdministrativeActions: []*fsx.AdministrativeAction{
+							AdministrativeActions: []types.AdministrativeAction{
 								{
-									AdministrativeActionType: aws.String(fsx.AdministrativeActionTypeFileSystemUpdate),
-									TargetFileSystemValues: &fsx.FileSystem{
-										StorageCapacity: aws.Int64(newSizeGiB),
+									AdministrativeActionType: types.AdministrativeActionTypeFileSystemUpdate,
+									TargetFileSystemValues: &types.FileSystem{
+										StorageCapacity: aws.Int32(newSizeGiB),
 									},
 								},
 							},
 							FileSystemId:    aws.String(fileSystemId),
-							StorageCapacity: aws.Int64(currentSizeGiB),
+							StorageCapacity: aws.Int32(currentSizeGiB),
 						},
 					},
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().UpdateFileSystemWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, awserr.New(fsx.ErrCodeBadRequest, "Unable to perform the storage capacity update. There is an update already in progress.", errors.New("")))
-				mockFSx.EXPECT().DescribeFileSystemsWithContext(gomock.Eq(ctx), gomock.Any()).Return(describeOutput, nil)
+				mockFSx.EXPECT().UpdateFileSystem(gomock.Eq(ctx), gomock.Any()).Return(nil, &types.BadRequest{Message: aws.String("Unable to perform the storage capacity update. There is an update already in progress.")})
+				mockFSx.EXPECT().DescribeFileSystems(gomock.Eq(ctx), gomock.Any()).Return(describeOutput, nil)
 				resp, err := c.ResizeFileSystem(ctx, fileSystemId, newSizeGiB)
 				if err != nil {
 					t.Fatalf("ResizeFileSystem is failed: %v", err)
@@ -312,7 +312,7 @@ func TestResizeFileSystem(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().UpdateFileSystemWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New(""))
+				mockFSx.EXPECT().UpdateFileSystem(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New(""))
 				_, err := c.ResizeFileSystem(ctx, fileSystemId, newSizeGiB)
 				if err == nil {
 					t.Fatalf("ResizeFileSystem is not failed")
@@ -331,25 +331,25 @@ func TestResizeFileSystem(t *testing.T) {
 				}
 
 				describeOutput := &fsx.DescribeFileSystemsOutput{
-					FileSystems: []*fsx.FileSystem{
+					FileSystems: []types.FileSystem{
 						{
-							AdministrativeActions: []*fsx.AdministrativeAction{
+							AdministrativeActions: []types.AdministrativeAction{
 								{
-									AdministrativeActionType: aws.String(fsx.AdministrativeActionTypeFileSystemUpdate),
-									TargetFileSystemValues: &fsx.FileSystem{
-										StorageCapacity: aws.Int64(currentSizeGiB),
+									AdministrativeActionType: types.AdministrativeActionTypeFileSystemUpdate,
+									TargetFileSystemValues: &types.FileSystem{
+										StorageCapacity: aws.Int32(currentSizeGiB),
 									},
 								},
 							},
 							FileSystemId:    aws.String(fileSystemId),
-							StorageCapacity: aws.Int64(currentSizeGiB),
+							StorageCapacity: aws.Int32(currentSizeGiB),
 						},
 					},
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().UpdateFileSystemWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, awserr.New(fsx.ErrCodeBadRequest, "Unable to perform the storage capacity update. There is an update already in progress.", errors.New("")))
-				mockFSx.EXPECT().DescribeFileSystemsWithContext(gomock.Eq(ctx), gomock.Any()).Return(describeOutput, nil)
+				mockFSx.EXPECT().UpdateFileSystem(gomock.Eq(ctx), gomock.Any()).Return(nil, &types.BadRequest{Message: aws.String("Unable to perform the storage capacity update. There is an update already in progress.")})
+				mockFSx.EXPECT().DescribeFileSystems(gomock.Eq(ctx), gomock.Any()).Return(describeOutput, nil)
 				_, err := c.ResizeFileSystem(ctx, fileSystemId, newSizeGiB)
 				if err == nil {
 					t.Fatalf("ResizeFileSystem is not failed")
@@ -384,7 +384,7 @@ func TestDeleteFileSystem(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().DeleteFileSystemWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, nil)
+				mockFSx.EXPECT().DeleteFileSystem(gomock.Eq(ctx), gomock.Any()).Return(nil, nil)
 				err := c.DeleteFileSystem(ctx, parameters)
 				if err != nil {
 					t.Fatalf("DeleteFileSystem is failed: %v", err)
@@ -403,7 +403,7 @@ func TestDeleteFileSystem(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().DeleteFileSystemWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, nil)
+				mockFSx.EXPECT().DeleteFileSystem(gomock.Eq(ctx), gomock.Any()).Return(nil, nil)
 				err := c.DeleteFileSystem(ctx, requiredParameters)
 				if err != nil {
 					t.Fatalf("DeleteFileSystem is failed: %v", err)
@@ -413,7 +413,7 @@ func TestDeleteFileSystem(t *testing.T) {
 			},
 		},
 		{
-			name: "fail: DeleteFileSystemWithContext return error",
+			name: "fail: DeleteFileSystem return error",
 			testFunc: func(t *testing.T) {
 				mockCtl := gomock.NewController(t)
 				mockFSx := mocks.NewMockFSx(mockCtl)
@@ -422,7 +422,7 @@ func TestDeleteFileSystem(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().DeleteFileSystemWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New("DeleteFileSystemWithContext failed"))
+				mockFSx.EXPECT().DeleteFileSystem(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New("DeleteFileSystem failed"))
 				err := c.DeleteFileSystem(ctx, requiredParameters)
 				if err == nil {
 					t.Fatal("DeleteFileSystem is not failed")
@@ -448,9 +448,9 @@ func TestDeleteFileSystem(t *testing.T) {
 
 func TestDescribeFileSystem(t *testing.T) {
 	var (
-		deploymentType     = aws.String("SINGLE_AZ_1")
-		throughputCapacity = aws.Int64(64)
-		storageCapacity    = aws.Int64(64)
+		deploymentType     = types.OpenZFSDeploymentTypeSingleAz1
+		throughputCapacity = aws.Int32(64)
+		storageCapacity    = aws.Int32(64)
 		fileSystemId       = aws.String("fs-1234567890abcdefgh")
 		dnsName            = aws.String("https://aws.com")
 		rootVolumeId       = aws.String("fsvol-03062e7ff37662dff")
@@ -469,12 +469,12 @@ func TestDescribeFileSystem(t *testing.T) {
 				}
 
 				output := &fsx.DescribeFileSystemsOutput{
-					FileSystems: []*fsx.FileSystem{
+					FileSystems: []types.FileSystem{
 						{
 							DNSName:         dnsName,
 							FileSystemId:    fileSystemId,
 							StorageCapacity: storageCapacity,
-							OpenZFSConfiguration: &fsx.OpenZFSFileSystemConfiguration{
+							OpenZFSConfiguration: &types.OpenZFSFileSystemConfiguration{
 								DeploymentType:     deploymentType,
 								RootVolumeId:       rootVolumeId,
 								ThroughputCapacity: throughputCapacity,
@@ -484,7 +484,7 @@ func TestDescribeFileSystem(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().DescribeFileSystemsWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
+				mockFSx.EXPECT().DescribeFileSystems(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
 				_, err := c.DescribeFileSystem(ctx, *fileSystemId)
 				if err != nil {
 					t.Fatalf("DeleteFileSystem is failed: %v", err)
@@ -503,7 +503,7 @@ func TestDescribeFileSystem(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().DescribeFileSystemsWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New("DescribeFileSystemsWithContext failed"))
+				mockFSx.EXPECT().DescribeFileSystems(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New("DescribeFileSystems failed"))
 				_, err := c.DescribeFileSystem(ctx, *fileSystemId)
 				if err == nil {
 					t.Fatal("DescribeFileSystem is not failed")
@@ -536,19 +536,19 @@ func TestWaitForFileSystemAvailable(t *testing.T) {
 					fsx: mockFSx,
 				}
 				input := &fsx.DescribeFileSystemsInput{
-					FileSystemIds: []*string{aws.String(filesystemId)},
+					FileSystemIds: []string{filesystemId},
 				}
 				output := &fsx.DescribeFileSystemsOutput{
-					FileSystems: []*fsx.FileSystem{
+					FileSystems: []types.FileSystem{
 						{
 							FileSystemId: aws.String(filesystemId),
-							Lifecycle:    aws.String(fsx.FileSystemLifecycleAvailable),
+							Lifecycle:    types.FileSystemLifecycleAvailable,
 						},
 					},
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().DescribeFileSystemsWithContext(gomock.Eq(ctx), gomock.Eq(input)).Return(output, nil)
+				mockFSx.EXPECT().DescribeFileSystems(gomock.Eq(ctx), gomock.Eq(input)).Return(output, nil)
 				err := c.WaitForFileSystemAvailable(ctx, filesystemId)
 				if err != nil {
 					t.Fatalf("WaitForFileSystemAvailable failed: %v", err)
@@ -566,19 +566,19 @@ func TestWaitForFileSystemAvailable(t *testing.T) {
 					fsx: mockFSx,
 				}
 				input := &fsx.DescribeFileSystemsInput{
-					FileSystemIds: []*string{aws.String(filesystemId)},
+					FileSystemIds: []string{filesystemId},
 				}
 				output := &fsx.DescribeFileSystemsOutput{
-					FileSystems: []*fsx.FileSystem{
+					FileSystems: []types.FileSystem{
 						{
 							FileSystemId: aws.String(filesystemId),
-							Lifecycle:    aws.String(fsx.FileSystemLifecycleFailed),
+							Lifecycle:    types.FileSystemLifecycleFailed,
 						},
 					},
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().DescribeFileSystemsWithContext(gomock.Eq(ctx), gomock.Eq(input)).Return(output, nil)
+				mockFSx.EXPECT().DescribeFileSystems(gomock.Eq(ctx), gomock.Eq(input)).Return(output, nil)
 				err := c.WaitForFileSystemAvailable(ctx, filesystemId)
 				if err == nil {
 					t.Fatal("WaitForFileSystemAvailable is not failed")
@@ -597,7 +597,7 @@ func TestWaitForFileSystemAvailable(t *testing.T) {
 func TestWaitForFileSystemResize(t *testing.T) {
 	var (
 		filesystemId       = "fs-1234"
-		resizeGiB    int64 = 100
+		resizeGiB    int32 = 100
 	)
 	testCases := []struct {
 		name     string
@@ -613,14 +613,14 @@ func TestWaitForFileSystemResize(t *testing.T) {
 				}
 
 				output := &fsx.DescribeFileSystemsOutput{
-					FileSystems: []*fsx.FileSystem{
+					FileSystems: []types.FileSystem{
 						{
-							AdministrativeActions: []*fsx.AdministrativeAction{
+							AdministrativeActions: []types.AdministrativeAction{
 								{
-									AdministrativeActionType: aws.String(fsx.AdministrativeActionTypeFileSystemUpdate),
-									Status:                   aws.String(fsx.StatusCompleted),
-									TargetFileSystemValues: &fsx.FileSystem{
-										StorageCapacity: aws.Int64(resizeGiB),
+									AdministrativeActionType: types.AdministrativeActionTypeFileSystemUpdate,
+									Status:                   types.StatusCompleted,
+									TargetFileSystemValues: &types.FileSystem{
+										StorageCapacity: aws.Int32(resizeGiB),
 									},
 								},
 							},
@@ -630,7 +630,7 @@ func TestWaitForFileSystemResize(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().DescribeFileSystemsWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
+				mockFSx.EXPECT().DescribeFileSystems(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
 				err := c.WaitForFileSystemResize(ctx, filesystemId, resizeGiB)
 				if err != nil {
 					t.Fatalf("WaitForFileSystemResize failed: %v", err)
@@ -649,16 +649,16 @@ func TestWaitForFileSystemResize(t *testing.T) {
 				}
 
 				output := &fsx.DescribeFileSystemsOutput{
-					FileSystems: []*fsx.FileSystem{
+					FileSystems: []types.FileSystem{
 						{
-							AdministrativeActions: []*fsx.AdministrativeAction{
+							AdministrativeActions: []types.AdministrativeAction{
 								{
-									AdministrativeActionType: aws.String(fsx.AdministrativeActionTypeFileSystemUpdate),
-									Status:                   aws.String(fsx.StatusFailed),
-									TargetFileSystemValues: &fsx.FileSystem{
-										StorageCapacity: aws.Int64(resizeGiB),
+									AdministrativeActionType: types.AdministrativeActionTypeFileSystemUpdate,
+									Status:                   types.StatusFailed,
+									TargetFileSystemValues: &types.FileSystem{
+										StorageCapacity: aws.Int32(resizeGiB),
 									},
-									FailureDetails: &fsx.AdministrativeActionFailureDetails{
+									FailureDetails: &types.AdministrativeActionFailureDetails{
 										Message: aws.String("Update failed"),
 									},
 								},
@@ -669,7 +669,7 @@ func TestWaitForFileSystemResize(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().DescribeFileSystemsWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
+				mockFSx.EXPECT().DescribeFileSystems(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
 				err := c.WaitForFileSystemResize(ctx, filesystemId, resizeGiB)
 				if err == nil {
 					t.Fatalf("WaitForFileSystemResize is not failed: %v", err)
@@ -708,9 +708,9 @@ func TestCreateVolume(t *testing.T) {
 				}
 
 				output := &fsx.CreateVolumeOutput{
-					Volume: &fsx.Volume{
+					Volume: &types.Volume{
 						FileSystemId: fileSystemId,
-						OpenZFSConfiguration: &fsx.OpenZFSVolumeConfiguration{
+						OpenZFSConfiguration: &types.OpenZFSVolumeConfiguration{
 							VolumePath: volumePath,
 						},
 						VolumeId: volumeId,
@@ -718,7 +718,7 @@ func TestCreateVolume(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().CreateVolumeWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
+				mockFSx.EXPECT().CreateVolume(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
 				resp, err := c.CreateVolume(ctx, parameters)
 				if err != nil {
 					t.Fatalf("CreateVolume is failed: %v", err)
@@ -728,15 +728,15 @@ func TestCreateVolume(t *testing.T) {
 					t.Fatal("resp is nil")
 				}
 
-				if resp.FileSystemId != aws.StringValue(fileSystemId) {
+				if resp.FileSystemId != aws.ToString(fileSystemId) {
 					t.Fatalf("FileSystemId mismatches. actual: %v expected: %v", resp.FileSystemId, fileSystemId)
 				}
 
-				if resp.VolumePath != aws.StringValue(volumePath) {
+				if resp.VolumePath != aws.ToString(volumePath) {
 					t.Fatalf("VolumePath mismatches. actual: %v expected: %v", resp.VolumePath, volumePath)
 				}
 
-				if resp.VolumeId != aws.StringValue(volumeId) {
+				if resp.VolumeId != aws.ToString(volumeId) {
 					t.Fatalf("VolumeId mismatches. actual: %v expected: %v", resp.VolumeId, volumeId)
 				}
 
@@ -753,9 +753,9 @@ func TestCreateVolume(t *testing.T) {
 				}
 
 				output := &fsx.CreateVolumeOutput{
-					Volume: &fsx.Volume{
+					Volume: &types.Volume{
 						FileSystemId: fileSystemId,
-						OpenZFSConfiguration: &fsx.OpenZFSVolumeConfiguration{
+						OpenZFSConfiguration: &types.OpenZFSVolumeConfiguration{
 							VolumePath: volumePath,
 						},
 						VolumeId: volumeId,
@@ -763,7 +763,7 @@ func TestCreateVolume(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().CreateVolumeWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
+				mockFSx.EXPECT().CreateVolume(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
 				resp, err := c.CreateVolume(ctx, requiredParameters)
 				if err != nil {
 					t.Fatalf("CreateVolume is failed: %v", err)
@@ -773,15 +773,15 @@ func TestCreateVolume(t *testing.T) {
 					t.Fatal("resp is nil")
 				}
 
-				if resp.FileSystemId != aws.StringValue(fileSystemId) {
+				if resp.FileSystemId != aws.ToString(fileSystemId) {
 					t.Fatalf("FileSystemId mismatches. actual: %v expected: %v", resp.FileSystemId, fileSystemId)
 				}
 
-				if resp.VolumePath != aws.StringValue(volumePath) {
+				if resp.VolumePath != aws.ToString(volumePath) {
 					t.Fatalf("VolumePath mismatches. actual: %v expected: %v", resp.VolumePath, volumePath)
 				}
 
-				if resp.VolumeId != aws.StringValue(volumeId) {
+				if resp.VolumeId != aws.ToString(volumeId) {
 					t.Fatalf("VolumeId mismatches. actual: %v expected: %v", resp.VolumeId, volumeId)
 				}
 
@@ -798,9 +798,9 @@ func TestCreateVolume(t *testing.T) {
 				}
 
 				output := &fsx.CreateVolumeOutput{
-					Volume: &fsx.Volume{
+					Volume: &types.Volume{
 						FileSystemId: fileSystemId,
-						OpenZFSConfiguration: &fsx.OpenZFSVolumeConfiguration{
+						OpenZFSConfiguration: &types.OpenZFSVolumeConfiguration{
 							VolumePath: volumePath,
 						},
 						VolumeId: volumeId,
@@ -808,7 +808,7 @@ func TestCreateVolume(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().CreateVolumeWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
+				mockFSx.EXPECT().CreateVolume(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
 				resp, err := c.CreateVolume(ctx, snapshotParameters)
 				if err != nil {
 					t.Fatalf("CreateVolume is failed: %v", err)
@@ -818,15 +818,15 @@ func TestCreateVolume(t *testing.T) {
 					t.Fatal("resp is nil")
 				}
 
-				if resp.FileSystemId != aws.StringValue(fileSystemId) {
+				if resp.FileSystemId != aws.ToString(fileSystemId) {
 					t.Fatalf("FileSystemId mismatches. actual: %v expected: %v", resp.FileSystemId, fileSystemId)
 				}
 
-				if resp.VolumePath != aws.StringValue(volumePath) {
+				if resp.VolumePath != aws.ToString(volumePath) {
 					t.Fatalf("VolumePath mismatches. actual: %v expected: %v", resp.VolumePath, volumePath)
 				}
 
-				if resp.VolumeId != aws.StringValue(volumeId) {
+				if resp.VolumeId != aws.ToString(volumeId) {
 					t.Fatalf("VolumeId mismatches. actual: %v expected: %v", resp.VolumeId, volumeId)
 				}
 
@@ -855,7 +855,7 @@ func TestCreateVolume(t *testing.T) {
 			},
 		},
 		{
-			name: "fail: CreateVolumeWithContext return ErrCodeIncompatibleParameterError error",
+			name: "fail: CreateVolume return ErrCodeIncompatibleParameterError error",
 			testFunc: func(t *testing.T) {
 				mockCtl := gomock.NewController(t)
 				mockFSx := mocks.NewMockFSx(mockCtl)
@@ -864,7 +864,7 @@ func TestCreateVolume(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().CreateVolumeWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, awserr.New(fsx.ErrCodeIncompatibleParameterError, "", errors.New("")))
+				mockFSx.EXPECT().CreateVolume(gomock.Eq(ctx), gomock.Any()).Return(nil, &types.IncompatibleParameterError{})
 				_, err := c.CreateVolume(ctx, parameters)
 				if !errors.Is(err, ErrAlreadyExists) {
 					t.Fatal("CreateVolume is not ErrAlreadyExists")
@@ -874,7 +874,7 @@ func TestCreateVolume(t *testing.T) {
 			},
 		},
 		{
-			name: "fail: CreateVolumeWithContext return error",
+			name: "fail: CreateVolume return error",
 			testFunc: func(t *testing.T) {
 				mockCtl := gomock.NewController(t)
 				mockFSx := mocks.NewMockFSx(mockCtl)
@@ -883,7 +883,7 @@ func TestCreateVolume(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().CreateVolumeWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New("CreateFileSystemWithContext failed"))
+				mockFSx.EXPECT().CreateVolume(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New("CreateFileSystem failed"))
 				_, err := c.CreateVolume(ctx, parameters)
 				if err == nil {
 					t.Fatal("CreateVolume is not failed")
@@ -938,7 +938,7 @@ func TestDeleteVolume(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().DeleteVolumeWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, nil)
+				mockFSx.EXPECT().DeleteVolume(gomock.Eq(ctx), gomock.Any()).Return(nil, nil)
 				err := c.DeleteVolume(ctx, parameters)
 				if err != nil {
 					t.Fatalf("DeleteVolume is failed: %v", err)
@@ -957,7 +957,7 @@ func TestDeleteVolume(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().DeleteVolumeWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, nil)
+				mockFSx.EXPECT().DeleteVolume(gomock.Eq(ctx), gomock.Any()).Return(nil, nil)
 				err := c.DeleteVolume(ctx, requiredParameters)
 				if err != nil {
 					t.Fatalf("DeleteVolume is failed: %v", err)
@@ -967,7 +967,7 @@ func TestDeleteVolume(t *testing.T) {
 			},
 		},
 		{
-			name: "fail: DeleteVolumeWithContext return error",
+			name: "fail: DeleteVolume return error",
 			testFunc: func(t *testing.T) {
 				mockCtl := gomock.NewController(t)
 				mockFSx := mocks.NewMockFSx(mockCtl)
@@ -976,7 +976,7 @@ func TestDeleteVolume(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().DeleteVolumeWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New("DeleteVolumeWithContext failed"))
+				mockFSx.EXPECT().DeleteVolume(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New("DeleteVolume failed"))
 				err := c.DeleteVolume(ctx, parameters)
 				if err == nil {
 					t.Fatal("DeleteVolume is not failed")
@@ -1003,8 +1003,8 @@ func TestDescribeVolume(t *testing.T) {
 	var (
 		fileSystemId                  = aws.String("fs-1234567890abcdefgh")
 		parentVolumeId                = aws.String("fsvol-03062e7ff37662dff")
-		storageCapacityQuotaGiB       = aws.Int64(10)
-		storageCapacityReservationGiB = aws.Int64(10)
+		storageCapacityQuotaGiB       = aws.Int32(10)
+		storageCapacityReservationGiB = aws.Int32(10)
 		volumePath                    = aws.String("/subVolume")
 		volumeId                      = aws.String("fsvol-0987654321abcdefg")
 	)
@@ -1022,10 +1022,10 @@ func TestDescribeVolume(t *testing.T) {
 				}
 
 				output := &fsx.DescribeVolumesOutput{
-					Volumes: []*fsx.Volume{
+					Volumes: []types.Volume{
 						{
 							FileSystemId: fileSystemId,
-							OpenZFSConfiguration: &fsx.OpenZFSVolumeConfiguration{
+							OpenZFSConfiguration: &types.OpenZFSVolumeConfiguration{
 								ParentVolumeId:                parentVolumeId,
 								StorageCapacityQuotaGiB:       storageCapacityQuotaGiB,
 								StorageCapacityReservationGiB: storageCapacityReservationGiB,
@@ -1037,7 +1037,7 @@ func TestDescribeVolume(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().DescribeVolumesWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
+				mockFSx.EXPECT().DescribeVolumes(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
 				_, err := c.DescribeVolume(ctx, *volumeId)
 				if err != nil {
 					t.Fatalf("DescribeVolume is failed: %v", err)
@@ -1047,7 +1047,7 @@ func TestDescribeVolume(t *testing.T) {
 			},
 		},
 		{
-			name: "fail: DescribeVolumesWithContext return error",
+			name: "fail: DescribeVolumes return error",
 			testFunc: func(t *testing.T) {
 				mockCtl := gomock.NewController(t)
 				mockFSx := mocks.NewMockFSx(mockCtl)
@@ -1056,7 +1056,7 @@ func TestDescribeVolume(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().DescribeVolumesWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New("DescribeVolumesWithContext failed"))
+				mockFSx.EXPECT().DescribeVolumes(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New("DescribeVolumes failed"))
 				_, err := c.DescribeVolume(ctx, *volumeId)
 				if err == nil {
 					t.Fatal("DescribeVolume is not failed")
@@ -1090,19 +1090,19 @@ func TestWaitForVolumeAvailable(t *testing.T) {
 				}
 
 				input := &fsx.DescribeVolumesInput{
-					VolumeIds: []*string{aws.String(volumeId)},
+					VolumeIds: []string{volumeId},
 				}
 				output := &fsx.DescribeVolumesOutput{
-					Volumes: []*fsx.Volume{
+					Volumes: []types.Volume{
 						{
 							VolumeId:  aws.String(volumeId),
-							Lifecycle: aws.String(fsx.VolumeLifecycleAvailable),
+							Lifecycle: types.VolumeLifecycleAvailable,
 						},
 					},
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().DescribeVolumesWithContext(gomock.Eq(ctx), gomock.Eq(input)).Return(output, nil)
+				mockFSx.EXPECT().DescribeVolumes(gomock.Eq(ctx), gomock.Eq(input)).Return(output, nil)
 				err := c.WaitForVolumeAvailable(ctx, volumeId)
 				if err != nil {
 					t.Fatalf("WaitForVolumeAvailable failed: %v", err)
@@ -1121,19 +1121,19 @@ func TestWaitForVolumeAvailable(t *testing.T) {
 				}
 
 				input := &fsx.DescribeVolumesInput{
-					VolumeIds: []*string{aws.String(volumeId)},
+					VolumeIds: []string{volumeId},
 				}
 				output := &fsx.DescribeVolumesOutput{
-					Volumes: []*fsx.Volume{
+					Volumes: []types.Volume{
 						{
 							FileSystemId: aws.String(volumeId),
-							Lifecycle:    aws.String(fsx.VolumeLifecycleFailed),
+							Lifecycle:    types.VolumeLifecycleFailed,
 						},
 					},
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().DescribeVolumesWithContext(gomock.Eq(ctx), gomock.Eq(input)).Return(output, nil)
+				mockFSx.EXPECT().DescribeVolumes(gomock.Eq(ctx), gomock.Eq(input)).Return(output, nil)
 				err := c.WaitForVolumeAvailable(ctx, volumeId)
 				if err == nil {
 					t.Fatal("WaitForVolumeAvailable is not failed")
@@ -1152,7 +1152,7 @@ func TestWaitForVolumeAvailable(t *testing.T) {
 func TestWaitForVolumeResize(t *testing.T) {
 	var (
 		volumeId        = "fsvol-1234"
-		resizeGiB int64 = 100
+		resizeGiB int32 = 100
 	)
 	testCases := []struct {
 		name     string
@@ -1168,16 +1168,16 @@ func TestWaitForVolumeResize(t *testing.T) {
 				}
 
 				output := &fsx.DescribeVolumesOutput{
-					Volumes: []*fsx.Volume{
+					Volumes: []types.Volume{
 						{
-							AdministrativeActions: []*fsx.AdministrativeAction{
+							AdministrativeActions: []types.AdministrativeAction{
 								{
-									AdministrativeActionType: aws.String(fsx.AdministrativeActionTypeVolumeUpdate),
-									Status:                   aws.String(fsx.StatusCompleted),
-									TargetVolumeValues: &fsx.Volume{
-										OpenZFSConfiguration: &fsx.OpenZFSVolumeConfiguration{
-											StorageCapacityQuotaGiB:       aws.Int64(resizeGiB),
-											StorageCapacityReservationGiB: aws.Int64(resizeGiB),
+									AdministrativeActionType: types.AdministrativeActionTypeVolumeUpdate,
+									Status:                   types.StatusCompleted,
+									TargetVolumeValues: &types.Volume{
+										OpenZFSConfiguration: &types.OpenZFSVolumeConfiguration{
+											StorageCapacityQuotaGiB:       aws.Int32(resizeGiB),
+											StorageCapacityReservationGiB: aws.Int32(resizeGiB),
 										},
 									},
 								},
@@ -1188,7 +1188,7 @@ func TestWaitForVolumeResize(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().DescribeVolumesWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
+				mockFSx.EXPECT().DescribeVolumes(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
 				err := c.WaitForVolumeResize(ctx, volumeId, resizeGiB)
 				if err != nil {
 					t.Fatalf("WaitForVolumeResize failed: %v", err)
@@ -1207,19 +1207,19 @@ func TestWaitForVolumeResize(t *testing.T) {
 				}
 
 				output := &fsx.DescribeVolumesOutput{
-					Volumes: []*fsx.Volume{
+					Volumes: []types.Volume{
 						{
-							AdministrativeActions: []*fsx.AdministrativeAction{
+							AdministrativeActions: []types.AdministrativeAction{
 								{
-									AdministrativeActionType: aws.String(fsx.AdministrativeActionTypeVolumeUpdate),
-									Status:                   aws.String(fsx.StatusFailed),
-									TargetVolumeValues: &fsx.Volume{
-										OpenZFSConfiguration: &fsx.OpenZFSVolumeConfiguration{
-											StorageCapacityQuotaGiB:       aws.Int64(resizeGiB),
-											StorageCapacityReservationGiB: aws.Int64(resizeGiB),
+									AdministrativeActionType: types.AdministrativeActionTypeVolumeUpdate,
+									Status:                   types.StatusFailed,
+									TargetVolumeValues: &types.Volume{
+										OpenZFSConfiguration: &types.OpenZFSVolumeConfiguration{
+											StorageCapacityQuotaGiB:       aws.Int32(resizeGiB),
+											StorageCapacityReservationGiB: aws.Int32(resizeGiB),
 										},
 									},
-									FailureDetails: &fsx.AdministrativeActionFailureDetails{
+									FailureDetails: &types.AdministrativeActionFailureDetails{
 										Message: aws.String("Update failed"),
 									},
 								},
@@ -1230,7 +1230,7 @@ func TestWaitForVolumeResize(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().DescribeVolumesWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
+				mockFSx.EXPECT().DescribeVolumes(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
 				err := c.WaitForVolumeResize(ctx, volumeId, resizeGiB)
 				if err == nil {
 					t.Fatalf("WaitForVolumeResize is not failed: %v", err)
@@ -1269,7 +1269,7 @@ func TestCreateSnapshot(t *testing.T) {
 				}
 
 				output := &fsx.CreateSnapshotOutput{
-					Snapshot: &fsx.Snapshot{
+					Snapshot: &types.Snapshot{
 						CreationTime: aws.Time(creationTime),
 						SnapshotId:   aws.String(snapshotId),
 						VolumeId:     aws.String(volumeId),
@@ -1277,7 +1277,7 @@ func TestCreateSnapshot(t *testing.T) {
 					},
 				}
 				ctx := context.Background()
-				mockFSx.EXPECT().CreateSnapshotWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
+				mockFSx.EXPECT().CreateSnapshot(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
 				resp, err := c.CreateSnapshot(ctx, parameters)
 				if err != nil {
 					t.Fatalf("CreateSnapshot failed: %v", err)
@@ -1316,7 +1316,7 @@ func TestCreateSnapshot(t *testing.T) {
 				}
 
 				output := &fsx.CreateSnapshotOutput{
-					Snapshot: &fsx.Snapshot{
+					Snapshot: &types.Snapshot{
 						CreationTime: aws.Time(creationTime),
 						SnapshotId:   aws.String(snapshotId),
 						VolumeId:     aws.String(volumeId),
@@ -1324,7 +1324,7 @@ func TestCreateSnapshot(t *testing.T) {
 					},
 				}
 				ctx := context.Background()
-				mockFSx.EXPECT().CreateSnapshotWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
+				mockFSx.EXPECT().CreateSnapshot(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
 				resp, err := c.CreateSnapshot(ctx, requiredParameters)
 				if err != nil {
 					t.Fatalf("CreateSnapshot failed: %v", err)
@@ -1376,7 +1376,7 @@ func TestCreateSnapshot(t *testing.T) {
 			},
 		},
 		{
-			name: "fail: CreateSnapshotWithContext return ErrCodeIncompatibleParameterError error",
+			name: "fail: CreateSnapshot return ErrCodeIncompatibleParameterError error",
 			testFunc: func(t *testing.T) {
 				mockCtl := gomock.NewController(t)
 				mockFSx := mocks.NewMockFSx(mockCtl)
@@ -1386,7 +1386,7 @@ func TestCreateSnapshot(t *testing.T) {
 
 				ctx := context.Background()
 
-				mockFSx.EXPECT().CreateSnapshotWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, awserr.New(fsx.ErrCodeIncompatibleParameterError, "", errors.New("")))
+				mockFSx.EXPECT().CreateSnapshot(gomock.Eq(ctx), gomock.Any()).Return(nil, &types.IncompatibleParameterError{})
 				_, err := c.CreateSnapshot(ctx, parameters)
 				if !errors.Is(err, ErrAlreadyExists) {
 					t.Fatal("CreateSnapshot is not ErrAlreadyExists")
@@ -1396,7 +1396,7 @@ func TestCreateSnapshot(t *testing.T) {
 			},
 		},
 		{
-			name: "fail: CreateSnapshotWithContext return error",
+			name: "fail: CreateSnapshot return error",
 			testFunc: func(t *testing.T) {
 				mockCtl := gomock.NewController(t)
 				mockFSx := mocks.NewMockFSx(mockCtl)
@@ -1406,7 +1406,7 @@ func TestCreateSnapshot(t *testing.T) {
 
 				ctx := context.Background()
 
-				mockFSx.EXPECT().CreateSnapshotWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New(""))
+				mockFSx.EXPECT().CreateSnapshot(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New(""))
 				_, err := c.CreateSnapshot(ctx, parameters)
 				if err == nil {
 					t.Fatal("CreateSnapshot is not failed")
@@ -1451,7 +1451,7 @@ func TestDeleteSnapshot(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().DeleteSnapshotWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, nil)
+				mockFSx.EXPECT().DeleteSnapshot(gomock.Eq(ctx), gomock.Any()).Return(nil, nil)
 				err := c.DeleteSnapshot(ctx, parameters)
 				if err != nil {
 					t.Fatalf("DeleteSnapshot failed: %v", err)
@@ -1461,7 +1461,7 @@ func TestDeleteSnapshot(t *testing.T) {
 			},
 		},
 		{
-			name: "fail: DeleteSnapshotWithContext return error",
+			name: "fail: DeleteSnapshot return error",
 			testFunc: func(t *testing.T) {
 				mockCtl := gomock.NewController(t)
 				mockFSx := mocks.NewMockFSx(mockCtl)
@@ -1470,7 +1470,7 @@ func TestDeleteSnapshot(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().DeleteSnapshotWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New(""))
+				mockFSx.EXPECT().DeleteSnapshot(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New(""))
 				err := c.DeleteSnapshot(ctx, parameters)
 				if err == nil {
 					t.Fatal("DeleteSnapshot is not failed")
@@ -1511,7 +1511,7 @@ func TestDescribeSnapshot(t *testing.T) {
 				}
 
 				output := &fsx.DescribeSnapshotsOutput{
-					Snapshots: []*fsx.Snapshot{
+					Snapshots: []types.Snapshot{
 						{
 							CreationTime: creationTime,
 							ResourceARN:  resourceARN,
@@ -1522,7 +1522,7 @@ func TestDescribeSnapshot(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().DescribeSnapshotsWithContext(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
+				mockFSx.EXPECT().DescribeSnapshots(gomock.Eq(ctx), gomock.Any()).Return(output, nil)
 				_, err := c.DescribeSnapshot(ctx, *snapshotId)
 				if err != nil {
 					t.Fatalf("DescribeSnapshot is failed: %v", err)
@@ -1532,7 +1532,7 @@ func TestDescribeSnapshot(t *testing.T) {
 			},
 		},
 		{
-			name: "fail: DescribeSnapshotsWithContext return error",
+			name: "fail: DescribeSnapshots return error",
 			testFunc: func(t *testing.T) {
 				mockCtl := gomock.NewController(t)
 				mockFSx := mocks.NewMockFSx(mockCtl)
@@ -1541,7 +1541,7 @@ func TestDescribeSnapshot(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().DescribeSnapshotsWithContext(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New("DescribeSnapshotsWithContext failed"))
+				mockFSx.EXPECT().DescribeSnapshots(gomock.Eq(ctx), gomock.Any()).Return(nil, errors.New("DescribeSnapshots failed"))
 				_, err := c.DescribeSnapshot(ctx, *snapshotId)
 				if err == nil {
 					t.Fatal("DescribeSnapshot is not failed")
@@ -1574,18 +1574,18 @@ func TestWaitForSnapshotAvailable(t *testing.T) {
 					fsx: mockFSx,
 				}
 				input := &fsx.DescribeSnapshotsInput{
-					SnapshotIds: []*string{aws.String(snapshotId)},
+					SnapshotIds: []string{snapshotId},
 				}
 				output := &fsx.DescribeSnapshotsOutput{
-					Snapshots: []*fsx.Snapshot{
+					Snapshots: []types.Snapshot{
 						{
 							SnapshotId: aws.String(snapshotId),
-							Lifecycle:  aws.String(fsx.SnapshotLifecycleAvailable),
+							Lifecycle:  types.SnapshotLifecycleAvailable,
 						},
 					},
 				}
 				ctx := context.Background()
-				mockFSx.EXPECT().DescribeSnapshotsWithContext(gomock.Eq(ctx), gomock.Eq(input)).Return(output, nil)
+				mockFSx.EXPECT().DescribeSnapshots(gomock.Eq(ctx), gomock.Eq(input)).Return(output, nil)
 				err := c.WaitForSnapshotAvailable(ctx, snapshotId)
 				if err != nil {
 					t.Fatalf("WaitForSnapshotAvailable failed: %v", err)
@@ -1603,18 +1603,18 @@ func TestWaitForSnapshotAvailable(t *testing.T) {
 					fsx: mockFSx,
 				}
 				input := &fsx.DescribeSnapshotsInput{
-					SnapshotIds: []*string{aws.String(snapshotId)},
+					SnapshotIds: []string{snapshotId},
 				}
 				output := &fsx.DescribeSnapshotsOutput{
-					Snapshots: []*fsx.Snapshot{
+					Snapshots: []types.Snapshot{
 						{
 							SnapshotId: aws.String(snapshotId),
-							Lifecycle:  aws.String(fsx.StatusFailed),
+							Lifecycle:  "FAILED",
 						},
 					},
 				}
 				ctx := context.Background()
-				mockFSx.EXPECT().DescribeSnapshotsWithContext(gomock.Eq(ctx), gomock.Eq(input)).Return(output, nil)
+				mockFSx.EXPECT().DescribeSnapshots(gomock.Eq(ctx), gomock.Eq(input)).Return(output, nil)
 				err := c.WaitForSnapshotAvailable(ctx, snapshotId)
 				if err == nil {
 					t.Fatal("WaitForSnapshotAvailable is not failed")
@@ -1673,13 +1673,13 @@ func TestGetDeleteParameters(t *testing.T) {
 					fsx: mockFSx,
 				}
 
-				describeOutput := &fsx.DescribeFileSystemsOutput{FileSystems: []*fsx.FileSystem{
+				describeOutput := &fsx.DescribeFileSystemsOutput{FileSystems: []types.FileSystem{
 					{
 						ResourceARN: resourceArn,
 					},
 				}}
 				listOutput := &fsx.ListTagsForResourceOutput{
-					Tags: []*fsx.Tag{
+					Tags: []types.Tag{
 						{
 							Key:   aws.String("SkipFinalBackupOnDeletion"),
 							Value: aws.String("true"),
@@ -1692,8 +1692,8 @@ func TestGetDeleteParameters(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().DescribeFileSystemsWithContext(gomock.Eq(ctx), gomock.Any()).Return(describeOutput, nil)
-				mockFSx.EXPECT().ListTagsForResource(gomock.Any()).Return(listOutput, nil)
+				mockFSx.EXPECT().DescribeFileSystems(gomock.Eq(ctx), gomock.Any()).Return(describeOutput, nil)
+				mockFSx.EXPECT().ListTagsForResource(gomock.Eq(ctx), gomock.Any()).Return(listOutput, nil)
 				resp, err := c.GetDeleteParameters(ctx, fileSystemId)
 				if err != nil {
 					t.Fatalf("CreateFileSystem is failed: %v", err)
@@ -1719,13 +1719,13 @@ func TestGetDeleteParameters(t *testing.T) {
 					fsx: mockFSx,
 				}
 
-				describeOutput := &fsx.DescribeVolumesOutput{Volumes: []*fsx.Volume{
+				describeOutput := &fsx.DescribeVolumesOutput{Volumes: []types.Volume{
 					{
 						ResourceARN: resourceArn,
 					},
 				}}
 				listOutput := &fsx.ListTagsForResourceOutput{
-					Tags: []*fsx.Tag{
+					Tags: []types.Tag{
 						{
 							Key:   aws.String("OptionsOnDeletion"),
 							Value: aws.String(" -  @ DELETE_CHILD_VOLUMES_AND_SNAPSHOTS @  _ "),
@@ -1734,8 +1734,8 @@ func TestGetDeleteParameters(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				mockFSx.EXPECT().DescribeVolumesWithContext(gomock.Eq(ctx), gomock.Any()).Return(describeOutput, nil)
-				mockFSx.EXPECT().ListTagsForResource(gomock.Any()).Return(listOutput, nil)
+				mockFSx.EXPECT().DescribeVolumes(gomock.Eq(ctx), gomock.Any()).Return(describeOutput, nil)
+				mockFSx.EXPECT().ListTagsForResource(gomock.Eq(ctx), gomock.Any()).Return(listOutput, nil)
 				resp, err := c.GetDeleteParameters(ctx, volumeId)
 				if err != nil {
 					t.Fatalf("CreateFileSystem is failed: %v", err)
@@ -1761,13 +1761,13 @@ func TestGetDeleteParameters(t *testing.T) {
 					fsx: mockFSx,
 				}
 
-				describeOutput := &fsx.DescribeFileSystemsOutput{FileSystems: []*fsx.FileSystem{
+				describeOutput := &fsx.DescribeFileSystemsOutput{FileSystems: []types.FileSystem{
 					{
 						ResourceARN: resourceArn,
 					},
 				}}
 				listOutput := &fsx.ListTagsForResourceOutput{
-					Tags: []*fsx.Tag{
+					Tags: []types.Tag{
 						{
 							Key:   aws.String("SkipFinalBackupOnDeletion"),
 							Value: aws.String("fail"),
@@ -1787,8 +1787,8 @@ func TestGetDeleteParameters(t *testing.T) {
 				delete(newParameters, "SkipFinalBackupOnDeletion")
 
 				ctx := context.Background()
-				mockFSx.EXPECT().DescribeFileSystemsWithContext(gomock.Eq(ctx), gomock.Any()).Return(describeOutput, nil)
-				mockFSx.EXPECT().ListTagsForResource(gomock.Any()).Return(listOutput, nil)
+				mockFSx.EXPECT().DescribeFileSystems(gomock.Eq(ctx), gomock.Any()).Return(describeOutput, nil)
+				mockFSx.EXPECT().ListTagsForResource(gomock.Eq(ctx), gomock.Any()).Return(listOutput, nil)
 				resp, err := c.GetDeleteParameters(ctx, fileSystemId)
 				if err != nil {
 					t.Fatalf("CreateFileSystem is failed: %v", err)

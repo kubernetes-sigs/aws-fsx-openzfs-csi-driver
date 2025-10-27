@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/url"
 	"os"
 	"path"
@@ -55,12 +56,16 @@ func ParseEndpoint(endpoint string) (string, string, error) {
 	return scheme, addr, nil
 }
 
-func BytesToGiB(volumeSizeGiB int64) int64 {
-	return volumeSizeGiB / GiB
+func BytesToGiB(volumeSizeBytes int64) (int32, error) {
+	volumeGiB := volumeSizeBytes / GiB
+	if volumeGiB > math.MaxInt32 {
+		return 0, fmt.Errorf("volume size %d would overflow int32", volumeGiB)
+	}
+	return int32(volumeGiB), nil
 }
 
-func GiBToBytes(volumeSizeGiB int64) int64 {
-	return volumeSizeGiB * GiB
+func GiBToBytes(volumeSizeGiB int32) int64 {
+	return int64(volumeSizeGiB) * GiB
 }
 
 func Contains(slice []string, element string) bool {

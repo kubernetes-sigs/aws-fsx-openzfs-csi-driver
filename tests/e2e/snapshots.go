@@ -28,7 +28,6 @@ func InitCustomSnapshotsTestSuite(patterns []storageframework.TestPattern) stora
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
 			},
-			FeatureTag: "[Feature:VolumeSnapshotDataSource]",
 		},
 	}
 }

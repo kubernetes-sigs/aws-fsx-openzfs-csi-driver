@@ -8,8 +8,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	request "github.com/aws/aws-sdk-go/aws/request"
-	fsx "github.com/aws/aws-sdk-go/service/fsx"
+	fsx "github.com/aws/aws-sdk-go-v2/service/fsx"
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -36,217 +35,222 @@ func (m *MockFSx) EXPECT() *MockFSxMockRecorder {
 	return m.recorder
 }
 
-// CreateFileSystemWithContext mocks base method.
-func (m *MockFSx) CreateFileSystemWithContext(arg0 context.Context, arg1 *fsx.CreateFileSystemInput, arg2 ...request.Option) (*fsx.CreateFileSystemOutput, error) {
+// CreateFileSystem mocks base method.
+func (m *MockFSx) CreateFileSystem(arg0 context.Context, arg1 *fsx.CreateFileSystemInput, arg2 ...func(*fsx.Options)) (*fsx.CreateFileSystemOutput, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
 		varargs = append(varargs, a)
 	}
-	ret := m.ctrl.Call(m, "CreateFileSystemWithContext", varargs...)
+	ret := m.ctrl.Call(m, "CreateFileSystem", varargs...)
 	ret0, _ := ret[0].(*fsx.CreateFileSystemOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// CreateFileSystemWithContext indicates an expected call of CreateFileSystemWithContext.
-func (mr *MockFSxMockRecorder) CreateFileSystemWithContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+// CreateFileSystem indicates an expected call of CreateFileSystem.
+func (mr *MockFSxMockRecorder) CreateFileSystem(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{arg0, arg1}, arg2...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateFileSystemWithContext", reflect.TypeOf((*MockFSx)(nil).CreateFileSystemWithContext), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateFileSystem", reflect.TypeOf((*MockFSx)(nil).CreateFileSystem), varargs...)
 }
 
-// CreateSnapshotWithContext mocks base method.
-func (m *MockFSx) CreateSnapshotWithContext(arg0 context.Context, arg1 *fsx.CreateSnapshotInput, arg2 ...request.Option) (*fsx.CreateSnapshotOutput, error) {
+// CreateSnapshot mocks base method.
+func (m *MockFSx) CreateSnapshot(arg0 context.Context, arg1 *fsx.CreateSnapshotInput, arg2 ...func(*fsx.Options)) (*fsx.CreateSnapshotOutput, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
 		varargs = append(varargs, a)
 	}
-	ret := m.ctrl.Call(m, "CreateSnapshotWithContext", varargs...)
+	ret := m.ctrl.Call(m, "CreateSnapshot", varargs...)
 	ret0, _ := ret[0].(*fsx.CreateSnapshotOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// CreateSnapshotWithContext indicates an expected call of CreateSnapshotWithContext.
-func (mr *MockFSxMockRecorder) CreateSnapshotWithContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+// CreateSnapshot indicates an expected call of CreateSnapshot.
+func (mr *MockFSxMockRecorder) CreateSnapshot(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{arg0, arg1}, arg2...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSnapshotWithContext", reflect.TypeOf((*MockFSx)(nil).CreateSnapshotWithContext), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSnapshot", reflect.TypeOf((*MockFSx)(nil).CreateSnapshot), varargs...)
 }
 
-// CreateVolumeWithContext mocks base method.
-func (m *MockFSx) CreateVolumeWithContext(arg0 context.Context, arg1 *fsx.CreateVolumeInput, arg2 ...request.Option) (*fsx.CreateVolumeOutput, error) {
+// CreateVolume mocks base method.
+func (m *MockFSx) CreateVolume(arg0 context.Context, arg1 *fsx.CreateVolumeInput, arg2 ...func(*fsx.Options)) (*fsx.CreateVolumeOutput, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
 		varargs = append(varargs, a)
 	}
-	ret := m.ctrl.Call(m, "CreateVolumeWithContext", varargs...)
+	ret := m.ctrl.Call(m, "CreateVolume", varargs...)
 	ret0, _ := ret[0].(*fsx.CreateVolumeOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// CreateVolumeWithContext indicates an expected call of CreateVolumeWithContext.
-func (mr *MockFSxMockRecorder) CreateVolumeWithContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+// CreateVolume indicates an expected call of CreateVolume.
+func (mr *MockFSxMockRecorder) CreateVolume(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{arg0, arg1}, arg2...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateVolumeWithContext", reflect.TypeOf((*MockFSx)(nil).CreateVolumeWithContext), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateVolume", reflect.TypeOf((*MockFSx)(nil).CreateVolume), varargs...)
 }
 
-// DeleteFileSystemWithContext mocks base method.
-func (m *MockFSx) DeleteFileSystemWithContext(arg0 context.Context, arg1 *fsx.DeleteFileSystemInput, arg2 ...request.Option) (*fsx.DeleteFileSystemOutput, error) {
+// DeleteFileSystem mocks base method.
+func (m *MockFSx) DeleteFileSystem(arg0 context.Context, arg1 *fsx.DeleteFileSystemInput, arg2 ...func(*fsx.Options)) (*fsx.DeleteFileSystemOutput, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
 		varargs = append(varargs, a)
 	}
-	ret := m.ctrl.Call(m, "DeleteFileSystemWithContext", varargs...)
+	ret := m.ctrl.Call(m, "DeleteFileSystem", varargs...)
 	ret0, _ := ret[0].(*fsx.DeleteFileSystemOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// DeleteFileSystemWithContext indicates an expected call of DeleteFileSystemWithContext.
-func (mr *MockFSxMockRecorder) DeleteFileSystemWithContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+// DeleteFileSystem indicates an expected call of DeleteFileSystem.
+func (mr *MockFSxMockRecorder) DeleteFileSystem(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{arg0, arg1}, arg2...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteFileSystemWithContext", reflect.TypeOf((*MockFSx)(nil).DeleteFileSystemWithContext), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteFileSystem", reflect.TypeOf((*MockFSx)(nil).DeleteFileSystem), varargs...)
 }
 
-// DeleteSnapshotWithContext mocks base method.
-func (m *MockFSx) DeleteSnapshotWithContext(arg0 context.Context, arg1 *fsx.DeleteSnapshotInput, arg2 ...request.Option) (*fsx.DeleteSnapshotOutput, error) {
+// DeleteSnapshot mocks base method.
+func (m *MockFSx) DeleteSnapshot(arg0 context.Context, arg1 *fsx.DeleteSnapshotInput, arg2 ...func(*fsx.Options)) (*fsx.DeleteSnapshotOutput, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
 		varargs = append(varargs, a)
 	}
-	ret := m.ctrl.Call(m, "DeleteSnapshotWithContext", varargs...)
+	ret := m.ctrl.Call(m, "DeleteSnapshot", varargs...)
 	ret0, _ := ret[0].(*fsx.DeleteSnapshotOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// DeleteSnapshotWithContext indicates an expected call of DeleteSnapshotWithContext.
-func (mr *MockFSxMockRecorder) DeleteSnapshotWithContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+// DeleteSnapshot indicates an expected call of DeleteSnapshot.
+func (mr *MockFSxMockRecorder) DeleteSnapshot(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{arg0, arg1}, arg2...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSnapshotWithContext", reflect.TypeOf((*MockFSx)(nil).DeleteSnapshotWithContext), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSnapshot", reflect.TypeOf((*MockFSx)(nil).DeleteSnapshot), varargs...)
 }
 
-// DeleteVolumeWithContext mocks base method.
-func (m *MockFSx) DeleteVolumeWithContext(arg0 context.Context, arg1 *fsx.DeleteVolumeInput, arg2 ...request.Option) (*fsx.DeleteVolumeOutput, error) {
+// DeleteVolume mocks base method.
+func (m *MockFSx) DeleteVolume(arg0 context.Context, arg1 *fsx.DeleteVolumeInput, arg2 ...func(*fsx.Options)) (*fsx.DeleteVolumeOutput, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
 		varargs = append(varargs, a)
 	}
-	ret := m.ctrl.Call(m, "DeleteVolumeWithContext", varargs...)
+	ret := m.ctrl.Call(m, "DeleteVolume", varargs...)
 	ret0, _ := ret[0].(*fsx.DeleteVolumeOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// DeleteVolumeWithContext indicates an expected call of DeleteVolumeWithContext.
-func (mr *MockFSxMockRecorder) DeleteVolumeWithContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+// DeleteVolume indicates an expected call of DeleteVolume.
+func (mr *MockFSxMockRecorder) DeleteVolume(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{arg0, arg1}, arg2...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteVolumeWithContext", reflect.TypeOf((*MockFSx)(nil).DeleteVolumeWithContext), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteVolume", reflect.TypeOf((*MockFSx)(nil).DeleteVolume), varargs...)
 }
 
-// DescribeFileSystemsWithContext mocks base method.
-func (m *MockFSx) DescribeFileSystemsWithContext(arg0 context.Context, arg1 *fsx.DescribeFileSystemsInput, arg2 ...request.Option) (*fsx.DescribeFileSystemsOutput, error) {
+// DescribeFileSystems mocks base method.
+func (m *MockFSx) DescribeFileSystems(arg0 context.Context, arg1 *fsx.DescribeFileSystemsInput, arg2 ...func(*fsx.Options)) (*fsx.DescribeFileSystemsOutput, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
 		varargs = append(varargs, a)
 	}
-	ret := m.ctrl.Call(m, "DescribeFileSystemsWithContext", varargs...)
+	ret := m.ctrl.Call(m, "DescribeFileSystems", varargs...)
 	ret0, _ := ret[0].(*fsx.DescribeFileSystemsOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// DescribeFileSystemsWithContext indicates an expected call of DescribeFileSystemsWithContext.
-func (mr *MockFSxMockRecorder) DescribeFileSystemsWithContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+// DescribeFileSystems indicates an expected call of DescribeFileSystems.
+func (mr *MockFSxMockRecorder) DescribeFileSystems(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{arg0, arg1}, arg2...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeFileSystemsWithContext", reflect.TypeOf((*MockFSx)(nil).DescribeFileSystemsWithContext), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeFileSystems", reflect.TypeOf((*MockFSx)(nil).DescribeFileSystems), varargs...)
 }
 
-// DescribeSnapshotsWithContext mocks base method.
-func (m *MockFSx) DescribeSnapshotsWithContext(arg0 context.Context, arg1 *fsx.DescribeSnapshotsInput, arg2 ...request.Option) (*fsx.DescribeSnapshotsOutput, error) {
+// DescribeSnapshots mocks base method.
+func (m *MockFSx) DescribeSnapshots(arg0 context.Context, arg1 *fsx.DescribeSnapshotsInput, arg2 ...func(*fsx.Options)) (*fsx.DescribeSnapshotsOutput, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
 		varargs = append(varargs, a)
 	}
-	ret := m.ctrl.Call(m, "DescribeSnapshotsWithContext", varargs...)
+	ret := m.ctrl.Call(m, "DescribeSnapshots", varargs...)
 	ret0, _ := ret[0].(*fsx.DescribeSnapshotsOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// DescribeSnapshotsWithContext indicates an expected call of DescribeSnapshotsWithContext.
-func (mr *MockFSxMockRecorder) DescribeSnapshotsWithContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+// DescribeSnapshots indicates an expected call of DescribeSnapshots.
+func (mr *MockFSxMockRecorder) DescribeSnapshots(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{arg0, arg1}, arg2...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeSnapshotsWithContext", reflect.TypeOf((*MockFSx)(nil).DescribeSnapshotsWithContext), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeSnapshots", reflect.TypeOf((*MockFSx)(nil).DescribeSnapshots), varargs...)
 }
 
-// DescribeVolumesWithContext mocks base method.
-func (m *MockFSx) DescribeVolumesWithContext(arg0 context.Context, arg1 *fsx.DescribeVolumesInput, arg2 ...request.Option) (*fsx.DescribeVolumesOutput, error) {
+// DescribeVolumes mocks base method.
+func (m *MockFSx) DescribeVolumes(arg0 context.Context, arg1 *fsx.DescribeVolumesInput, arg2 ...func(*fsx.Options)) (*fsx.DescribeVolumesOutput, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
 		varargs = append(varargs, a)
 	}
-	ret := m.ctrl.Call(m, "DescribeVolumesWithContext", varargs...)
+	ret := m.ctrl.Call(m, "DescribeVolumes", varargs...)
 	ret0, _ := ret[0].(*fsx.DescribeVolumesOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// DescribeVolumesWithContext indicates an expected call of DescribeVolumesWithContext.
-func (mr *MockFSxMockRecorder) DescribeVolumesWithContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+// DescribeVolumes indicates an expected call of DescribeVolumes.
+func (mr *MockFSxMockRecorder) DescribeVolumes(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{arg0, arg1}, arg2...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeVolumesWithContext", reflect.TypeOf((*MockFSx)(nil).DescribeVolumesWithContext), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeVolumes", reflect.TypeOf((*MockFSx)(nil).DescribeVolumes), varargs...)
 }
 
 // ListTagsForResource mocks base method.
-func (m *MockFSx) ListTagsForResource(arg0 *fsx.ListTagsForResourceInput) (*fsx.ListTagsForResourceOutput, error) {
+func (m *MockFSx) ListTagsForResource(arg0 context.Context, arg1 *fsx.ListTagsForResourceInput, arg2 ...func(*fsx.Options)) (*fsx.ListTagsForResourceOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListTagsForResource", arg0)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ListTagsForResource", varargs...)
 	ret0, _ := ret[0].(*fsx.ListTagsForResourceOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListTagsForResource indicates an expected call of ListTagsForResource.
-func (mr *MockFSxMockRecorder) ListTagsForResource(arg0 interface{}) *gomock.Call {
+func (mr *MockFSxMockRecorder) ListTagsForResource(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListTagsForResource", reflect.TypeOf((*MockFSx)(nil).ListTagsForResource), arg0)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListTagsForResource", reflect.TypeOf((*MockFSx)(nil).ListTagsForResource), varargs...)
 }
 
-// UpdateFileSystemWithContext mocks base method.
-func (m *MockFSx) UpdateFileSystemWithContext(arg0 context.Context, arg1 *fsx.UpdateFileSystemInput, arg2 ...request.Option) (*fsx.UpdateFileSystemOutput, error) {
+// UpdateFileSystem mocks base method.
+func (m *MockFSx) UpdateFileSystem(arg0 context.Context, arg1 *fsx.UpdateFileSystemInput, arg2 ...func(*fsx.Options)) (*fsx.UpdateFileSystemOutput, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
 		varargs = append(varargs, a)
 	}
-	ret := m.ctrl.Call(m, "UpdateFileSystemWithContext", varargs...)
+	ret := m.ctrl.Call(m, "UpdateFileSystem", varargs...)
 	ret0, _ := ret[0].(*fsx.UpdateFileSystemOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// UpdateFileSystemWithContext indicates an expected call of UpdateFileSystemWithContext.
-func (mr *MockFSxMockRecorder) UpdateFileSystemWithContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+// UpdateFileSystem indicates an expected call of UpdateFileSystem.
+func (mr *MockFSxMockRecorder) UpdateFileSystem(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{arg0, arg1}, arg2...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateFileSystemWithContext", reflect.TypeOf((*MockFSx)(nil).UpdateFileSystemWithContext), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateFileSystem", reflect.TypeOf((*MockFSx)(nil).UpdateFileSystem), varargs...)
 }
