@@ -39,6 +39,10 @@ Search for any references to the previous version on the README, and update them
 
 Update the VERSION variable in the Makefile
 
+### Update `docs/install.md`
+
+Update the release version specified in the Kustomize installation instructions.
+
 ### Send a release PR to the release branch
 
 At this point you should have all changes required for the release commit. 
