@@ -1,11 +1,14 @@
-# v1.1.0
+# v1.2.0
+### Notable changes
+* Migrate AWS SDK to v2 ([#76](https://github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pull/76), [@gomesjason](https://github.com/gomesjason))
+* Make hostNetwork configurable on node daemonset ([#63](https://github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pull/63), [@Jasper-Ben](https://github.com/Jasper-Ben))
 
+# v1.1.0
 ### Notable changes
 * Add support for Multi-AZ ([#49](https://github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pull/49), [@gomesjason](https://github.com/gomesjason/))
 * Improved error logging for improperly formatted parameters ([#45](https://github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pull/45), [@hughdanliu](https://github.com/hughdanliu/))
 
 # v1.0.0
-
 ### Notable changes
 * Modularize the controller and node services; Add support for JSON logging ([#30](https://github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pull/30), [@hughdanliu](https://github.com/hughdanliu/))
 * Add support for operating modes; Perform metadata collection via the Kubernetes API ([#34](https://github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pull/34), [@hughdanliu](https://github.com/hughdanliu/))
@@ -21,7 +24,6 @@
 * Adopt Kubernetes standard logging patterns ([#38](https://github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pull/38), [@hughdanliu](https://github.com/hughdanliu/))
 
 # v0.1.0
-
 ### Notable changes
 * Add support for static provisioning of file systems and child volumes ([#1](https://github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pull/1), [@hughdanliu](https://github.com/hughdanliu/))
 * Add support for dynamically creating volume snapshots ([#3](https://github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pull/3), [@hughdanliu](https://github.com/hughdanliu/))
