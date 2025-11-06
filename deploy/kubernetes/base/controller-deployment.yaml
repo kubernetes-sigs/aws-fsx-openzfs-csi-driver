@@ -60,7 +60,7 @@ spec:
         runAsUser: 1000
       containers:
         - name: fsx-openzfs-plugin
-          image: public.ecr.aws/fsx-csi-driver/aws-fsx-openzfs-csi-driver:v1.1.0
+          image: public.ecr.aws/fsx-csi-driver/aws-fsx-openzfs-csi-driver:v1.2.0
           imagePullPolicy: IfNotPresent
           args:
             - --mode=controller

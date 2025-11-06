@@ -1,4 +1,8 @@
 # Helm chart
+# v1.2.0
+* Use driver v1.2.0
+* Make hostNetwork configurable on node daemonset
+
 # v1.1.0
 * Use driver v1.1.0
 
