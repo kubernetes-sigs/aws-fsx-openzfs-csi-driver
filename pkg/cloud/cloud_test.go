@@ -18,16 +18,17 @@ package cloud
 import (
 	"context"
 	"errors"
+	"reflect"
+	"strconv"
+	"testing"
+	"time"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/fsx"
 	"github.com/aws/aws-sdk-go-v2/service/fsx/types"
 	"github.com/golang/mock/gomock"
 	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/cloud/mocks"
 	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/util"
-	"reflect"
-	"strconv"
-	"testing"
-	"time"
 )
 
 func TestCreateFileSystem(t *testing.T) {
@@ -594,6 +595,57 @@ func TestWaitForFileSystemAvailable(t *testing.T) {
 	}
 }
 
+func TestWaitForFileSystemDeletion(t *testing.T) {
+	fileSystemId := "fs-123456789abcdefgh"
+	testCases := []struct {
+		name     string
+		testFunc func(t *testing.T)
+	}{
+		{
+			name: "success: DescribeFileSystems return not found",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().DescribeFileSystems(gomock.Any(), gomock.Any()).Return(nil, ErrNotFound)
+				err := c.WaitForFileSystemDeletion(ctx, fileSystemId)
+				if err != nil {
+					t.Fatalf("WaitForFileSystemDeletion is failed: %v", err)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: DescribeFileSystems return other error",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().DescribeFileSystems(gomock.Any(), gomock.Any()).Return(nil, errors.New(""))
+				err := c.WaitForFileSystemDeletion(ctx, fileSystemId)
+				if err == nil {
+					t.Fatalf("WaitForFileSystemDeletion is not failed: %v", err)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, tc.testFunc)
+	}
+}
+
 func TestWaitForFileSystemResize(t *testing.T) {
 	var (
 		filesystemId       = "fs-1234"
@@ -1137,6 +1189,58 @@ func TestWaitForVolumeAvailable(t *testing.T) {
 				err := c.WaitForVolumeAvailable(ctx, volumeId)
 				if err == nil {
 					t.Fatal("WaitForVolumeAvailable is not failed")
+				}
+
+				mockCtl.Finish()
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, tc.testFunc)
+	}
+}
+
+func TestWaitForVolumeDeletion(t *testing.T) {
+	volumeId := "fsvol-0987654321abcdefg"
+
+	testCases := []struct {
+		name     string
+		testFunc func(t *testing.T)
+	}{
+		{
+			name: "success: DescribeVolumes return empty",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().DescribeVolumes(gomock.Any(), gomock.Any()).Return(nil, ErrNotFound)
+				err := c.WaitForVolumeDeletion(ctx, volumeId)
+				if err != nil {
+					t.Fatalf("WaitForVolumeDeletion is failed: %v", err)
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: DescribeVolumes return other error",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockFSx := mocks.NewMockFSx(mockCtl)
+				c := &cloud{
+					fsx: mockFSx,
+				}
+
+				ctx := context.Background()
+				mockFSx.EXPECT().DescribeVolumes(gomock.Any(), gomock.Any()).Return(nil, errors.New(""))
+				err := c.WaitForVolumeDeletion(ctx, volumeId)
+				if err == nil {
+					t.Fatalf("WaitForVolumeDeletion is not failed: %v", err)
 				}
 
 				mockCtl.Finish()

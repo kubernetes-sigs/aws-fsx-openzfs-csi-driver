@@ -18,6 +18,9 @@ package driver
 import (
 	"context"
 	"errors"
+	"testing"
+	"time"
+
 	"github.com/aws/aws-sdk-go-v2/service/fsx/types"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/golang/mock/gomock"
@@ -26,8 +29,6 @@ import (
 	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/driver/mocks"
 	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/util"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"testing"
-	"time"
 )
 
 func TestCreateVolume(t *testing.T) {
@@ -1028,6 +1029,7 @@ func TestDeleteVolume(t *testing.T) {
 				ctx := context.Background()
 				mockCloud.EXPECT().GetDeleteParameters(gomock.Eq(ctx), gomock.Any()).Return(filesystemParameters, nil)
 				mockCloud.EXPECT().DeleteFileSystem(gomock.Eq(ctx), gomock.Any()).Return(nil)
+				mockCloud.EXPECT().WaitForFileSystemDeletion(gomock.Eq(ctx), gomock.Any()).Return(nil)
 
 				_, err := driver.DeleteVolume(ctx, req)
 				if err != nil {
@@ -1056,6 +1058,7 @@ func TestDeleteVolume(t *testing.T) {
 				ctx := context.Background()
 				mockCloud.EXPECT().GetDeleteParameters(gomock.Eq(ctx), gomock.Any()).Return(map[string]string{}, nil)
 				mockCloud.EXPECT().DeleteFileSystem(gomock.Eq(ctx), gomock.Any()).Return(nil)
+				mockCloud.EXPECT().WaitForFileSystemDeletion(gomock.Eq(ctx), gomock.Any()).Return(nil)
 
 				_, err := driver.DeleteVolume(ctx, req)
 				if err != nil {
@@ -1084,6 +1087,7 @@ func TestDeleteVolume(t *testing.T) {
 				ctx := context.Background()
 				mockCloud.EXPECT().GetDeleteParameters(gomock.Eq(ctx), gomock.Any()).Return(volumeParameters, nil)
 				mockCloud.EXPECT().DeleteVolume(gomock.Eq(ctx), gomock.Any()).Return(nil)
+				mockCloud.EXPECT().WaitForVolumeDeletion(gomock.Eq(ctx), gomock.Any()).Return(nil)
 
 				_, err := driver.DeleteVolume(ctx, req)
 				if err != nil {
@@ -1112,6 +1116,7 @@ func TestDeleteVolume(t *testing.T) {
 				ctx := context.Background()
 				mockCloud.EXPECT().GetDeleteParameters(gomock.Eq(ctx), gomock.Any()).Return(map[string]string{}, nil)
 				mockCloud.EXPECT().DeleteVolume(gomock.Eq(ctx), gomock.Any()).Return(nil)
+				mockCloud.EXPECT().WaitForVolumeDeletion(gomock.Eq(ctx), gomock.Any()).Return(nil)
 
 				_, err := driver.DeleteVolume(ctx, req)
 				if err != nil {
@@ -1205,6 +1210,35 @@ func TestDeleteVolume(t *testing.T) {
 			},
 		},
 		{
+			name: "fail: WaitForFileSystemDeletion returns error",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockCloud := mocks.NewMockCloud(mockCtl)
+
+				driver := controllerService{
+					cloud:         mockCloud,
+					inFlight:      internal.NewInFlight(),
+					driverOptions: &DriverOptions{},
+				}
+
+				req := &csi.DeleteVolumeRequest{
+					VolumeId: fileSystemId,
+				}
+
+				ctx := context.Background()
+				mockCloud.EXPECT().GetDeleteParameters(gomock.Eq(ctx), gomock.Any()).Return(volumeParameters, nil)
+				mockCloud.EXPECT().DeleteFileSystem(gomock.Eq(ctx), gomock.Any()).Return(nil)
+				mockCloud.EXPECT().WaitForFileSystemDeletion(gomock.Eq(ctx), gomock.Any()).Return(errors.New(""))
+
+				_, err := driver.DeleteVolume(ctx, req)
+				if err == nil {
+					t.Fatal("DeleteVolume is not failed")
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
 			name: "success: DeleteVolume returns ErrNotFound",
 			testFunc: func(t *testing.T) {
 				mockCtl := gomock.NewController(t)
@@ -1251,6 +1285,35 @@ func TestDeleteVolume(t *testing.T) {
 				ctx := context.Background()
 				mockCloud.EXPECT().GetDeleteParameters(gomock.Eq(ctx), gomock.Any()).Return(volumeParameters, nil)
 				mockCloud.EXPECT().DeleteVolume(gomock.Eq(ctx), gomock.Any()).Return(errors.New(""))
+
+				_, err := driver.DeleteVolume(ctx, req)
+				if err == nil {
+					t.Fatal("DeleteVolume is not failed")
+				}
+
+				mockCtl.Finish()
+			},
+		},
+		{
+			name: "fail: WaitForVolumeDeletion returns error",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				mockCloud := mocks.NewMockCloud(mockCtl)
+
+				driver := controllerService{
+					cloud:         mockCloud,
+					inFlight:      internal.NewInFlight(),
+					driverOptions: &DriverOptions{},
+				}
+
+				req := &csi.DeleteVolumeRequest{
+					VolumeId: volumeId,
+				}
+
+				ctx := context.Background()
+				mockCloud.EXPECT().GetDeleteParameters(gomock.Eq(ctx), gomock.Any()).Return(volumeParameters, nil)
+				mockCloud.EXPECT().DeleteVolume(gomock.Eq(ctx), gomock.Any()).Return(nil)
+				mockCloud.EXPECT().WaitForVolumeDeletion(gomock.Eq(ctx), gomock.Any()).Return(errors.New(""))
 
 				_, err := driver.DeleteVolume(ctx, req)
 				if err == nil {

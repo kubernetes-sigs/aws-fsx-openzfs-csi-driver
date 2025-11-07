@@ -226,6 +226,20 @@ func (mr *MockCloudMockRecorder) WaitForFileSystemAvailable(arg0, arg1 interface
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForFileSystemAvailable", reflect.TypeOf((*MockCloud)(nil).WaitForFileSystemAvailable), arg0, arg1)
 }
 
+// WaitForFileSystemDeletion mocks base method.
+func (m *MockCloud) WaitForFileSystemDeletion(arg0 context.Context, arg1 string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WaitForFileSystemDeletion", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// WaitForFileSystemDeletion indicates an expected call of WaitForFileSystemDeletion.
+func (mr *MockCloudMockRecorder) WaitForFileSystemDeletion(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForFileSystemDeletion", reflect.TypeOf((*MockCloud)(nil).WaitForFileSystemDeletion), arg0, arg1)
+}
+
 // WaitForFileSystemResize mocks base method.
 func (m *MockCloud) WaitForFileSystemResize(arg0 context.Context, arg1 string, arg2 int32) error {
 	m.ctrl.T.Helper()
@@ -266,6 +280,20 @@ func (m *MockCloud) WaitForVolumeAvailable(arg0 context.Context, arg1 string) er
 func (mr *MockCloudMockRecorder) WaitForVolumeAvailable(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForVolumeAvailable", reflect.TypeOf((*MockCloud)(nil).WaitForVolumeAvailable), arg0, arg1)
+}
+
+// WaitForVolumeDeletion mocks base method.
+func (m *MockCloud) WaitForVolumeDeletion(arg0 context.Context, arg1 string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WaitForVolumeDeletion", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// WaitForVolumeDeletion indicates an expected call of WaitForVolumeDeletion.
+func (mr *MockCloudMockRecorder) WaitForVolumeDeletion(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForVolumeDeletion", reflect.TypeOf((*MockCloud)(nil).WaitForVolumeDeletion), arg0, arg1)
 }
 
 // WaitForVolumeResize mocks base method.

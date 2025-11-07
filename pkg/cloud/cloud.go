@@ -19,6 +19,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/fsx"
@@ -26,9 +30,6 @@ import (
 	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/util"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
-	"os"
-	"strings"
-	"time"
 )
 
 // Polling
@@ -102,11 +103,13 @@ type Cloud interface {
 	DeleteFileSystem(ctx context.Context, parameters map[string]string) error
 	DescribeFileSystem(ctx context.Context, fileSystemId string) (*FileSystem, error)
 	WaitForFileSystemAvailable(ctx context.Context, fileSystemId string) error
+	WaitForFileSystemDeletion(ctx context.Context, fileSystemId string) error
 	WaitForFileSystemResize(ctx context.Context, fileSystemId string, resizeGiB int32) error
 	CreateVolume(ctx context.Context, parameters map[string]string) (*Volume, error)
 	DeleteVolume(ctx context.Context, parameters map[string]string) error
 	DescribeVolume(ctx context.Context, volumeId string) (*Volume, error)
 	WaitForVolumeAvailable(ctx context.Context, volumeId string) error
+	WaitForVolumeDeletion(ctx context.Context, volumeId string) error
 	WaitForVolumeResize(ctx context.Context, volumeId string, resizeGiB int32) error
 	CreateSnapshot(ctx context.Context, options map[string]string) (*Snapshot, error)
 	DeleteSnapshot(ctx context.Context, parameters map[string]string) error
@@ -242,6 +245,21 @@ func (c *cloud) WaitForFileSystemAvailable(ctx context.Context, fileSystemId str
 	return err
 }
 
+func (c *cloud) WaitForFileSystemDeletion(ctx context.Context, fileSystemId string) error {
+	err := wait.PollUntilContextTimeout(ctx, PollCheckInterval, PollCheckTimeout, true, func(ctx context.Context) (done bool, err error) {
+		_, err = c.getFileSystem(ctx, fileSystemId)
+		if err == ErrNotFound {
+			return true, nil
+		} else if err != nil {
+			return true, err
+		}
+		klog.V(2).InfoS("WaitForFileSystemDeletion", "filesystem", fileSystemId)
+		return false, nil
+	})
+
+	return err
+}
+
 func (c *cloud) WaitForFileSystemResize(ctx context.Context, fileSystemId string, resizeGiB int32) error {
 	err := wait.Poll(PollCheckInterval, PollCheckTimeout, func() (done bool, err error) {
 		updateAction, err := c.getUpdateResizeFilesystemAdministrativeAction(ctx, fileSystemId, resizeGiB)
@@ -335,6 +353,21 @@ func (c *cloud) WaitForVolumeAvailable(ctx context.Context, volumeId string) err
 		default:
 			return true, fmt.Errorf("unexpected state for volume %s: %q", volumeId, v.Lifecycle)
 		}
+	})
+
+	return err
+}
+
+func (c *cloud) WaitForVolumeDeletion(ctx context.Context, volumeId string) error {
+	err := wait.PollUntilContextTimeout(ctx, PollCheckInterval, PollCheckTimeout, true, func(ctx context.Context) (done bool, err error) {
+		_, err = c.getVolume(ctx, volumeId)
+		if err == ErrNotFound {
+			return true, nil
+		} else if err != nil {
+			return true, err
+		}
+		klog.V(2).InfoS("WaitForVolumeDeletion", "volume", volumeId)
+		return false, nil
 	})
 
 	return err
