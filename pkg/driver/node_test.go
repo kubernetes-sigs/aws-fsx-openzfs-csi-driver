@@ -17,14 +17,17 @@ package driver
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"reflect"
+	"testing"
+	"time"
+
 	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/driver/internal"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
-	"reflect"
-	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/golang/mock/gomock"
@@ -956,5 +959,34 @@ func expectErr(t *testing.T, actualErr error, expectedCode codes.Code) {
 
 	if errStatus.Code() != expectedCode {
 		t.Fatalf("Expected error code %d, got %d message %s", expectedCode, errStatus.Code(), errStatus.Message())
+	}
+}
+
+func TestTryRemoveNotReadyTaintUntilSucceed(t *testing.T) {
+	{
+		i := 0
+		tryRemoveNotReadyTaintUntilSucceed(time.Second, func() error {
+			i++
+			if i < 3 {
+				return errors.New("test")
+			}
+
+			return nil
+		})
+
+		if i != 3 {
+			t.Fatalf("unexpected result")
+		}
+	}
+	{
+		i := 0
+		tryRemoveNotReadyTaintUntilSucceed(time.Second, func() error {
+			i++
+			return nil
+		})
+
+		if i != 1 {
+			t.Fatalf("unexpected result")
+		}
 	}
 }
