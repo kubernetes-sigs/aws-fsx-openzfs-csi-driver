@@ -19,11 +19,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/cloud"
 	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/driver/internal"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"os"
-	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
@@ -72,10 +74,9 @@ func newNodeService(driverOptions *DriverOptions) nodeService {
 
 	// Remove taint from node to indicate driver startup success
 	// This is done at the last possible moment to prevent race conditions or false positive removals
-	err = removeNotReadyTaint(cloud.DefaultKubernetesAPIClient)
-	if err != nil {
-		klog.ErrorS(err, "Unexpected failure when attempting to remove node taint(s)")
-	}
+	go tryRemoveNotReadyTaintUntilSucceed(time.Second, func() error {
+		return removeNotReadyTaint(cloud.DefaultKubernetesAPIClient)
+	})
 
 	return nodeService{
 		metadata:      metadata,
@@ -383,4 +384,17 @@ func removeNotReadyTaint(k8sClient cloud.KubernetesAPIClient) error {
 	}
 	klog.InfoS("Removed taint(s) from local node", "node", nodeName)
 	return nil
+}
+
+// removing the taint may fail, this retries until it succeeds, ensuring the taint will eventually be removed
+func tryRemoveNotReadyTaintUntilSucceed(interval time.Duration, removeFn func() error) {
+	for {
+		err := removeFn()
+		if err == nil {
+			return
+		}
+
+		klog.ErrorS(err, "Unexpected failure when attempting to remove node taint(s)")
+		time.Sleep(interval)
+	}
 }
