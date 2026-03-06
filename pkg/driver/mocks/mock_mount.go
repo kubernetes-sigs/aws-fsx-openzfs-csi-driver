@@ -8,6 +8,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
+	unix "golang.org/x/sys/unix"
 	mount "k8s.io/mount-utils"
 )
 
@@ -46,6 +47,21 @@ func (m *MockMounter) CanSafelySkipMountPointCheck() bool {
 func (mr *MockMounterMockRecorder) CanSafelySkipMountPointCheck() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CanSafelySkipMountPointCheck", reflect.TypeOf((*MockMounter)(nil).CanSafelySkipMountPointCheck))
+}
+
+// GetStatfs mocks base method.
+func (m *MockMounter) GetStatfs(arg0 string) (*unix.Statfs_t, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetStatfs", arg0)
+	ret0, _ := ret[0].(*unix.Statfs_t)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetStatfs indicates an expected call of GetStatfs.
+func (mr *MockMounterMockRecorder) GetStatfs(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStatfs", reflect.TypeOf((*MockMounter)(nil).GetStatfs), arg0)
 }
 
 // GetMountRefs mocks base method.

@@ -38,7 +38,9 @@ const (
 )
 
 var (
-	nodeCaps = []csi.NodeServiceCapability_RPC_Type{}
+	nodeCaps = []csi.NodeServiceCapability_RPC_Type{
+		csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
+	}
 )
 
 type nodeService struct {
@@ -248,7 +250,57 @@ func (d *nodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 }
 
 func (d *nodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
+	klog.V(4).InfoS("NodeGetVolumeStats: called with", "args", *req)
+
+	volumeID := req.GetVolumeId()
+	if len(volumeID) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "NodeGetVolumeStats: Volume ID not provided")
+	}
+
+	volumePath := req.GetVolumePath()
+	if len(volumePath) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "NodeGetVolumeStats: Volume path not provided")
+	}
+
+	exists, err := d.mounter.PathExists(volumePath)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "NodeGetVolumeStats: failed to check if path %s exists: %v", volumePath, err)
+	}
+	if !exists {
+		return nil, status.Errorf(codes.NotFound, "NodeGetVolumeStats: volume path %s does not exist", volumePath)
+	}
+
+	statfs, err := d.mounter.GetStatfs(volumePath)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "NodeGetVolumeStats: failed to statfs on %s: %v", volumePath, err)
+	}
+
+	availableBytes := int64(statfs.Bavail) * int64(statfs.Bsize)
+	totalBytes := int64(statfs.Blocks) * int64(statfs.Bsize)
+	usedBytes := (int64(statfs.Blocks) - int64(statfs.Bfree)) * int64(statfs.Bsize)
+
+	usage := []*csi.VolumeUsage{
+		{
+			Unit:      csi.VolumeUsage_BYTES,
+			Available: availableBytes,
+			Total:     totalBytes,
+			Used:      usedBytes,
+		},
+	}
+
+	totalInodes := int64(statfs.Files)
+	if totalInodes > 0 {
+		freeInodes := int64(statfs.Ffree)
+		usedInodes := totalInodes - freeInodes
+		usage = append(usage, &csi.VolumeUsage{
+			Unit:      csi.VolumeUsage_INODES,
+			Available: freeInodes,
+			Total:     totalInodes,
+			Used:      usedInodes,
+		})
+	}
+
+	return &csi.NodeGetVolumeStatsResponse{Usage: usage}, nil
 }
 
 func (d *nodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {

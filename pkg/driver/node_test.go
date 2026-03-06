@@ -18,18 +18,19 @@ package driver
 import (
 	"context"
 	"fmt"
-	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/driver/internal"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes"
 	"reflect"
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/golang/mock/gomock"
+	"golang.org/x/sys/unix"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes"
 
 	cloudMock "github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/cloud/mocks"
+	"github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/driver/internal"
 	driverMocks "github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pkg/driver/mocks"
 )
 
@@ -816,6 +817,271 @@ func TestNodeUnpublishVolume(t *testing.T) {
 			},
 		},
 	}
+	for _, tc := range testCases {
+		t.Run(tc.name, tc.testFunc)
+	}
+}
+
+func TestNodeGetVolumeStats(t *testing.T) {
+	var (
+		volumeId   = "fsvol-0efb292807cc770ff"
+		volumePath = "/target/path"
+	)
+
+	testCases := []struct {
+		name     string
+		testFunc func(t *testing.T)
+	}{
+		{
+			name: "success: returns bytes and inode usage",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+
+				mockMetadata := cloudMock.NewMockMetadataService(mockCtl)
+				mockMounter := driverMocks.NewMockMounter(mockCtl)
+
+				driver := &nodeService{
+					metadata: mockMetadata,
+					mounter:  mockMounter,
+					inFlight: internal.NewInFlight(),
+				}
+
+				ctx := context.Background()
+				req := &csi.NodeGetVolumeStatsRequest{
+					VolumeId:   volumeId,
+					VolumePath: volumePath,
+				}
+
+				mockMounter.EXPECT().PathExists(gomock.Eq(volumePath)).Return(true, nil)
+				mockMounter.EXPECT().GetStatfs(gomock.Eq(volumePath)).Return(&unix.Statfs_t{
+					Bsize:  4096,
+					Blocks: 262144, // 1 GiB total
+					Bfree:  131072, // 512 MiB free
+					Bavail: 131072, // 512 MiB available
+					Files:  65536,
+					Ffree:  32768,
+				}, nil)
+
+				resp, err := driver.NodeGetVolumeStats(ctx, req)
+				if err != nil {
+					t.Fatalf("NodeGetVolumeStats failed: %v", err)
+				}
+
+				if len(resp.Usage) != 2 {
+					t.Fatalf("Expected 2 usage entries (bytes + inodes), got %d", len(resp.Usage))
+				}
+
+				// Check bytes usage
+				bytesUsage := resp.Usage[0]
+				if bytesUsage.Unit != csi.VolumeUsage_BYTES {
+					t.Fatalf("Expected BYTES unit, got %v", bytesUsage.Unit)
+				}
+				expectedTotal := int64(262144) * int64(4096)
+				expectedUsed := (int64(262144) - int64(131072)) * int64(4096)
+				expectedAvail := int64(131072) * int64(4096)
+				if bytesUsage.Total != expectedTotal {
+					t.Fatalf("Expected total %d, got %d", expectedTotal, bytesUsage.Total)
+				}
+				if bytesUsage.Used != expectedUsed {
+					t.Fatalf("Expected used %d, got %d", expectedUsed, bytesUsage.Used)
+				}
+				if bytesUsage.Available != expectedAvail {
+					t.Fatalf("Expected available %d, got %d", expectedAvail, bytesUsage.Available)
+				}
+
+				// Check inode usage
+				inodeUsage := resp.Usage[1]
+				if inodeUsage.Unit != csi.VolumeUsage_INODES {
+					t.Fatalf("Expected INODES unit, got %v", inodeUsage.Unit)
+				}
+				if inodeUsage.Total != 65536 {
+					t.Fatalf("Expected total inodes 65536, got %d", inodeUsage.Total)
+				}
+				if inodeUsage.Available != 32768 {
+					t.Fatalf("Expected available inodes 32768, got %d", inodeUsage.Available)
+				}
+				if inodeUsage.Used != 32768 {
+					t.Fatalf("Expected used inodes 32768, got %d", inodeUsage.Used)
+				}
+			},
+		},
+		{
+			name: "success: no inode entry when Files is zero",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+
+				mockMetadata := cloudMock.NewMockMetadataService(mockCtl)
+				mockMounter := driverMocks.NewMockMounter(mockCtl)
+
+				driver := &nodeService{
+					metadata: mockMetadata,
+					mounter:  mockMounter,
+					inFlight: internal.NewInFlight(),
+				}
+
+				ctx := context.Background()
+				req := &csi.NodeGetVolumeStatsRequest{
+					VolumeId:   volumeId,
+					VolumePath: volumePath,
+				}
+
+				mockMounter.EXPECT().PathExists(gomock.Eq(volumePath)).Return(true, nil)
+				mockMounter.EXPECT().GetStatfs(gomock.Eq(volumePath)).Return(&unix.Statfs_t{
+					Bsize:  4096,
+					Blocks: 262144,
+					Bfree:  131072,
+					Bavail: 131072,
+					Files:  0,
+					Ffree:  0,
+				}, nil)
+
+				resp, err := driver.NodeGetVolumeStats(ctx, req)
+				if err != nil {
+					t.Fatalf("NodeGetVolumeStats failed: %v", err)
+				}
+
+				if len(resp.Usage) != 1 {
+					t.Fatalf("Expected 1 usage entry (bytes only), got %d", len(resp.Usage))
+				}
+				if resp.Usage[0].Unit != csi.VolumeUsage_BYTES {
+					t.Fatalf("Expected BYTES unit, got %v", resp.Usage[0].Unit)
+				}
+			},
+		},
+		{
+			name: "fail: missing volume ID",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+
+				mockMetadata := cloudMock.NewMockMetadataService(mockCtl)
+				mockMounter := driverMocks.NewMockMounter(mockCtl)
+
+				driver := &nodeService{
+					metadata: mockMetadata,
+					mounter:  mockMounter,
+					inFlight: internal.NewInFlight(),
+				}
+
+				ctx := context.Background()
+				req := &csi.NodeGetVolumeStatsRequest{
+					VolumePath: volumePath,
+				}
+
+				_, err := driver.NodeGetVolumeStats(ctx, req)
+				expectErr(t, err, codes.InvalidArgument)
+			},
+		},
+		{
+			name: "fail: missing volume path",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+
+				mockMetadata := cloudMock.NewMockMetadataService(mockCtl)
+				mockMounter := driverMocks.NewMockMounter(mockCtl)
+
+				driver := &nodeService{
+					metadata: mockMetadata,
+					mounter:  mockMounter,
+					inFlight: internal.NewInFlight(),
+				}
+
+				ctx := context.Background()
+				req := &csi.NodeGetVolumeStatsRequest{
+					VolumeId: volumeId,
+				}
+
+				_, err := driver.NodeGetVolumeStats(ctx, req)
+				expectErr(t, err, codes.InvalidArgument)
+			},
+		},
+		{
+			name: "fail: volume path does not exist",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+
+				mockMetadata := cloudMock.NewMockMetadataService(mockCtl)
+				mockMounter := driverMocks.NewMockMounter(mockCtl)
+
+				driver := &nodeService{
+					metadata: mockMetadata,
+					mounter:  mockMounter,
+					inFlight: internal.NewInFlight(),
+				}
+
+				ctx := context.Background()
+				req := &csi.NodeGetVolumeStatsRequest{
+					VolumeId:   volumeId,
+					VolumePath: volumePath,
+				}
+
+				mockMounter.EXPECT().PathExists(gomock.Eq(volumePath)).Return(false, nil)
+
+				_, err := driver.NodeGetVolumeStats(ctx, req)
+				expectErr(t, err, codes.NotFound)
+			},
+		},
+		{
+			name: "fail: PathExists returns error",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+
+				mockMetadata := cloudMock.NewMockMetadataService(mockCtl)
+				mockMounter := driverMocks.NewMockMounter(mockCtl)
+
+				driver := &nodeService{
+					metadata: mockMetadata,
+					mounter:  mockMounter,
+					inFlight: internal.NewInFlight(),
+				}
+
+				ctx := context.Background()
+				req := &csi.NodeGetVolumeStatsRequest{
+					VolumeId:   volumeId,
+					VolumePath: volumePath,
+				}
+
+				mockMounter.EXPECT().PathExists(gomock.Eq(volumePath)).Return(false, fmt.Errorf("permission denied"))
+
+				_, err := driver.NodeGetVolumeStats(ctx, req)
+				expectErr(t, err, codes.Internal)
+			},
+		},
+		{
+			name: "fail: statfs returns error",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+
+				mockMetadata := cloudMock.NewMockMetadataService(mockCtl)
+				mockMounter := driverMocks.NewMockMounter(mockCtl)
+
+				driver := &nodeService{
+					metadata: mockMetadata,
+					mounter:  mockMounter,
+					inFlight: internal.NewInFlight(),
+				}
+
+				ctx := context.Background()
+				req := &csi.NodeGetVolumeStatsRequest{
+					VolumeId:   volumeId,
+					VolumePath: volumePath,
+				}
+
+				mockMounter.EXPECT().PathExists(gomock.Eq(volumePath)).Return(true, nil)
+				mockMounter.EXPECT().GetStatfs(gomock.Eq(volumePath)).Return(nil, fmt.Errorf("statfs failed"))
+
+				_, err := driver.NodeGetVolumeStats(ctx, req)
+				expectErr(t, err, codes.Internal)
+			},
+		},
+	}
+
 	for _, tc := range testCases {
 		t.Run(tc.name, tc.testFunc)
 	}
