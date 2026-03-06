@@ -16,8 +16,10 @@ limitations under the License.
 package driver
 
 import (
-	"k8s.io/mount-utils"
 	"os"
+
+	"golang.org/x/sys/unix"
+	"k8s.io/mount-utils"
 )
 
 // Mounter is an interface for mount operations
@@ -26,6 +28,7 @@ type Mounter interface {
 	IsCorruptedMnt(err error) bool
 	PathExists(path string) (bool, error)
 	MakeDir(pathname string) error
+	GetStatfs(path string) (*unix.Statfs_t, error)
 }
 
 type NodeMounter struct {
@@ -60,4 +63,13 @@ func (m *NodeMounter) PathExists(path string) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+// GetStatfs returns filesystem statistics for the given path.
+func (m *NodeMounter) GetStatfs(path string) (*unix.Statfs_t, error) {
+	var stat unix.Statfs_t
+	if err := unix.Statfs(path, &stat); err != nil {
+		return nil, err
+	}
+	return &stat, nil
 }
