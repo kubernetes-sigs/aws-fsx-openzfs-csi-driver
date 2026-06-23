@@ -111,12 +111,22 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume: Volume capability not supported")
 	}
 
-	if ok := d.inFlight.Insert(volumeID); !ok {
+	targetPath := req.GetTargetPath()
+	if len(targetPath) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume: Target path not provided")
+	}
+
+	// A single FSx for OpenZFS file system/volume can be mounted by multiple pods on the
+	// same node (e.g. ReadWriteMany), each at a distinct target path. Key the in-flight
+	// lock on volumeID+targetPath so concurrent operations for different pods do not
+	// collide and return Aborted.
+	inFlightKey := volumeID + targetPath
+	if ok := d.inFlight.Insert(inFlightKey); !ok {
 		return nil, status.Errorf(codes.Aborted, internal.VolumeOperationAlreadyExistsErrorMsg, volumeID)
 	}
 	defer func() {
-		klog.V(4).InfoS("NodePublishVolume: volume operation finished", "volumeId", volumeID)
-		d.inFlight.Delete(volumeID)
+		klog.V(4).InfoS("NodePublishVolume: volume operation finished", "volumeId", volumeID, "targetPath", targetPath)
+		d.inFlight.Delete(inFlightKey)
 	}()
 
 	context := req.GetVolumeContext()
@@ -149,11 +159,6 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	}
 
 	source := fmt.Sprintf("%s:%s", dnsName, volumePath)
-
-	targetPath := req.GetTargetPath()
-	if len(targetPath) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume: Target path not provided")
-	}
 
 	mountOptions := []string{}
 	if req.GetReadonly() {
@@ -219,12 +224,13 @@ func (d *nodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 		return nil, status.Error(codes.InvalidArgument, "NodeUnpublishVolume: Target path not provided")
 	}
 
-	if ok := d.inFlight.Insert(volumeID); !ok {
+	inFlightKey := volumeID + targetPath
+	if ok := d.inFlight.Insert(inFlightKey); !ok {
 		return nil, status.Errorf(codes.Aborted, internal.VolumeOperationAlreadyExistsErrorMsg, volumeID)
 	}
 	defer func() {
-		klog.V(4).InfoS("NodeUnpublishVolume: volume operation finished", "volumeId", volumeID)
-		d.inFlight.Delete(volumeID)
+		klog.V(4).InfoS("NodeUnpublishVolume: volume operation finished", "volumeId", volumeID, "targetPath", targetPath)
+		d.inFlight.Delete(inFlightKey)
 	}()
 
 	// Check if the target is mounted before unmounting
