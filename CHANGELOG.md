@@ -1,3 +1,7 @@
+# v1.3.3
+### Bug Fixes
+* Fix node in-flight lock to key on volumeID + targetPath so pods sharing an RWX volume no longer block one another ([#104](https://github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver/pull/104), [@alec-v](https://github.com/alec-v))
+
 # v1.3.2
 ### Notable changes
 * Update Go dependencies (golang.org/x/net, golang.org/x/text, google.golang.org/grpc) to fix CVEs

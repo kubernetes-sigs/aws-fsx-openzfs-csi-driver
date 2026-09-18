@@ -651,7 +651,7 @@ func TestNodePublishVolume(t *testing.T) {
 					TargetPath:       targetPath,
 				}
 
-				driver.inFlight.Insert(volumeId)
+				driver.inFlight.Insert(volumeId + targetPath)
 
 				_, err := driver.NodePublishVolume(ctx, req)
 				expectErr(t, err, codes.Aborted)
@@ -812,10 +812,45 @@ func TestNodeUnpublishVolume(t *testing.T) {
 					TargetPath: targetPath,
 				}
 
-				driver.inFlight.Insert(volumeId)
+				driver.inFlight.Insert(volumeId + targetPath)
 
 				_, err := driver.NodeUnpublishVolume(ctx, req)
 				expectErr(t, err, codes.Aborted)
+			},
+		},
+		{
+			name: "success: same volume different target path not blocked",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+
+				mockMetadata := cloudMock.NewMockMetadataService(mockCtl)
+				mockMounter := driverMocks.NewMockMounter(mockCtl)
+
+				driver := &nodeService{
+					metadata: mockMetadata,
+					mounter:  mockMounter,
+					inFlight: internal.NewInFlight(),
+				}
+
+				ctx := context.Background()
+				otherTargetPath := "/target/path-other"
+				req := &csi.NodeUnpublishVolumeRequest{
+					VolumeId:   volumeId,
+					TargetPath: targetPath,
+				}
+
+				// Another pod's operation on the same volume but a different target
+				// path is in-flight; this must not block this request.
+				driver.inFlight.Insert(volumeId + otherTargetPath)
+
+				mockMounter.EXPECT().IsLikelyNotMountPoint(gomock.Eq(targetPath)).Return(false, nil)
+				mockMounter.EXPECT().Unmount(gomock.Eq(targetPath)).Return(nil)
+
+				_, err := driver.NodeUnpublishVolume(ctx, req)
+				if err != nil {
+					t.Fatalf("NodeUnpublishVolume is failed: %v", err)
+				}
 			},
 		},
 	}

@@ -31,8 +31,9 @@ type Idempotent interface {
 }
 
 const (
-	VolumeOperationAlreadyExistsErrorMsg   = "An operation with the given volume %s already exists"
-	SnapshotOperationAlreadyExistsErrorMsg = "An operation with the given snapshot %s already exists"
+	VolumeOperationAlreadyExistsErrorMsg           = "An operation with the given volume %s already exists"
+	VolumeTargetPathOperationAlreadyExistsErrorMsg = "An operation with the given volume=%q and target path=%q already exists"
+	SnapshotOperationAlreadyExistsErrorMsg         = "An operation with the given snapshot %s already exists"
 )
 
 // InFlight is a struct used to manage in flight requests
