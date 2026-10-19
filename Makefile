@@ -11,7 +11,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-VERSION?=1.3.2
+VERSION?=1.3.3
 
 PKG=github.com/kubernetes-sigs/aws-fsx-openzfs-csi-driver
 GIT_COMMIT?=$(shell git rev-parse HEAD)
