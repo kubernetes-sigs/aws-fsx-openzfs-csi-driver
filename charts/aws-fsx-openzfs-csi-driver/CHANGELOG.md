@@ -1,4 +1,8 @@
 # Helm chart
+# v1.3.3
+* Use driver v1.3.3
+* Fix node in-flight lock to key on volumeID + targetPath
+
 # v1.3.2
 * Use driver v1.3.2
 * Update Go dependencies to fix CVEs
