@@ -104,6 +104,12 @@ test-sanity:
 test-e2e:
 	cd ./tests/e2e/ && ginkgo -r --procs=4 --timeout=5h
 
+# The e2e suites on an EKS cluster created by eksctl, where the controller uses EKS
+# Pod Identity, followed by the cluster tag isolation tests. See hack/e2e/README.md.
+.PHONY: test-e2e-eksctl
+test-e2e-eksctl:
+	./hack/e2e/eksctl.sh all
+
 .PHONY: clean
 clean:
 	rm -rf .*image-* bin/
