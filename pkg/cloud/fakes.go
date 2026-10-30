@@ -266,3 +266,20 @@ func (c *FakeCloudProvider) GetVolumeId(ctx context.Context, volumeId string) (s
 
 	return "", ErrNotFound
 }
+
+func (c *FakeCloudProvider) DescribeResource(ctx context.Context, id string) (*Resource, error) {
+	if _, ok := c.fileSystems[id]; ok {
+		return &Resource{ID: id, ARN: "arn:aws:fsx:us-east-1:111122223333:file-system/" + id, Tags: map[string]string{}}, nil
+	}
+	if _, ok := c.volumes[id]; ok {
+		return &Resource{ID: id, ARN: "arn:aws:fsx:us-east-1:111122223333:volume/" + c.filesystemId + "/" + id, Tags: map[string]string{}}, nil
+	}
+	if s, ok := c.snapshots[id]; ok {
+		return &Resource{ID: id, ARN: s.ResourceARN, Tags: map[string]string{}}, nil
+	}
+	return nil, ErrNotFound
+}
+
+func (c *FakeCloudProvider) TagResource(ctx context.Context, resourceARN string, tags map[string]string) error {
+	return nil
+}

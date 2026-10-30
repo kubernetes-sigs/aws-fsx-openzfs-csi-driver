@@ -1,0 +1,32 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AddClusterTagToDriverResources",
+      "Effect": "Allow",
+      "Action": "fsx:TagResource",
+      "Resource": [
+        "arn:*:fsx:*:*:file-system/fs-*",
+        "arn:*:fsx:*:*:volume/*/fsvol-*",
+        "arn:*:fsx:*:*:snapshot/*/fsvolsnap-*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/fsx.openzfs.csi.aws.com/cluster": "true",
+          "aws:RequestTag/eks:eks-cluster-name": "${aws:PrincipalTag/eks-cluster-name}"
+        },
+        "Null": {
+          "aws:ResourceTag/eks:eks-cluster-name": "true"
+        },
+        "ForAllValues:StringEquals": {
+          "aws:TagKeys": [
+            "eks:eks-cluster-name"
+          ]
+        },
+        "StringLike": {
+          "aws:PrincipalTag/eks-cluster-arn": "arn:*:eks:${aws:RequestedRegion}:*:cluster/*"
+        }
+      }
+    }
+  ]
+}

@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 	"os"
+	"sort"
 	"strings"
 	"time"
 )
@@ -55,6 +56,7 @@ var (
 const (
 	FilesystemPrefix = "fs"
 	VolumePrefix     = "fsvol"
+	SnapshotPrefix   = "fsvolsnap"
 )
 
 // FileSystem represents an OpenZFS filesystem
@@ -80,6 +82,22 @@ type Snapshot struct {
 	CreationTime   time.Time
 }
 
+// Resource represents an existing FSx file system, volume or snapshot together with its tags
+type Resource struct {
+	// ID is the file system, volume or snapshot ID
+	ID string
+	// ARN is the resource ARN
+	ARN string
+	// Name is the name of a volume or snapshot; file systems have none
+	Name string
+	// Tags are the resource tags
+	Tags map[string]string
+	// RootVolumeID is the root volume of a file system
+	RootVolumeID string
+	// ParentVolumeID is the parent volume of a volume
+	ParentVolumeID string
+}
+
 // FSx abstracts FSx client to facilitate its mocking.
 // See https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/fsx for details
 type FSx interface {
@@ -94,6 +112,7 @@ type FSx interface {
 	DeleteSnapshot(context.Context, *fsx.DeleteSnapshotInput, ...func(*fsx.Options)) (*fsx.DeleteSnapshotOutput, error)
 	DescribeSnapshots(context.Context, *fsx.DescribeSnapshotsInput, ...func(*fsx.Options)) (*fsx.DescribeSnapshotsOutput, error)
 	ListTagsForResource(context.Context, *fsx.ListTagsForResourceInput, ...func(*fsx.Options)) (*fsx.ListTagsForResourceOutput, error)
+	TagResource(context.Context, *fsx.TagResourceInput, ...func(*fsx.Options)) (*fsx.TagResourceOutput, error)
 }
 
 type Cloud interface {
@@ -114,6 +133,8 @@ type Cloud interface {
 	WaitForSnapshotAvailable(ctx context.Context, snapshotId string) error
 	GetDeleteParameters(ctx context.Context, id string) (map[string]string, error)
 	GetVolumeId(ctx context.Context, volumeId string) (string, error)
+	DescribeResource(ctx context.Context, id string) (*Resource, error)
+	TagResource(ctx context.Context, resourceARN string, tags map[string]string) error
 }
 
 type cloud struct {
@@ -567,6 +588,89 @@ func (c *cloud) getTagsForResource(ctx context.Context, resourceARN string) ([]t
 	}
 
 	return output.Tags, nil
+}
+
+// DescribeResource returns the ARN, tags and related volume IDs of the file system, volume or snapshot with the given ID.
+// It returns ErrNotFound if the resource does not exist.
+func (c *cloud) DescribeResource(ctx context.Context, id string) (*Resource, error) {
+	var (
+		arn *string
+		r   = Resource{ID: id}
+	)
+	switch strings.SplitN(id, "-", 2)[0] {
+	case FilesystemPrefix:
+		f, err := c.getFileSystem(ctx, id)
+		if err != nil {
+			return nil, notFound(err)
+		}
+		arn = f.ResourceARN
+		if f.OpenZFSConfiguration != nil {
+			r.RootVolumeID = aws.ToString(f.OpenZFSConfiguration.RootVolumeId)
+		}
+	case VolumePrefix:
+		v, err := c.getVolume(ctx, id)
+		if err != nil {
+			return nil, notFound(err)
+		}
+		arn = v.ResourceARN
+		r.Name = aws.ToString(v.Name)
+		if v.OpenZFSConfiguration != nil {
+			r.ParentVolumeID = aws.ToString(v.OpenZFSConfiguration.ParentVolumeId)
+		}
+	case SnapshotPrefix:
+		s, err := c.getSnapshot(ctx, id)
+		if err != nil {
+			return nil, notFound(err)
+		}
+		arn = s.ResourceARN
+		r.Name = aws.ToString(s.Name)
+	default:
+		return nil, fmt.Errorf("resource id %s is improperly formatted", id)
+	}
+	if arn == nil {
+		return nil, fmt.Errorf("resource %s has no ARN", id)
+	}
+	r.ARN = *arn
+	// DescribeVolumes and DescribeSnapshots do not return tags, so read them separately for every resource type.
+	tags, err := c.getTagsForResource(ctx, r.ARN)
+	if err != nil {
+		return nil, notFound(err)
+	}
+	r.Tags = make(map[string]string, len(tags))
+	for _, tag := range tags {
+		if tag.Key != nil && tag.Value != nil {
+			r.Tags[*tag.Key] = *tag.Value
+		}
+	}
+	return &r, nil
+}
+
+// notFound maps the FSx not-found errors to ErrNotFound.
+func notFound(err error) error {
+	var (
+		fileSystemNotFoundErr *types.FileSystemNotFound
+		volumeNotFoundErr     *types.VolumeNotFound
+		snapshotNotFoundErr   *types.SnapshotNotFound
+	)
+	if errors.As(err, &fileSystemNotFoundErr) || errors.As(err, &volumeNotFoundErr) || errors.As(err, &snapshotNotFoundErr) {
+		return ErrNotFound
+	}
+	return err
+}
+
+// TagResource adds the given tags to an existing resource.
+func (c *cloud) TagResource(ctx context.Context, resourceARN string, tags map[string]string) error {
+	input := &fsx.TagResourceInput{ResourceARN: aws.String(resourceARN)}
+	keys := make([]string, 0, len(tags))
+	for k := range tags {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		input.Tags = append(input.Tags, types.Tag{Key: aws.String(k), Value: aws.String(tags[k])})
+	}
+	_, err := c.fsx.TagResource(ctx, input)
+	return err
 }
 
 // GetVolumeId getVolumeId Parses the volumeId to determine if it is the id of a file system or an OpenZFS volume.

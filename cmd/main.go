@@ -34,9 +34,16 @@ func main() {
 
 	options := GetOptions(fs)
 
+	clusterTagOptions, err := options.ControllerOptions.ClusterTagOptions()
+	if err != nil {
+		klog.ErrorS(err, "invalid controller options")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+	}
+
 	drv, err := driver.NewDriver(
 		driver.WithEndpoint(options.ServerOptions.Endpoint),
 		driver.WithMode(options.ServerOptions.DriverMode),
+		driver.WithClusterTagOptions(clusterTagOptions),
 	)
 
 	if err != nil {

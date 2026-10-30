@@ -54,3 +54,44 @@ app.kubernetes.io/part-of: {{ include "aws-fsx-openzfs-csi-driver.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 {{- end -}}
+
+{{/*
+Controller arguments for the cluster tag, cluster tag isolation and extra tags.
+*/}}
+{{- define "aws-fsx-openzfs-csi-driver.clusterTagArgs" -}}
+{{- $c := .Values.controller -}}
+{{- $name := trim (toString (default "" $c.clusterName)) -}}
+{{- $key := trim (toString (default "" $c.clusterTagKey)) -}}
+{{- $isolation := $c.clusterTagIsolation -}}
+{{- if kindIs "invalid" $isolation -}}
+{{- $isolation = "disable" -}}
+{{- end -}}
+{{- if not (kindIs "string" $isolation) -}}
+{{- fail (printf "controller.clusterTagIsolation must be one of \"disable\", \"backfill\" or \"enforce\", got the %s %v" (kindOf $isolation) $isolation) -}}
+{{- end -}}
+{{- if not (has $isolation (list "" "disable" "backfill" "enforce")) -}}
+{{- fail (printf "controller.clusterTagIsolation must be \"disable\", \"backfill\" or \"enforce\", got %q" $isolation) -}}
+{{- end -}}
+{{- if eq $isolation "" -}}
+{{- $isolation = "disable" -}}
+{{- end -}}
+{{- if and (ne $isolation "disable") (or (not $name) (not $key)) -}}
+{{- fail (printf "controller.clusterTagIsolation=%s requires controller.clusterName and controller.clusterTagKey" $isolation) -}}
+{{- end -}}
+{{- if $name }}
+- {{ printf "--cluster-name=%s" $name | quote }}
+{{- end }}
+{{- if $key }}
+- {{ printf "--cluster-tag-key=%s" $key | quote }}
+{{- end }}
+{{- if ne $isolation "disable" }}
+- --cluster-tag-isolation={{ $isolation }}
+{{- end }}
+{{- with $c.extraTags }}
+{{- $tags := list -}}
+{{- range $k, $v := . -}}
+{{- $tags = append $tags (printf "%s=%s" $k (toString $v)) -}}
+{{- end }}
+- {{ printf "--extra-tags=%s" (join "," $tags) | quote }}
+{{- end }}
+{{- end -}}

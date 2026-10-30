@@ -16,6 +16,19 @@ The CSI driver attaches the following tag to the resources it creates:
 |---------------------------------|-----------------------------|-----------------------------------------------------------|
 | fsx.openzfs.csi.aws.com/cluster | true                        | Attached to all FSx OpenZFS resources the driver creates. |                                                                                      |
 
+## Cluster Tag
+
+With `--cluster-name` and `--cluster-tag-key` set, the driver also adds `<cluster-tag-key>=<cluster-name>` to every
+resource it creates, including final backups. StorageClass and VolumeSnapshotClass `Tags`, and
+`FinalBackupTagsOnDeletion`, must not set the cluster tag key or `fsx.openzfs.csi.aws.com/cluster`; such a request
+fails with `InvalidArgument`. See [cluster tag isolation](./cluster-tag-isolation.md).
+
+## Extra Tags
+
+`--extra-tags` (Helm `controller.extraTags`) adds tags to every resource the driver creates. They are not used to find,
+filter or isolate resources, and they are not the cluster tag. StorageClass and VolumeSnapshotClass `Tags` override
+extra tags with the same key. Extra tags cannot set the cluster tag key, the driver tag, or keys ending in `OnDeletion`.
+
 ## Deletion Tags
 
 To get around CSI limitations, the driver also tags deletion parameters that were provided by the user.
@@ -23,6 +36,8 @@ Any parameter specified with the key suffix of `OnDeletion` is individually save
 
 It is possible to modify the delete behavior of a resource after it's created due to this design.
 Any parameter additions or modifications must be manually done using our API.
+The [tag-based and shared IAM policies](./cluster-tag-isolation.md) allow the driver to tag resources only when it creates them,
+so only an administrator can change these tags afterwards.
 If tags are incorrect formatted when edited, they will be ignored during delete, and default behavior will take precedence.
 
 The parameter(s) will still be saved as Key-Value pair(s).

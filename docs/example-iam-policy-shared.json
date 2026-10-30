@@ -1,0 +1,146 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "Describe",
+      "Effect": "Allow",
+      "Action": [
+        "fsx:DescribeFileSystems",
+        "fsx:DescribeVolumes",
+        "fsx:DescribeSnapshots"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ListTags",
+      "Effect": "Allow",
+      "Action": "fsx:ListTagsForResource",
+      "Resource": [
+        "arn:*:fsx:*:*:file-system/*",
+        "arn:*:fsx:*:*:volume/*/*",
+        "arn:*:fsx:*:*:snapshot/*/*"
+      ]
+    },
+    {
+      "Sid": "CreateFileSystemWithDriverTag",
+      "Effect": "Allow",
+      "Action": "fsx:CreateFileSystem",
+      "Resource": "arn:*:fsx:*:*:file-system/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/fsx.openzfs.csi.aws.com/cluster": "true"
+        }
+      }
+    },
+    {
+      "Sid": "CreateVolumeWithDriverTag",
+      "Effect": "Allow",
+      "Action": "fsx:CreateVolume",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/fsx.openzfs.csi.aws.com/cluster": "true"
+        }
+      }
+    },
+    {
+      "Sid": "CreateVolumeInDriverParentOrFromDriverSnapshot",
+      "Effect": "Allow",
+      "Action": "fsx:CreateVolume",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/fsx.openzfs.csi.aws.com/cluster": "true"
+        }
+      }
+    },
+    {
+      "Sid": "CreateSnapshotWithDriverTag",
+      "Effect": "Allow",
+      "Action": "fsx:CreateSnapshot",
+      "Resource": "arn:*:fsx:*:*:snapshot/*/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/fsx.openzfs.csi.aws.com/cluster": "true"
+        }
+      }
+    },
+    {
+      "Sid": "CreateSnapshotOfDriverVolume",
+      "Effect": "Allow",
+      "Action": "fsx:CreateSnapshot",
+      "Resource": "arn:*:fsx:*:*:volume/*/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/fsx.openzfs.csi.aws.com/cluster": "true"
+        }
+      }
+    },
+    {
+      "Sid": "UpdateDeleteDriverFileSystem",
+      "Effect": "Allow",
+      "Action": [
+        "fsx:UpdateFileSystem",
+        "fsx:DeleteFileSystem"
+      ],
+      "Resource": "arn:*:fsx:*:*:file-system/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/fsx.openzfs.csi.aws.com/cluster": "true"
+        }
+      }
+    },
+    {
+      "Sid": "DeleteFileSystemFinalBackup",
+      "Effect": "Allow",
+      "Action": "fsx:DeleteFileSystem",
+      "Resource": "arn:*:fsx:*:*:backup/*"
+    },
+    {
+      "Sid": "DeleteDriverVolumeOrSnapshot",
+      "Effect": "Allow",
+      "Action": [
+        "fsx:DeleteVolume",
+        "fsx:DeleteSnapshot"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/fsx.openzfs.csi.aws.com/cluster": "true"
+        }
+      }
+    },
+    {
+      "Sid": "TagOnCreateOnly",
+      "Effect": "Allow",
+      "Action": "fsx:TagResource",
+      "Resource": [
+        "arn:*:fsx:*:*:file-system/?",
+        "arn:*:fsx:*:*:volume/*/?",
+        "arn:*:fsx:*:*:snapshot/*/?"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/fsx.openzfs.csi.aws.com/cluster": "true"
+        }
+      }
+    },
+    {
+      "Sid": "TagFinalBackupOnCreate",
+      "Effect": "Allow",
+      "Action": "fsx:TagResource",
+      "Resource": "arn:*:fsx:*:*:backup/?"
+    },
+    {
+      "Sid": "FsxServiceLinkedRole",
+      "Effect": "Allow",
+      "Action": "iam:CreateServiceLinkedRole",
+      "Resource": "arn:*:iam::*:role/aws-service-role/fsx.amazonaws.com/*",
+      "Condition": {
+        "StringEquals": {
+          "iam:AWSServiceName": "fsx.amazonaws.com"
+        }
+      }
+    }
+  ]
+}

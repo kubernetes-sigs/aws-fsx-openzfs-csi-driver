@@ -51,8 +51,9 @@ type Driver struct {
 }
 
 type DriverOptions struct {
-	endpoint string
-	mode     string
+	endpoint   string
+	mode       string
+	clusterTag *ClusterTagOptions
 }
 
 func NewDriver(options ...func(*DriverOptions)) (*Driver, error) {
@@ -122,6 +123,14 @@ func (d *Driver) Run() error {
 		return fmt.Errorf("unknown mode: %s", d.options.mode)
 	}
 
+	if d.options.mode != NodeMode {
+		d.options.clusterTag.logSettings()
+	}
+	// In disable and backfill, the controller adds the driver's tags to existing resources it created.
+	if d.options.mode != NodeMode && d.options.clusterTag.isolation() != ClusterTagIsolationEnforce {
+		go d.controllerService.runBackfill(context.Background())
+	}
+
 	klog.V(4).InfoS("Listening for connections", "address", listener.Addr())
 	return d.srv.Serve(listener)
 }
@@ -140,5 +149,12 @@ func WithEndpoint(endpoint string) func(*DriverOptions) {
 func WithMode(mode string) func(*DriverOptions) {
 	return func(o *DriverOptions) {
 		o.mode = mode
+	}
+}
+
+// WithClusterTagOptions sets the cluster tag, cluster tag isolation and extra tags options of the controller.
+func WithClusterTagOptions(clusterTag *ClusterTagOptions) func(*DriverOptions) {
+	return func(o *DriverOptions) {
+		o.clusterTag = clusterTag
 	}
 }
