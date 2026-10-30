@@ -1,0 +1,183 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DescribeInClusterRegion",
+      "Effect": "Allow",
+      "Action": [
+        "fsx:DescribeFileSystems",
+        "fsx:DescribeVolumes",
+        "fsx:DescribeSnapshots"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringLike": {
+          "aws:PrincipalTag/eks-cluster-arn": "arn:*:eks:${aws:RequestedRegion}:*:cluster/*"
+        }
+      }
+    },
+    {
+      "Sid": "ListTagsInClusterRegion",
+      "Effect": "Allow",
+      "Action": "fsx:ListTagsForResource",
+      "Resource": [
+        "arn:*:fsx:*:*:file-system/*",
+        "arn:*:fsx:*:*:volume/*/*",
+        "arn:*:fsx:*:*:snapshot/*/*"
+      ],
+      "Condition": {
+        "StringLike": {
+          "aws:PrincipalTag/eks-cluster-arn": "arn:*:eks:${aws:RequestedRegion}:*:cluster/*"
+        }
+      }
+    },
+    {
+      "Sid": "CreateFileSystemWithClusterTag",
+      "Effect": "Allow",
+      "Action": "fsx:CreateFileSystem",
+      "Resource": "arn:*:fsx:*:*:file-system/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/eks:eks-cluster-name": "${aws:PrincipalTag/eks-cluster-name}"
+        },
+        "StringLike": {
+          "aws:PrincipalTag/eks-cluster-arn": "arn:*:eks:${aws:RequestedRegion}:*:cluster/*"
+        }
+      }
+    },
+    {
+      "Sid": "CreateVolumeWithClusterTag",
+      "Effect": "Allow",
+      "Action": "fsx:CreateVolume",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/eks:eks-cluster-name": "${aws:PrincipalTag/eks-cluster-name}"
+        },
+        "StringLike": {
+          "aws:PrincipalTag/eks-cluster-arn": "arn:*:eks:${aws:RequestedRegion}:*:cluster/*"
+        }
+      }
+    },
+    {
+      "Sid": "CreateVolumeInClusterParentOrFromClusterSnapshot",
+      "Effect": "Allow",
+      "Action": "fsx:CreateVolume",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/eks:eks-cluster-name": "${aws:PrincipalTag/eks-cluster-name}"
+        },
+        "StringLike": {
+          "aws:PrincipalTag/eks-cluster-arn": "arn:*:eks:${aws:RequestedRegion}:*:cluster/*"
+        }
+      }
+    },
+    {
+      "Sid": "CreateSnapshotWithClusterTag",
+      "Effect": "Allow",
+      "Action": "fsx:CreateSnapshot",
+      "Resource": "arn:*:fsx:*:*:snapshot/*/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/eks:eks-cluster-name": "${aws:PrincipalTag/eks-cluster-name}"
+        },
+        "StringLike": {
+          "aws:PrincipalTag/eks-cluster-arn": "arn:*:eks:${aws:RequestedRegion}:*:cluster/*"
+        }
+      }
+    },
+    {
+      "Sid": "CreateSnapshotOfClusterVolume",
+      "Effect": "Allow",
+      "Action": "fsx:CreateSnapshot",
+      "Resource": "arn:*:fsx:*:*:volume/*/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/eks:eks-cluster-name": "${aws:PrincipalTag/eks-cluster-name}"
+        },
+        "StringLike": {
+          "aws:PrincipalTag/eks-cluster-arn": "arn:*:eks:${aws:RequestedRegion}:*:cluster/*"
+        }
+      }
+    },
+    {
+      "Sid": "UpdateDeleteClusterFileSystem",
+      "Effect": "Allow",
+      "Action": [
+        "fsx:UpdateFileSystem",
+        "fsx:DeleteFileSystem"
+      ],
+      "Resource": "arn:*:fsx:*:*:file-system/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/eks:eks-cluster-name": "${aws:PrincipalTag/eks-cluster-name}"
+        },
+        "StringLike": {
+          "aws:PrincipalTag/eks-cluster-arn": "arn:*:eks:${aws:RequestedRegion}:*:cluster/*"
+        }
+      }
+    },
+    {
+      "Sid": "DeleteFileSystemFinalBackupWithClusterTag",
+      "Effect": "Allow",
+      "Action": "fsx:DeleteFileSystem",
+      "Resource": "arn:*:fsx:*:*:backup/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/eks:eks-cluster-name": "${aws:PrincipalTag/eks-cluster-name}"
+        },
+        "StringLike": {
+          "aws:PrincipalTag/eks-cluster-arn": "arn:*:eks:${aws:RequestedRegion}:*:cluster/*"
+        }
+      }
+    },
+    {
+      "Sid": "DeleteClusterVolumeOrSnapshot",
+      "Effect": "Allow",
+      "Action": [
+        "fsx:DeleteVolume",
+        "fsx:DeleteSnapshot"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/eks:eks-cluster-name": "${aws:PrincipalTag/eks-cluster-name}"
+        },
+        "StringLike": {
+          "aws:PrincipalTag/eks-cluster-arn": "arn:*:eks:${aws:RequestedRegion}:*:cluster/*"
+        }
+      }
+    },
+    {
+      "Sid": "TagOnCreateOnly",
+      "Effect": "Allow",
+      "Action": "fsx:TagResource",
+      "Resource": [
+        "arn:*:fsx:*:*:file-system/?",
+        "arn:*:fsx:*:*:volume/*/?",
+        "arn:*:fsx:*:*:snapshot/*/?",
+        "arn:*:fsx:*:*:backup/?"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/eks:eks-cluster-name": "${aws:PrincipalTag/eks-cluster-name}"
+        },
+        "StringLike": {
+          "aws:PrincipalTag/eks-cluster-arn": "arn:*:eks:${aws:RequestedRegion}:*:cluster/*"
+        }
+      }
+    },
+    {
+      "Sid": "FsxServiceLinkedRole",
+      "Effect": "Allow",
+      "Action": "iam:CreateServiceLinkedRole",
+      "Resource": "arn:*:iam::*:role/aws-service-role/fsx.amazonaws.com/*",
+      "Condition": {
+        "StringEquals": {
+          "iam:AWSServiceName": "fsx.amazonaws.com"
+        }
+      }
+    }
+  ]
+}

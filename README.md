@@ -59,6 +59,7 @@ Please read the documentation below before using the FSx for OpenZFS CSI Driver.
 * [FAQ](docs/FAQ.md)
 * [Driver Installation](docs/install.md)
 * [Driver Launch Options](docs/options.md)
+* [Cluster Tag Isolation](docs/cluster-tag-isolation.md)
 * [StorageClass Parameters](docs/parameters.md)
 * [Volume Tagging](docs/tagging.md)
 * [Guides and Examples](/examples/kubernetes)

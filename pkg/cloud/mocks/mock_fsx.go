@@ -235,6 +235,26 @@ func (mr *MockFSxMockRecorder) ListTagsForResource(arg0, arg1 interface{}, arg2 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListTagsForResource", reflect.TypeOf((*MockFSx)(nil).ListTagsForResource), varargs...)
 }
 
+// TagResource mocks base method.
+func (m *MockFSx) TagResource(arg0 context.Context, arg1 *fsx.TagResourceInput, arg2 ...func(*fsx.Options)) (*fsx.TagResourceOutput, error) {
+	m.ctrl.T.Helper()
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "TagResource", varargs...)
+	ret0, _ := ret[0].(*fsx.TagResourceOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// TagResource indicates an expected call of TagResource.
+func (mr *MockFSxMockRecorder) TagResource(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TagResource", reflect.TypeOf((*MockFSx)(nil).TagResource), varargs...)
+}
+
 // UpdateFileSystem mocks base method.
 func (m *MockFSx) UpdateFileSystem(arg0 context.Context, arg1 *fsx.UpdateFileSystemInput, arg2 ...func(*fsx.Options)) (*fsx.UpdateFileSystemOutput, error) {
 	m.ctrl.T.Helper()

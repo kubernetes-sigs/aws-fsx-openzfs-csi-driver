@@ -10,6 +10,7 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/fsx"
 	"github.com/aws/aws-sdk-go-v2/service/fsx/types"
+	"strings"
 	"time"
 )
 
@@ -149,4 +150,79 @@ func (c *Cloud) WaitForVolumeAvailable(ctx context.Context, volumeId string) err
 		}
 	}
 	return errors.New("WaitForVolumeAvailable timed out")
+}
+
+func (c *Cloud) DescribeFileSystem(ctx context.Context, filesystemId string) (*types.FileSystem, error) {
+	response, err := c.FSx.DescribeFileSystems(ctx, &fsx.DescribeFileSystemsInput{FileSystemIds: []string{filesystemId}})
+	if err != nil {
+		return nil, err
+	}
+	if len(response.FileSystems) == 0 {
+		return nil, errors.New("no filesystem found")
+	}
+	return &response.FileSystems[0], nil
+}
+
+// Tags returns the tags of a file system, volume or snapshot. DescribeVolumes and
+// DescribeSnapshots don't return tags, so they are read with ListTagsForResource.
+func (c *Cloud) Tags(ctx context.Context, id string) (map[string]string, error) {
+	var arn *string
+	switch {
+	case strings.HasPrefix(id, "fsvolsnap-"):
+		response, err := c.FSx.DescribeSnapshots(ctx, &fsx.DescribeSnapshotsInput{SnapshotIds: []string{id}})
+		if err != nil {
+			return nil, err
+		}
+		arn = response.Snapshots[0].ResourceARN
+	case strings.HasPrefix(id, "fsvol-"):
+		response, err := c.FSx.DescribeVolumes(ctx, &fsx.DescribeVolumesInput{VolumeIds: []string{id}})
+		if err != nil {
+			return nil, err
+		}
+		arn = response.Volumes[0].ResourceARN
+	default:
+		fs, err := c.DescribeFileSystem(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		arn = fs.ResourceARN
+	}
+	response, err := c.FSx.ListTagsForResource(ctx, &fsx.ListTagsForResourceInput{ResourceARN: arn})
+	if err != nil {
+		return nil, err
+	}
+	tags := map[string]string{}
+	for _, t := range response.Tags {
+		tags[aws.ToString(t.Key)] = aws.ToString(t.Value)
+	}
+	return tags, nil
+}
+
+func (c *Cloud) WaitForSnapshotAvailable(ctx context.Context, snapshotId string) error {
+	timeout := 15 * time.Minute
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(15 * time.Second) {
+		response, err := c.FSx.DescribeSnapshots(ctx, &fsx.DescribeSnapshotsInput{SnapshotIds: []string{snapshotId}})
+		if err != nil {
+			return err
+		}
+		if len(response.Snapshots) > 0 && response.Snapshots[0].Lifecycle == types.SnapshotLifecycleAvailable {
+			return nil
+		}
+	}
+	return errors.New("WaitForSnapshotAvailable timed out")
+}
+
+func (c *Cloud) WaitForSnapshotDeleted(ctx context.Context, snapshotId string) error {
+	timeout := 15 * time.Minute
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(15 * time.Second) {
+		_, err := c.FSx.DescribeSnapshots(ctx, &fsx.DescribeSnapshotsInput{SnapshotIds: []string{snapshotId}})
+		var notFound *types.SnapshotNotFound
+		if errors.As(err, &notFound) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return errors.New("WaitForSnapshotDeleted timed out")
 }

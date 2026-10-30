@@ -59,6 +59,7 @@ const (
 	volumeParamsClientRequestToken   = "ClientRequestToken"
 	volumeParamsFileSystemId         = "FileSystemId"
 	volumeParamsFileSystemType       = "FileSystemType"
+	volumeParamsFinalBackupTags      = "FinalBackupTags"
 	volumeParamsName                 = "Name"
 	volumeParamsOpenZFSConfiguration = "OpenZFSConfiguration"
 	volumeParamsOriginSnapshot       = "OriginSnapshot"
@@ -183,13 +184,25 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	volumeParams[volumeParamsClientRequestToken] = strconv.Quote(volName)
 
+	if finalBackupTags, ok := volumeParams[volumeParamsFinalBackupTags+deletionSuffix]; ok {
+		var tags []map[string]string
+		if err = util.ConvertJsonStringToObject(finalBackupTags, &tags); err == nil {
+			if err = d.clusterTagOptions().validateProvidedTags(tags); err != nil {
+				return nil, status.Error(codes.InvalidArgument, err.Error())
+			}
+		}
+	}
+
 	err = appendDeleteTags(volumeParams, resourceType)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, ErrIncorrectlyFormatted, "Delete Parameters", err)
 	}
 
-	err = appendCustomTags(volumeParams, resourceType)
+	err = appendCustomTags(volumeParams, resourceType, d.clusterTagOptions())
 	if err != nil {
+		if errors.Is(err, errClusterTagConflict) {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -259,6 +272,10 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 				return nil, status.Error(codes.InvalidArgument, "Error retrieving snapshot from the volumeContentSource")
 			}
 			snapshotId := sourceSnapshot.GetSnapshotId()
+
+			if err = d.checkClusterTag(ctx, snapshotId); err != nil {
+				return nil, err
+			}
 
 			err = d.appendSnapshotARN(ctx, volumeParams, snapshotId)
 			if err != nil {
@@ -338,6 +355,10 @@ func (d *controllerService) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	}
 	defer d.inFlight.Delete(volumeID)
 
+	if err = d.checkClusterTag(ctx, volumeID); err != nil {
+		return nil, err
+	}
+
 	deleteParams, err := d.cloud.GetDeleteParameters(ctx, volumeID)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
@@ -346,6 +367,13 @@ func (d *controllerService) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	splitVolumeId := strings.SplitN(volumeID, "-", 2)
 	if splitVolumeId[0] == cloud.FilesystemPrefix {
 		deleteParams[volumeParamsFileSystemId] = strconv.Quote(volumeID)
+		err = appendFinalBackupTags(deleteParams, d.clusterTagOptions())
+		if err != nil {
+			if errors.Is(err, errClusterTagConflict) {
+				return nil, status.Error(codes.InvalidArgument, err.Error())
+			}
+			return nil, status.Error(codes.Internal, err.Error())
+		}
 		err = cloud.CollapseDeleteFileSystemParameters(deleteParams)
 		if err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
@@ -500,14 +528,21 @@ func (d *controllerService) CreateSnapshot(ctx context.Context, req *csi.CreateS
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	err = appendCustomTags(snapshotParams, snapshotType)
+	err = appendCustomTags(snapshotParams, snapshotType, d.clusterTagOptions())
 	if err != nil {
+		if errors.Is(err, errClusterTagConflict) {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	volumeId, err := d.cloud.GetVolumeId(ctx, req.GetSourceVolumeId())
 	if err != nil {
 		return nil, status.Error(codes.Internal, "Custom tags incorrectly added")
+	}
+
+	if err = d.checkClusterTag(ctx, volumeId); err != nil {
+		return nil, err
 	}
 
 	snapshotParams[volumeParamsClientRequestToken] = strconv.Quote(req.GetName())
@@ -556,6 +591,10 @@ func (d *controllerService) DeleteSnapshot(ctx context.Context, req *csi.DeleteS
 		return nil, status.Error(codes.Aborted, msg)
 	}
 	defer d.inFlight.Delete(snapshotId)
+
+	if err := d.checkClusterTag(ctx, snapshotId); err != nil {
+		return nil, err
+	}
 
 	deleteParams["SnapshotId"] = strconv.Quote(snapshotId)
 
@@ -625,6 +664,10 @@ func (d *controllerService) ControllerExpandVolume(ctx context.Context, req *csi
 			}, nil
 		}
 
+		if err = d.checkClusterTag(ctx, volumeID); err != nil {
+			return nil, err
+		}
+
 		finalCapacity, err := d.cloud.ResizeFileSystem(ctx, volumeID, newCapacity)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "resize failed: %v", err)
@@ -689,9 +732,10 @@ func containsDriverProvidedParameters(parameters map[string]string) error {
 }
 
 // appendCustomTags appends custom CSI driver tags to resources created.
-// Added tags are directly combined to the Tags field in parameters
-// Errors if the provided parameters is not an expected json
-func appendCustomTags(parameters map[string]string, resourceType string) error {
+// Added tags are directly combined to the Tags field in parameters.
+// When configured, the --extra-tags tags and the cluster tag are added as well; provided tags override extra tags.
+// Errors if the provided parameters is not an expected json, or if a provided tag sets the driver tag or the cluster tag
+func appendCustomTags(parameters map[string]string, resourceType string, clusterTag *ClusterTagOptions) error {
 	//Create object containing existing tags
 	var existingTags []map[string]string
 	err := util.ConvertJsonStringToObject(parameters[volumeParamsTags], &existingTags)
@@ -699,7 +743,13 @@ func appendCustomTags(parameters map[string]string, resourceType string) error {
 		return err
 	}
 
+	if err = clusterTag.validateProvidedTags(existingTags); err != nil {
+		return err
+	}
+
 	existingTags = append(existingTags, map[string]string{"Key": AwsFsxOpenZfsDriverTagKey, "Value": "true"})
+
+	existingTags = clusterTag.mergeTags(existingTags)
 
 	//Put the combined Tags json on parameters
 	combinedJsonString, err := util.ConvertObjectToJsonString(existingTags)
@@ -804,5 +854,31 @@ func (d *controllerService) appendSnapshotARN(ctx context.Context, parameters ma
 
 	parameters[volumeParamsOriginSnapshot] = originSnapshotJsonString
 
+	return nil
+}
+
+// appendFinalBackupTags adds the --extra-tags tags and the cluster tag to the final backup of a file system,
+// when one is taken. The parameters are the delete parameters before they are collapsed into OpenZFSConfiguration.
+func appendFinalBackupTags(parameters map[string]string, clusterTag *ClusterTagOptions) error {
+	if clusterTag == nil || parameters[volumeParamsSkipFinalBackup] == "true" {
+		return nil
+	}
+	if !clusterTag.tagsNewResources() && len(clusterTag.ExtraTags) == 0 {
+		return nil
+	}
+	var existingTags []map[string]string
+	err := util.ConvertJsonStringToObject(parameters[volumeParamsFinalBackupTags], &existingTags)
+	if err != nil {
+		return err
+	}
+	if err = clusterTag.validateProvidedTags(existingTags); err != nil {
+		return err
+	}
+	existingTags = clusterTag.mergeTags(existingTags)
+	combinedJsonString, err := util.ConvertObjectToJsonString(existingTags)
+	if err != nil {
+		return err
+	}
+	parameters[volumeParamsFinalBackupTags] = combinedJsonString
 	return nil
 }

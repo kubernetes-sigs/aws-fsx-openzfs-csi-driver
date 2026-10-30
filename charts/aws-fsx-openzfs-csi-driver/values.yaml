@@ -108,6 +108,18 @@ controller:
                     - fsx-openzfs-csi-controller
             topologyKey: kubernetes.io/hostname
           weight: 100
+  # Cluster tag <clusterTagKey>=<clusterName>, added to every AWS resource the controller creates.
+  # Set both or neither. See docs/cluster-tag-isolation.md.
+  clusterName: ""
+  clusterTagKey: ""
+  # disable, backfill or enforce (--cluster-tag-isolation). Must match the controller's IAM policy;
+  # backfill and enforce require clusterName and clusterTagKey.
+  clusterTagIsolation: "disable"
+  # Tags added to every AWS resource the controller creates (--extra-tags). StorageClass and
+  # VolumeSnapshotClass Tags override them. Keys and values must not contain commas.
+  # extraTags:
+  #   team: storage
+  extraTags: {}
   env: []
   # Use envFrom to reference ConfigMaps and Secrets across all containers in the deployment
   envFrom: []
@@ -137,6 +149,9 @@ controller:
     # A service account will be created for you if set to true. Set to false if you want to use your own.
     create: true
     name: fsx-openzfs-csi-controller-sa
+    # IRSA only:
+    # annotations:
+    #   eks.amazonaws.com/role-arn: arn:<partition>:iam::<account>:role/<name>
     annotations: {}
   tolerations:
     - key: CriticalAddonsOnly

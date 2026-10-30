@@ -1,0 +1,59 @@
+suite: cluster tag isolation
+templates:
+  - controller-deployment.yaml
+tests:
+  - it: renders no cluster tag arguments by default
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: --cluster-tag-isolation=disable
+      - lengthEqual:
+          path: spec.template.spec.containers[0].args
+          count: 4
+  - it: renders the cluster tag, isolation and extra tags
+    set:
+      controller.clusterName: my-cluster
+      controller.clusterTagKey: eks:eks-cluster-name
+      controller.clusterTagIsolation: enforce
+      controller.extraTags:
+        team: storage
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --cluster-name=my-cluster
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --cluster-tag-key=eks:eks-cluster-name
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --cluster-tag-isolation=enforce
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --extra-tags=team=storage
+  - it: fails backfill without the cluster name
+    set:
+      controller.clusterTagKey: eks:eks-cluster-name
+      controller.clusterTagIsolation: backfill
+    asserts:
+      - failedTemplate:
+          errorMessage: controller.clusterTagIsolation=backfill requires controller.clusterName and controller.clusterTagKey
+  - it: treats a whitespace-only cluster name as empty
+    set:
+      controller.clusterName: "  "
+      controller.clusterTagKey: eks:eks-cluster-name
+      controller.clusterTagIsolation: enforce
+    asserts:
+      - failedTemplate:
+          errorMessage: controller.clusterTagIsolation=enforce requires controller.clusterName and controller.clusterTagKey
+  - it: fails an unknown isolation value
+    set:
+      controller.clusterTagIsolation: "off"
+    asserts:
+      - failedTemplate:
+          errorMessage: controller.clusterTagIsolation must be "disable", "backfill" or "enforce", got "off"
+  - it: fails a boolean isolation value
+    set:
+      controller.clusterTagIsolation: false
+    asserts:
+      - failedTemplate:
+          errorMessage: controller.clusterTagIsolation must be one of "disable", "backfill" or "enforce", got the bool false

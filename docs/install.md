@@ -9,68 +9,48 @@
 
 ## Installation
 ### Set up driver permissions
-The driver requires IAM permissions to interact with the Amazon FSx for OpenZFS service to create/delete file systems, volumes, and snapshots on the user's behalf. 
-There are several methods to grant the driver IAM permissions:
-* Using [IAM roles for ServiceAccounts](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html) (**Recommended**) - Create a Kubernetes service account for the driver and attach the AmazonFSxFullAccess AWS-managed policy to it with the following command. If your cluster is in the AWS GovCloud Regions, then replace arn:aws: with arn:aws-us-gov. Likewise, if your cluster is in the AWS China Regions, replace arn:aws: with arn:aws-cn.
-```sh
-eksctl create iamserviceaccount \
-    --name fsx-openzfs-csi-controller-sa \
-    --namespace kube-system \
-    --cluster $cluster_name \
-    --attach-policy-arn arn:aws:iam::aws:policy/AmazonFSxFullAccess \
-    --approve \
-    --role-name AmazonEKSFSxOpenZFSCSIDriverFullAccess \
-    --region $region_code
-```
+The driver requires IAM permissions to interact with the Amazon FSx for OpenZFS service to create/delete file systems, volumes, and snapshots on the user's behalf.
+The node pods need only the EC2 instance ID. They read it from the Node's `spec.providerID` through the Kubernetes API.
+The instance metadata service is a deprecated fallback. Only the controller calls AWS APIs.
 
-* Using IAM [instance profile](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html) - Create the following IAM policy and attach the policy to the instance profile IAM role of your cluster's worker nodes. 
-See [here](https://docs.aws.amazon.com/eks/latest/userguide/create-node-role.html) for guidelines on how to access your EKS node IAM role.
+> [!IMPORTANT]
+> These steps are for new clusters. A cluster that already has volumes created by the driver must backfill the cluster
+> tag first; see [Existing clusters](./cluster-tag-isolation.md#existing-clusters).
+
+#### Amazon EKS: EKS Pod Identity (Recommended)
+The tag-based policy [example-iam-policy-cluster-tag.json](./example-iam-policy-cluster-tag.json) limits each cluster's
+controller to the resources tagged for its own cluster. See [cluster tag isolation](./cluster-tag-isolation.md) for what
+it allows.
+
+1. Install the [EKS Pod Identity Agent](https://docs.aws.amazon.com/eks/latest/userguide/pod-id-agent-setup.html). It must
+   be installed as an EKS add-on; the driver itself can be installed in any of the ways below.
 ```sh
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "iam:CreateServiceLinkedRole",
-        "iam:AttachRolePolicy",
-        "iam:PutRolePolicy"
-      ],
-      "Resource": "arn:aws:iam::*:role/aws-service-role/fsx.amazonaws.com/*"
-    },
-    {
-      "Action":"iam:CreateServiceLinkedRole",
-      "Effect":"Allow",
-      "Resource":"*",
-      "Condition":{
-        "StringLike":{
-          "iam:AWSServiceName":[
-            "fsx.amazonaws.com"
-          ]
-        }
-      }
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
-        "fsx:CreateFileSystem",
-        "fsx:UpdateFileSystem",
-        "fsx:DeleteFileSystem",
-        "fsx:DescribeFileSystems",
-        "fsx:CreateVolume",
-        "fsx:DeleteVolume",
-        "fsx:DescribeVolumes",
-        "fsx:CreateSnapshot",
-        "fsx:DeleteSnapshot",
-        "fsx:DescribeSnapshots",
-        "fsx:TagResource",
-        "fsx:ListTagsForResource"
-      ],
-      "Resource": ["*"]
-    }
-  ]
-}
+aws eks create-addon --cluster-name $cluster_name --addon-name eks-pod-identity-agent
 ```
+2. Create an IAM role with the [EKS Pod Identity trust policy](https://docs.aws.amazon.com/eks/latest/userguide/pod-id-role.html),
+   and attach the tag-based policy. One role can serve every cluster in the account.
+```sh
+aws iam put-role-policy --role-name FSxOpenZFSCSIDriverRole --policy-name cluster-tag \
+    --policy-document file://docs/example-iam-policy-cluster-tag.json
+```
+3. Associate the role with the controller's ServiceAccount, in each cluster:
+```sh
+aws eks create-pod-identity-association --cluster-name $cluster_name --namespace kube-system \
+    --service-account fsx-openzfs-csi-controller-sa \
+    --role-arn arn:aws:iam::$account_id:role/FSxOpenZFSCSIDriverRole
+```
+4. When you [deploy the driver](#deploy-driver), set the cluster name, the cluster tag key and `enforce`. With Helm:
+```sh
+    --set controller.clusterName=$cluster_name \
+    --set controller.clusterTagKey=eks:eks-cluster-name \
+    --set controller.clusterTagIsolation=enforce
+```
+   The controller flags are `--cluster-name=$cluster_name --cluster-tag-key=eks:eks-cluster-name --cluster-tag-isolation=enforce`.
+
+#### Other credentials
+With IAM roles for service accounts or other credentials without the EKS Pod Identity session tags, use the
+[shared policy](./example-iam-policy-shared.json), which limits the controller to resources this driver created. Leave
+`controller.clusterName` and `controller.clusterTagKey` unset. The shared policy doesn't isolate clusters; see [IRSA and other credentials](./cluster-tag-isolation.md#irsa-and-other-credentials).
 
 ### Configure driver toleration settings
 By default, the driver controller pod tolerates taint `CriticalAddonsOnly` and has `tolerationSeconds` configured as `300`. 
@@ -116,7 +96,6 @@ helm repo update
 ```sh
 helm upgrade --install aws-fsx-openzfs-csi-driver \
     --namespace kube-system \
-    --set controller.serviceAccount.create=false \
     aws-fsx-openzfs-csi-driver/aws-fsx-openzfs-csi-driver
 ```
 

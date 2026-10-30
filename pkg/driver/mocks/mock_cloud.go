@@ -137,6 +137,21 @@ func (mr *MockCloudMockRecorder) DescribeFileSystem(arg0, arg1 interface{}) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeFileSystem", reflect.TypeOf((*MockCloud)(nil).DescribeFileSystem), arg0, arg1)
 }
 
+// DescribeResource mocks base method.
+func (m *MockCloud) DescribeResource(arg0 context.Context, arg1 string) (*cloud.Resource, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DescribeResource", arg0, arg1)
+	ret0, _ := ret[0].(*cloud.Resource)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DescribeResource indicates an expected call of DescribeResource.
+func (mr *MockCloudMockRecorder) DescribeResource(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeResource", reflect.TypeOf((*MockCloud)(nil).DescribeResource), arg0, arg1)
+}
+
 // DescribeSnapshot mocks base method.
 func (m *MockCloud) DescribeSnapshot(arg0 context.Context, arg1 string) (*cloud.Snapshot, error) {
 	m.ctrl.T.Helper()
@@ -210,6 +225,20 @@ func (m *MockCloud) ResizeFileSystem(arg0 context.Context, arg1 string, arg2 int
 func (mr *MockCloudMockRecorder) ResizeFileSystem(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResizeFileSystem", reflect.TypeOf((*MockCloud)(nil).ResizeFileSystem), arg0, arg1, arg2)
+}
+
+// TagResource mocks base method.
+func (m *MockCloud) TagResource(arg0 context.Context, arg1 string, arg2 map[string]string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "TagResource", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// TagResource indicates an expected call of TagResource.
+func (mr *MockCloudMockRecorder) TagResource(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TagResource", reflect.TypeOf((*MockCloud)(nil).TagResource), arg0, arg1, arg2)
 }
 
 // WaitForFileSystemAvailable mocks base method.
