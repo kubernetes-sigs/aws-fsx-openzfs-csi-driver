@@ -204,6 +204,10 @@ node:
     create: true
     name: fsx-openzfs-csi-node-sa
     annotations: {}
+  # Limits the node service account to removing the fsx.openzfs.csi.aws.com/agent-not-ready taint from its own Node.
+  # Installed on Kubernetes 1.30 and later.
+  validatingAdmissionPolicy:
+    enabled: true
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
