@@ -93,8 +93,8 @@ image: .image-$(TAG)-$(OS)-$(ARCH)-$(OSVERSION)
 	touch $@
 
 .PHONY: test
-test:
-	go test -v -race ./cmd/... ./pkg/...
+test: bin/helm
+	go test -v -race ./cmd/... ./pkg/... ./tests/helm-template/...
 
 .PHONY: test-sanity
 test-sanity:
@@ -112,7 +112,7 @@ bin /tmp/helm /tmp/kubeval:
 	@mkdir -p $@
 
 bin/helm: | /tmp/helm bin
-	@curl -o /tmp/helm/helm.tar.gz -sSL https://get.helm.sh/helm-v3.11.2-${GOOS}-amd64.tar.gz
+	@curl -o /tmp/helm/helm.tar.gz -sSL https://get.helm.sh/helm-v3.11.2-${GOOS}-$(shell go env GOHOSTARCH).tar.gz
 	@tar -zxf /tmp/helm/helm.tar.gz -C bin --strip-components=1
 	@rm -rf /tmp/helm/*
 
@@ -132,3 +132,4 @@ generate-kustomize: bin/helm
 	cd charts/aws-fsx-openzfs-csi-driver && ../../bin/helm template kustomize . -s templates/node-serviceaccount.yaml | sed -e "/namespace: /d" > ../../deploy/kubernetes/base/node-serviceaccount.yaml
 	cd charts/aws-fsx-openzfs-csi-driver && ../../bin/helm template kustomize . -s templates/clusterrole-csi-node.yaml > ../../deploy/kubernetes/base/clusterrole-csi-node.yaml
 	cd charts/aws-fsx-openzfs-csi-driver && ../../bin/helm template kustomize . -s templates/clusterrolebinding-csi-node.yaml > ../../deploy/kubernetes/base/clusterrolebinding-csi-node.yaml
+	cd charts/aws-fsx-openzfs-csi-driver && ../../bin/helm template kustomize . -s templates/validatingadmissionpolicy-csi-node.yaml --kube-version 1.30.0 | sed -e "s/request.userInfo.username == \"system:serviceaccount:default:fsx-openzfs-csi-node-sa\"/request.userInfo.username.startsWith('system:serviceaccount:') \&\& request.userInfo.username.endsWith(':fsx-openzfs-csi-node-sa')/" > ../../deploy/kubernetes/base/validatingadmissionpolicy-csi-node.yaml

@@ -72,6 +72,16 @@ See [here](https://docs.aws.amazon.com/eks/latest/userguide/create-node-role.htm
 }
 ```
 
+### Node permissions
+The node pods remove the `fsx.openzfs.csi.aws.com/agent-not-ready` taint from their own Node at startup (see
+[Configure node startup taint](#configure-node-startup-taint)). A
+[ValidatingAdmissionPolicy](https://kubernetes.io/docs/reference/access-authn-authz/validating-admission-policy/),
+`fsx-openzfs-csi-node`, limits the node service account to removing that taint from its own Node. It identifies the
+Node by the node name in the pod's service account token.
+
+The Helm chart installs the policy on Kubernetes 1.30 and later. Set `node.validatingAdmissionPolicy.enabled=false` to
+not install it. The Kustomize base always includes the policy, so it needs Kubernetes 1.30 or later.
+
 ### Configure driver toleration settings
 By default, the driver controller pod tolerates taint `CriticalAddonsOnly` and has `tolerationSeconds` configured as `300`. 
 Additionally, the driver node pod tolerates all taints. 
